@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRoute, Link } from "wouter";
-import { listings } from "@/data/listings";
+import { useListing, useListings } from "@/hooks/use-listings";
 import {
   ArrowLeft, Star, ShoppingCart, Zap, Shield, RotateCcw,
   Truck, BadgeCheck, ChevronLeft, ChevronRight, Minus, Plus,
@@ -50,25 +50,50 @@ function RatingBar({ label, value, total }: { label: string; value: number; tota
 export default function ListingDetail() {
   const [, params] = useRoute("/listing/:id");
   const id = params?.id ? parseInt(params.id, 10) : null;
-  const listing = listings.find((l) => l.id === id);
+  const { listing, loading, error } = useListing(id);
+  const { listings: allListings } = useListings();
 
   const [activeImage, setActiveImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
-  const [selectedColor, setSelectedColor] = useState<string | null>(
-    listing?.colors?.[0] ?? null
-  );
-  const [selectedSize, setSelectedSize] = useState<string | null>(
-    listing?.sizes?.[0] ?? null
-  );
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [addedToCart, setAddedToCart] = useState(false);
   const [wishlisted, setWishlisted] = useState(false);
 
-  if (!listing) {
+  useEffect(() => {
+    if (listing) {
+      setSelectedColor(listing.colors?.[0] ?? null);
+      setSelectedSize(listing.sizes?.[0] ?? null);
+      setActiveImage(0);
+    }
+  }, [listing]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="max-w-7xl mx-auto px-4 py-10 w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-pulse">
+            <div className="aspect-square rounded-2xl bg-gray-200" />
+            <div className="space-y-4">
+              <div className="h-4 bg-gray-200 rounded w-1/4" />
+              <div className="h-8 bg-gray-200 rounded w-3/4" />
+              <div className="h-4 bg-gray-200 rounded w-1/3" />
+              <div className="h-20 bg-gray-200 rounded" />
+              <div className="h-12 bg-gray-200 rounded" />
+              <div className="h-12 bg-gray-200 rounded" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !listing) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 text-center">
         <Package className="h-12 w-12 text-gray-300 mb-4" />
         <h2 className="text-xl font-bold text-gray-800 mb-2">Product not found</h2>
-        <p className="text-gray-500 mb-6 text-sm">This item may have been sold or removed.</p>
+        <p className="text-gray-500 mb-6 text-sm">{error ?? "This item may have been sold or removed."}</p>
         <Link href="/">
           <Button className="gap-2 rounded-full px-6">
             <ArrowLeft className="w-4 h-4" /> Back to Store
@@ -78,9 +103,9 @@ export default function ListingDetail() {
     );
   }
 
-  const relatedProducts = listings.filter(
-    (l) => l.id !== listing.id && l.category === listing.category
-  ).slice(0, 4);
+  const relatedProducts = allListings
+    .filter((l) => l.id !== listing.id && l.category === listing.category)
+    .slice(0, 4);
 
   const handleAddToCart = () => {
     setAddedToCart(true);

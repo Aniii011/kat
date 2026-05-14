@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { Link } from "wouter";
-import { listings } from "@/data/listings";
-import { Search, Star, Heart, ShoppingCart, Zap, ChevronDown } from "lucide-react";
+import { useListings } from "@/hooks/use-listings";
+import { Search, Star, Heart, ShoppingCart, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -44,6 +44,7 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [sortBy, setSortBy] = useState("featured");
   const [wishlist, setWishlist] = useState<Set<number>>(new Set());
+  const { listings, loading, error } = useListings();
 
   const filteredListings = useMemo(() => {
     let result = listings.filter((l) => {
@@ -132,113 +133,129 @@ export default function Home() {
 
       {/* Main */}
       <main className="flex-1 max-w-7xl mx-auto px-4 py-6 w-full">
-        {/* Toolbar */}
-        <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
-          <p className="text-sm text-gray-500">
-            <span className="font-semibold text-gray-800">{filteredListings.length}</span> products
-            {selectedCategory !== "All" && <> in <span className="font-medium text-gray-800">{selectedCategory}</span></>}
-            {searchQuery && <> for "<span className="font-medium text-gray-800">{searchQuery}</span>"</>}
-          </p>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500 hidden sm:inline">Sort by:</span>
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="h-9 w-40 text-sm border-gray-200 bg-white rounded-lg">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="featured">Featured</SelectItem>
-                <SelectItem value="rating">Top Rated</SelectItem>
-                <SelectItem value="discount">Biggest Discount</SelectItem>
-                <SelectItem value="price-asc">Price: Low to High</SelectItem>
-                <SelectItem value="price-desc">Price: High to Low</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* Product grid */}
-        {filteredListings.length > 0 ? (
+        {/* Loading skeleton */}
+        {loading && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-            {filteredListings.map((listing) => (
-              <Link key={listing.id} href={`/listing/${listing.id}`} className="group block">
-                <div className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col h-full">
-                  {/* Image */}
-                  <div className="relative aspect-square overflow-hidden bg-gray-100">
-                    <img
-                      src={listing.imageUrl}
-                      alt={listing.title}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                    {/* Badge */}
-                    {listing.badge && (
-                      <div className={`absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${BADGE_STYLES[listing.badge]}`}>
-                        {listing.badge}
-                      </div>
-                    )}
-                    {/* Discount */}
-                    {listing.discount && !listing.badge && (
-                      <div className="absolute top-2 left-2 bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                        -{listing.discount}%
-                      </div>
-                    )}
-                    {/* Wishlist */}
-                    <button
-                      onClick={(e) => toggleWishlist(e, listing.id)}
-                      className="absolute top-2 right-2 w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-sm hover:bg-white transition-colors"
-                    >
-                      <Heart
-                        className={`h-3.5 w-3.5 transition-colors ${wishlist.has(listing.id) ? "fill-rose-500 text-rose-500" : "text-gray-400"}`}
-                      />
-                    </button>
-                    {/* Free shipping pill */}
-                    {listing.freeShipping && (
-                      <div className="absolute bottom-2 left-2 bg-emerald-500 text-white text-[9px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <Zap className="h-2.5 w-2.5" /> Free ship
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div className="p-3 flex flex-col gap-1.5 flex-1">
-                    <p className="text-[11px] text-gray-400 font-medium uppercase tracking-wide">{listing.category}</p>
-                    <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight group-hover:text-primary transition-colors">
-                      {listing.title}
-                    </h3>
-                    <StarRow rating={listing.rating} count={listing.reviewCount} size="xs" />
-                    <div className="mt-auto pt-1.5 flex items-end justify-between gap-2">
-                      <div>
-                        <div className="flex items-baseline gap-1.5">
-                          <span className="text-base font-extrabold text-gray-900">${listing.price.toLocaleString()}</span>
-                          {listing.originalPrice && (
-                            <span className="text-xs text-gray-400 line-through">${listing.originalPrice.toLocaleString()}</span>
-                          )}
-                        </div>
-                        {listing.discount && (
-                          <span className="text-[10px] font-semibold text-emerald-600">{listing.discount}% off</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm animate-pulse">
+                <div className="aspect-square bg-gray-200" />
+                <div className="p-3 space-y-2">
+                  <div className="h-2.5 bg-gray-200 rounded w-1/3" />
+                  <div className="h-4 bg-gray-200 rounded w-5/6" />
+                  <div className="h-3 bg-gray-200 rounded w-1/2" />
+                  <div className="h-5 bg-gray-200 rounded w-1/4 mt-2" />
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
-        ) : (
-          <div className="py-24 text-center flex flex-col items-center">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-              <Search className="h-7 w-7 text-gray-400" />
+        )}
+
+        {/* Error state */}
+        {error && !loading && (
+          <div className="py-20 text-center flex flex-col items-center">
+            <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mb-4">
+              <Search className="h-7 w-7 text-rose-400" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-1">No products found</h3>
-            <p className="text-sm text-gray-500 mb-6 max-w-xs">
-              Try different keywords or browse another category.
-            </p>
-            <Button
-              onClick={() => { setSearchQuery(""); setSelectedCategory("All"); }}
-              className="rounded-full px-6"
-            >
-              Clear filters
-            </Button>
+            <h3 className="text-lg font-semibold text-gray-800 mb-1">Couldn't load products</h3>
+            <p className="text-sm text-gray-500 max-w-xs">{error}</p>
           </div>
+        )}
+
+        {/* Toolbar + grid */}
+        {!loading && !error && (
+          <>
+            <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
+              <p className="text-sm text-gray-500">
+                <span className="font-semibold text-gray-800">{filteredListings.length}</span> products
+                {selectedCategory !== "All" && <> in <span className="font-medium text-gray-800">{selectedCategory}</span></>}
+                {searchQuery && <> for "<span className="font-medium text-gray-800">{searchQuery}</span>"</>}
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500 hidden sm:inline">Sort by:</span>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="h-9 w-40 text-sm border-gray-200 bg-white rounded-lg">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="featured">Featured</SelectItem>
+                    <SelectItem value="rating">Top Rated</SelectItem>
+                    <SelectItem value="discount">Biggest Discount</SelectItem>
+                    <SelectItem value="price-asc">Price: Low to High</SelectItem>
+                    <SelectItem value="price-desc">Price: High to Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Product grid */}
+            {filteredListings.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                {filteredListings.map((listing) => (
+                  <Link key={listing.id} href={`/listing/${listing.id}`} className="group block">
+                    <div className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col h-full">
+                      <div className="relative aspect-square overflow-hidden bg-gray-100">
+                        <img
+                          src={listing.imageUrl}
+                          alt={listing.title}
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                        {listing.badge && (
+                          <div className={`absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${BADGE_STYLES[listing.badge]}`}>
+                            {listing.badge}
+                          </div>
+                        )}
+                        {listing.discount && !listing.badge && (
+                          <div className="absolute top-2 left-2 bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            -{listing.discount}%
+                          </div>
+                        )}
+                        <button
+                          onClick={(e) => toggleWishlist(e, listing.id)}
+                          className="absolute top-2 right-2 w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-sm hover:bg-white transition-colors"
+                        >
+                          <Heart className={`h-3.5 w-3.5 transition-colors ${wishlist.has(listing.id) ? "fill-rose-500 text-rose-500" : "text-gray-400"}`} />
+                        </button>
+                        {listing.freeShipping && (
+                          <div className="absolute bottom-2 left-2 bg-emerald-500 text-white text-[9px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <Zap className="h-2.5 w-2.5" /> Free ship
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-3 flex flex-col gap-1.5 flex-1">
+                        <p className="text-[11px] text-gray-400 font-medium uppercase tracking-wide">{listing.category}</p>
+                        <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight group-hover:text-primary transition-colors">
+                          {listing.title}
+                        </h3>
+                        <StarRow rating={listing.rating} count={listing.reviewCount} size="xs" />
+                        <div className="mt-auto pt-1.5">
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-base font-extrabold text-gray-900">${listing.price.toLocaleString()}</span>
+                            {listing.originalPrice && (
+                              <span className="text-xs text-gray-400 line-through">${listing.originalPrice.toLocaleString()}</span>
+                            )}
+                          </div>
+                          {listing.discount && (
+                            <span className="text-[10px] font-semibold text-emerald-600">{listing.discount}% off</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="py-24 text-center flex flex-col items-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                  <Search className="h-7 w-7 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-1">No products found</h3>
+                <p className="text-sm text-gray-500 mb-6 max-w-xs">Try different keywords or browse another category.</p>
+                <Button onClick={() => { setSearchQuery(""); setSelectedCategory("All"); }} className="rounded-full px-6">
+                  Clear filters
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </main>
 
