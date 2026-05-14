@@ -128,7 +128,7 @@ export default function ListingDetail() {
                       <div className="flex items-center gap-1.5 mb-1">
                         <p className="font-semibold text-lg leading-none">{listing.sellerName}</p>
                         {listing.isVerifiedSeller && (
-                          <BadgeCheck className="h-5 w-5 text-teal-500" title="Verified Seller" />
+                          <BadgeCheck className="h-5 w-5 text-teal-500" />
                         )}
                       </div>
                       
