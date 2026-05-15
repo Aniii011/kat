@@ -7,6 +7,8 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import ListingDetail from "@/pages/listing-detail";
 import ThriftDrops from "@/pages/thrift-drops";
+import Boards from "@/pages/boards";
+import BoardDetail from "@/pages/board-detail";
 import AiAssistant from "@/components/ai-assistant";
 
 const queryClient = new QueryClient();
@@ -17,6 +19,8 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/listing/:id" component={ListingDetail} />
       <Route path="/thrift-drops" component={ThriftDrops} />
+      <Route path="/boards" component={Boards} />
+      <Route path="/boards/:id" component={BoardDetail} />
       <Route component={NotFound} />
     </Switch>
   );
