@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import type { Listing, Review } from "@/data/listings";
+import type { Listing, Review, Aesthetic } from "@/data/listings";
 
 function rowToListing(row: Record<string, unknown>): Listing {
   return {
@@ -11,7 +11,7 @@ function rowToListing(row: Record<string, unknown>): Listing {
     discount: row.discount as number | undefined,
     category: row.category as string,
     description: row.description as string,
-    location: row.location as string,
+    brand: row.brand as string | undefined,
     imageUrl: row.image_url as string,
     images: (row.images as string[]) ?? [],
     rating: Number(row.rating),
@@ -23,11 +23,19 @@ function rowToListing(row: Record<string, unknown>): Listing {
     freeShipping: row.free_shipping as boolean,
     shippingDays: row.shipping_days as number,
     sellerName: row.seller_name as string,
+    sellerAvatar: row.seller_avatar as string | undefined,
     sellerRating: Number(row.seller_rating),
+    sellerFollowers: row.seller_followers as number | undefined,
     isVerifiedSeller: row.is_verified_seller as boolean,
     badge: row.badge as Listing["badge"] | undefined,
     colors: (row.colors as string[]) ?? undefined,
-    sizes: (row.sizes as string[]) ?? undefined,
+    clothingSizes: (row.clothing_sizes as string[]) ?? undefined,
+    shoeSizes: (row.shoe_sizes as string[]) ?? undefined,
+    aesthetics: (row.aesthetics as Aesthetic[]) ?? undefined,
+    isThrift: (row.is_thrift as boolean) ?? false,
+    depositAmount: row.deposit_amount ? Number(row.deposit_amount) : undefined,
+    isFeatured: (row.is_featured as boolean) ?? false,
+    tags: (row.tags as string[]) ?? undefined,
   };
 }
 
@@ -44,7 +52,7 @@ function rowToReview(row: Record<string, unknown>): Review {
   };
 }
 
-export function useListings() {
+export function useListings(filters?: { category?: string; aesthetic?: string; isThrift?: boolean; search?: string }) {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,10 +61,14 @@ export function useListings() {
     async function fetchListings() {
       setLoading(true);
       setError(null);
-      const { data, error } = await supabase
-        .from("listings")
-        .select("*")
-        .order("id");
+      let query = supabase.from("listings").select("*").order("id");
+      if (filters?.isThrift !== undefined) {
+        query = query.eq("is_thrift", filters.isThrift);
+      }
+      if (filters?.category && filters.category !== "All") {
+        query = query.eq("category", filters.category);
+      }
+      const { data, error } = await query;
       if (error) {
         setError(error.message);
       } else {
@@ -65,7 +77,7 @@ export function useListings() {
       setLoading(false);
     }
     fetchListings();
-  }, []);
+  }, [filters?.category, filters?.isThrift, filters?.aesthetic, filters?.search]);
 
   return { listings, loading, error };
 }
@@ -90,7 +102,7 @@ export function useListing(id: number | null) {
         return;
       }
       const parsed = rowToListing(listingRes.data as Record<string, unknown>);
-      parsed.reviews = (reviewsRes.data ?? []).map(r => rowToReview(r as Record<string, unknown>));
+      parsed.reviews = (reviewsRes.data ?? []).map((r) => rowToReview(r as Record<string, unknown>));
       setListing(parsed);
       setLoading(false);
     }
