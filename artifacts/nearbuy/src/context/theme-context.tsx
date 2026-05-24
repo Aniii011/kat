@@ -12,8 +12,7 @@ const ThemeContext = createContext<ThemeContextValue>({
   setTheme: () => {},
 });
 
-const STORAGE_KEY = "dripp-theme";
-
+const STORAGE_KEY = "kat-theme";
 const THEME_CLASSES: AppTheme[] = ["light", "dark", "pink", "blue", "beige", "black-luxury"];
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -28,20 +27,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const root = document.documentElement;
     THEME_CLASSES.forEach((t) => root.classList.remove(t, `theme-${t}`));
-    if (theme === "dark") {
-      root.classList.add("dark");
-    } else if (theme !== "light") {
-      root.classList.add(`theme-${theme}`);
-    }
-    try {
-      localStorage.setItem(STORAGE_KEY, theme);
-    } catch {}
+    if (theme === "dark") root.classList.add("dark");
+    else if (theme !== "light") root.classList.add(`theme-${theme}`);
+    try { localStorage.setItem(STORAGE_KEY, theme); } catch {}
   }, [theme]);
 
-  const setTheme = (t: AppTheme) => setThemeState(t);
-
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme: setThemeState }}>
       {children}
     </ThemeContext.Provider>
   );

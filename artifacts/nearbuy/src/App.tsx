@@ -9,6 +9,11 @@ import ListingDetail from "@/pages/listing-detail";
 import ThriftDrops from "@/pages/thrift-drops";
 import Boards from "@/pages/boards";
 import BoardDetail from "@/pages/board-detail";
+import Cart from "@/pages/cart";
+import Search from "@/pages/search";
+import Me from "@/pages/me";
+import Seller from "@/pages/seller";
+import BottomNav from "@/components/bottom-nav";
 import AiAssistant from "@/components/ai-assistant";
 
 const queryClient = new QueryClient();
@@ -21,6 +26,10 @@ function Router() {
       <Route path="/thrift-drops" component={ThriftDrops} />
       <Route path="/boards" component={Boards} />
       <Route path="/boards/:id" component={BoardDetail} />
+      <Route path="/cart" component={Cart} />
+      <Route path="/search" component={Search} />
+      <Route path="/me" component={Me} />
+      <Route path="/seller" component={Seller} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -33,6 +42,7 @@ function App() {
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <Router />
+            <BottomNav />
             <AiAssistant />
           </WouterRouter>
           <Toaster />

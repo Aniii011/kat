@@ -1,13 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? "";
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY environment variables.");
-}
+export const supabase = supabaseUrl && supabaseAnonKey
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : createClient("https://placeholder.supabase.co", "placeholder-key");
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
 export type Database = {
   public: {
@@ -21,7 +21,6 @@ export type Database = {
           discount: number | null;
           category: string;
           description: string;
-          location: string;
           image_url: string;
           images: string[];
           rating: number;
@@ -32,11 +31,19 @@ export type Database = {
           free_shipping: boolean;
           shipping_days: number;
           seller_name: string;
+          seller_avatar: string | null;
           seller_rating: number;
+          seller_followers: number | null;
           is_verified_seller: boolean;
           badge: string | null;
           colors: string[] | null;
-          sizes: string[] | null;
+          clothing_sizes: string[] | null;
+          shoe_sizes: string[] | null;
+          aesthetics: string[] | null;
+          is_thrift: boolean;
+          deposit_amount: number | null;
+          is_featured: boolean;
+          tags: string[] | null;
           created_at: string;
         };
         Insert: Omit<Database["public"]["Tables"]["listings"]["Row"], "id" | "created_at">;
