@@ -120,7 +120,7 @@ export default function AiAssistant() {
           dragElastic={0.1}
           dragMomentum={false}
           onClick={() => setOpen(true)}
-          className="fixed bottom-20 sm:bottom-6 right-5 z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center cursor-grab active:cursor-grabbing touch-none"
+          className="fixed bottom-[82px] sm:bottom-6 right-5 z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center cursor-grab active:cursor-grabbing touch-none"
           whileHover={{ scale: 1.08 }}
           whileTap={{ scale: 0.94 }}
           animate={{ boxShadow: ["0 4px 20px rgba(0,0,0,.2)", "0 6px 28px rgba(0,0,0,.3)", "0 4px 20px rgba(0,0,0,.2)"] }}
