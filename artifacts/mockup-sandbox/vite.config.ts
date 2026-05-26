@@ -3,10 +3,6 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
-const isReplit =
-  process.env.NODE_ENV !== "production" &&
-  process.env.REPL_ID !== undefined;
-
 export default defineConfig({
   base: process.env.BASE_PATH || "/",
 
@@ -31,7 +27,6 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     allowedHosts: true,
-    fs: { strict: true },
   },
 
   preview: {
