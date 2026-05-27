@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import ThemeSwitcher from "@/components/theme-switcher";
 import { useTheme, type AppTheme } from "@/context/theme-context";
+import { useAuth } from "@/context/auth-context";
+import AuthModal from "@/components/auth-modal";
 import {
   Package, MapPin, Star, RotateCcw, Tag, HelpCircle,
-  LogOut, ChevronRight, Edit3, Check, Shield,
-  Truck, Clock, X, Store
+  LogOut, ChevronRight, Edit3, Check, Shield, BadgeCheck,
+  Truck, Clock, X, Store, LogIn, UserCircle2, ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,14 +48,19 @@ const THEME_OPTIONS: { value: AppTheme; label: string; swatch: string }[] = [
 
 export default function Me() {
   const { theme, setTheme } = useTheme();
-  const [displayName, setDisplayName] = useState(() => localStorage.getItem("kat_name") ?? "");
+  const { user, signOut } = useAuth();
+  const [showAuth, setShowAuth] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [displayName, setDisplayName] = useState(() => user?.name || localStorage.getItem("kat_name") || "");
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(displayName);
-  const [loggedIn, setLoggedIn] = useState(true);
   const [address, setAddress] = useState(() => localStorage.getItem("kat_address") ?? "");
   const [editingAddress, setEditingAddress] = useState(false);
   const [addressInput, setAddressInput] = useState(address);
   const [activeTab, setActiveTab] = useState<"orders" | "addresses" | "coupons" | "returns">("orders");
+
+  const openLogin = () => { setAuthMode("login"); setShowAuth(true); };
+  const openSignup = () => { setAuthMode("signup"); setShowAuth(true); };
 
   const saveName = () => {
     setDisplayName(nameInput);
@@ -67,7 +74,44 @@ export default function Me() {
     setEditingAddress(false);
   };
 
-  const initials = displayName ? displayName.slice(0, 2).toUpperCase() : "KAT";
+  const effectiveName = user?.name || displayName;
+  const initials = effectiveName ? effectiveName.slice(0, 2).toUpperCase() : "KAT";
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
+          <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
+            <div className="flex-1"><h1 className="text-base font-black">My Account</h1></div>
+            <ThemeSwitcher />
+          </div>
+        </header>
+        <main className="flex-1 flex flex-col items-center justify-center px-6 pb-28 text-center">
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="max-w-xs w-full">
+            <div className="w-20 h-20 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center mx-auto mb-5">
+              <UserCircle2 className="w-10 h-10 text-primary" />
+            </div>
+            <h2 className="text-xl font-black mb-2">Welcome to KAT</h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              Sign in to view your orders, save favourites, and access your full account.
+            </p>
+            <div className="flex flex-col gap-2">
+              <Button className="w-full rounded-full h-11 font-bold gap-2" onClick={openLogin}>
+                <LogIn className="w-4 h-4" /> Sign In
+              </Button>
+              <Button variant="outline" className="w-full rounded-full h-11 font-semibold" onClick={openSignup}>
+                Create Account
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-6">
+              Guest? You can still browse and shop — just sign in at checkout.
+            </p>
+          </motion.div>
+        </main>
+        <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
+      </div>
+    );
+  }
 
   const menuItems = [
     { icon: <Package className="w-4 h-4" />, label: "My Orders", tab: "orders" as const },
@@ -84,11 +128,6 @@ export default function Me() {
             <h1 className="text-base font-black">My Account</h1>
           </div>
           <ThemeSwitcher />
-          <Link href="/seller">
-            <Button variant="ghost" size="sm" className="rounded-full text-xs gap-1.5">
-              <Store className="w-3.5 h-3.5" /> Sell on KAT
-            </Button>
-          </Link>
         </div>
       </header>
 
@@ -110,14 +149,28 @@ export default function Me() {
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <p className="font-bold text-base truncate">{displayName || "Set your name"}</p>
-                  <button onClick={() => { setNameInput(displayName); setEditingName(true); }}
-                    className="w-6 h-6 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0">
-                    <Edit3 className="w-3 h-3" />
-                  </button>
+                  <p className="font-bold text-base truncate">{effectiveName || "Set your name"}</p>
+                  {!user?.name && (
+                    <button onClick={() => { setNameInput(displayName); setEditingName(true); }}
+                      className="w-6 h-6 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0">
+                      <Edit3 className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
               )}
-              <p className="text-xs text-muted-foreground mt-0.5">KAT Member</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-xs text-muted-foreground">{user?.email || "KAT Member"}</p>
+                {user?.sellerVerified && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full">
+                    <BadgeCheck className="w-3 h-3" /> Verified Seller
+                  </span>
+                )}
+                {user?.isAdmin && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                    <ShieldCheck className="w-3 h-3" /> Admin
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -284,9 +337,33 @@ export default function Me() {
           ))}
         </div>
 
+        {/* Admin / Seller quick links */}
+        {(user?.isAdmin || user?.sellerVerified) && (
+          <div className="bg-card border border-card-border rounded-2xl overflow-hidden">
+            {user?.isAdmin && (
+              <Link href="/admin/sellers">
+                <button className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted transition-colors text-sm">
+                  <span className="text-primary"><ShieldCheck className="w-4 h-4" /></span>
+                  <span className="flex-1 text-left font-medium">Admin — Seller Management</span>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </Link>
+            )}
+            {user?.sellerVerified && (
+              <Link href="/seller">
+                <button className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted transition-colors text-sm border-t border-border first:border-0">
+                  <span className="text-primary"><Store className="w-4 h-4" /></span>
+                  <span className="flex-1 text-left font-medium">My Seller Dashboard</span>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </Link>
+            )}
+          </div>
+        )}
+
         {/* Logout */}
         <Button variant="outline" className="w-full rounded-2xl h-12 border-destructive/30 text-destructive hover:bg-destructive/10 font-semibold gap-2"
-          onClick={() => setLoggedIn(false)}>
+          onClick={signOut}>
           <LogOut className="w-4 h-4" /> Sign Out
         </Button>
       </main>

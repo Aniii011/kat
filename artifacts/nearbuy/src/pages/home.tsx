@@ -7,12 +7,14 @@ import {
   CATEGORY_TO_TOP, type Listing, type TopCategory,
 } from "@/data/listings";
 import { useBoards } from "@/hooks/use-boards";
+import { useAuth } from "@/context/auth-context";
 import ThemeSwitcher from "@/components/theme-switcher";
 import QuickViewModal from "@/components/quick-view-modal";
 import SaveToBoardModal from "@/components/save-to-board-modal";
+import AuthModal from "@/components/auth-modal";
 import {
   Search, ShoppingBag, Star, BadgeCheck, Flame, Sparkles,
-  ChevronRight, Bookmark, Heart,
+  ChevronRight, Bookmark, Heart, LogIn, UserCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -172,10 +174,16 @@ export default function Home() {
   const [sortBy, setSortBy] = useState("featured");
   const [quickViewListing, setQuickViewListing] = useState<Listing | null>(null);
   const [saveTarget, setSaveTarget] = useState<Listing | null>(null);
+  const [showAuth, setShowAuth] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
 
+  const { user } = useAuth();
   const { listings: remoteListings, loading } = useListings();
   const allListings = remoteListings.length > 0 ? remoteListings : staticListings;
   const { isSaved } = useBoards();
+
+  const openLogin = () => { setAuthMode("login"); setShowAuth(true); };
+  const openSignup = () => { setAuthMode("signup"); setShowAuth(true); };
 
   const subcats =
     topCategory !== "All" ? (SUBCATEGORIES[topCategory as TopCategory] ?? []) : [];
@@ -256,7 +264,7 @@ export default function Home() {
           <div className="flex items-center gap-0.5">
             <ThemeSwitcher />
             <Link href="/boards">
-              <Button variant="ghost" size="icon" className="w-9 h-9 rounded-full" title="My Boards">
+              <Button variant="ghost" size="icon" className="w-9 h-9 rounded-full hidden sm:flex" title="My Boards">
                 <Bookmark className="w-4 h-4" />
               </Button>
             </Link>
@@ -265,6 +273,31 @@ export default function Home() {
                 <ShoppingBag className="w-4 h-4" />
               </Button>
             </Link>
+
+            {/* Auth buttons — desktop only */}
+            {user ? (
+              <Link href="/me">
+                <button className="hidden sm:flex items-center gap-2 ml-1 h-9 px-3 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors">
+                  <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center shrink-0">
+                    <span className="text-[10px] font-black text-primary-foreground leading-none">
+                      {user.name.slice(0, 2).toUpperCase()}
+                    </span>
+                  </div>
+                  <span className="text-xs font-semibold text-foreground truncate max-w-[80px]">
+                    {user.name.split(" ")[0]}
+                  </span>
+                </button>
+              </Link>
+            ) : (
+              <div className="hidden sm:flex items-center gap-1 ml-1">
+                <Button variant="ghost" size="sm" className="rounded-full h-8 text-xs font-semibold" onClick={openLogin}>
+                  <LogIn className="w-3.5 h-3.5 mr-1" /> Log In
+                </Button>
+                <Button size="sm" className="rounded-full h-8 text-xs font-semibold" onClick={openSignup}>
+                  Sign Up
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -511,6 +544,11 @@ export default function Home() {
           listingTitle={saveTarget.title}
         />
       )}
+      <AuthModal
+        open={showAuth}
+        onClose={() => setShowAuth(false)}
+        defaultMode={authMode}
+      />
     </div>
   );
 }

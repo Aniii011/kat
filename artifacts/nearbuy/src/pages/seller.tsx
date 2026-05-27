@@ -3,10 +3,13 @@ import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { listings as staticListings } from "@/data/listings";
 import ThemeSwitcher from "@/components/theme-switcher";
+import { useAuth } from "@/context/auth-context";
+import AuthModal from "@/components/auth-modal";
 import {
   ArrowLeft, Plus, Package, ShoppingCart, TrendingUp,
   Eye, Edit, Trash2, Zap, BarChart3, ChevronRight,
-  Upload, Star, BadgeCheck, Clock, Truck, CheckCircle
+  Upload, Star, BadgeCheck, Clock, Truck, CheckCircle,
+  Lock, ShieldCheck, LogIn,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,10 +32,66 @@ const MOCK_ORDERS = [
 const STATUS = { Shipped: "bg-blue-100 text-blue-700", Pending: "bg-amber-100 text-amber-700", Delivered: "bg-emerald-100 text-emerald-700" };
 
 export default function Seller() {
+  const { user } = useAuth();
+  const [showAuth, setShowAuth] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [newCategory, setNewCategory] = useState("");
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+          <LogIn className="w-8 h-8 text-primary" />
+        </div>
+        <h1 className="text-xl font-black mb-2">Sign in to continue</h1>
+        <p className="text-sm text-muted-foreground mb-6 max-w-xs">
+          You need to be signed in to access the seller area.
+        </p>
+        <Button className="rounded-full gap-2 font-bold" onClick={() => setShowAuth(true)}>
+          <LogIn className="w-4 h-4" /> Sign In
+        </Button>
+        <Link href="/" className="mt-3">
+          <Button variant="ghost" className="rounded-full text-sm">Back to Home</Button>
+        </Link>
+        <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
+      </div>
+    );
+  }
+
+  if (!user.sellerVerified) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-950/40 flex items-center justify-center mb-4">
+          <Lock className="w-8 h-8 text-amber-600" />
+        </div>
+        <h1 className="text-xl font-black mb-2">Seller Access Required</h1>
+        <p className="text-sm text-muted-foreground mb-2 max-w-sm">
+          Hi <span className="font-semibold text-foreground">{user.name}</span>, your account is not yet approved as a verified KAT seller.
+        </p>
+        <p className="text-xs text-muted-foreground mb-6 max-w-sm">
+          Seller accounts are created and approved by KAT admins. Contact us at{" "}
+          <span className="text-primary font-medium">sellers@kat.com</span> to apply.
+        </p>
+        <div className="flex gap-2">
+          <Link href="/me">
+            <Button variant="outline" className="rounded-full">My Account</Button>
+          </Link>
+          <Link href="/">
+            <Button className="rounded-full">Back to Shopping</Button>
+          </Link>
+        </div>
+        {user.isAdmin && (
+          <Link href="/admin/sellers" className="mt-4">
+            <Button variant="ghost" size="sm" className="rounded-full gap-1.5 text-xs text-primary">
+              <ShieldCheck className="w-3.5 h-3.5" /> Go to Admin Panel
+            </Button>
+          </Link>
+        )}
+      </div>
+    );
+  }
 
   const stats = [
     { label: "Products", value: myProducts.length, icon: <Package className="w-4 h-4" />, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-950/30" },

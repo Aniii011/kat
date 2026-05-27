@@ -434,3 +434,140 @@ select id, 'Nadia S.', 'https://picsum.photos/seed/at2/40/40', 5, 'Apr 10, 2025'
 
 insert into reviews (listing_id, author, avatar, rating, date, title, body, verified)
 select id, 'Emeka P.', 'https://picsum.photos/seed/at3/40/40', 5, 'May 1, 2025', 'Cultural treasure', 'I cannot believe this exists. My dad actually went to this concert. I will treasure this forever.', true from listings where title = 'Thrift: 90s Band Tee – Fela Kuti';
+
+-- ============================================================
+-- AUTH, PROFILES & SELLER SYSTEM
+-- Run these AFTER enabling Supabase Auth in your project
+-- ============================================================
+
+-- ── Profiles table (extends Supabase auth.users) ─────────────
+create table if not exists profiles (
+  id                uuid        primary key references auth.users(id) on delete cascade,
+  full_name         text,
+  email             text,
+  avatar_url        text,
+  is_seller         boolean     not null default false,
+  seller_verified   boolean     not null default false,
+  store_name        text,
+  store_description text,
+  store_category    text,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+
+alter table profiles enable row level security;
+
+-- Users can read any profile (for seller pages)
+create policy "Public read profiles"
+  on profiles for select using (true);
+
+-- Users can only update their own profile
+create policy "Users update own profile"
+  on profiles for update using (auth.uid() = id);
+
+-- Auto-create profile on signup
+create or replace function handle_new_user()
+returns trigger language plpgsql security definer as $$
+begin
+  insert into public.profiles (id, full_name, email)
+  values (
+    new.id,
+    new.raw_user_meta_data->>'full_name',
+    new.email
+  );
+  return new;
+end;
+$$;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function handle_new_user();
+
+-- ── Seller applications table ─────────────────────────────────
+create table if not exists seller_applications (
+  id            bigint generated always as identity primary key,
+  user_id       uuid        references auth.users(id) on delete cascade,
+  store_name    text        not null,
+  email         text        not null,
+  owner_name    text        not null,
+  category      text        not null,
+  description   text,
+  status        text        not null default 'pending'
+                            check (status in ('pending','approved','rejected')),
+  reviewed_by   uuid        references auth.users(id),
+  reviewed_at   timestamptz,
+  created_at    timestamptz not null default now()
+);
+
+alter table seller_applications enable row level security;
+
+-- Only admins (service_role) can read all applications
+-- Sellers can read their own application
+create policy "Users read own application"
+  on seller_applications for select
+  using (auth.uid() = user_id);
+
+-- Users can submit their own application
+create policy "Users insert own application"
+  on seller_applications for insert
+  with check (auth.uid() = user_id);
+
+-- ── Add video + style_tags to listings ───────────────────────
+alter table listings
+  add column if not exists video_url    text,
+  add column if not exists style_tags   text[]  default '{}',
+  add column if not exists subcategory  text,
+  add column if not exists seller_id    uuid    references auth.users(id);
+
+-- Verified sellers can insert/update their own products
+create policy "Sellers insert own products"
+  on listings for insert
+  with check (
+    auth.uid() = seller_id and
+    exists (select 1 from profiles where id = auth.uid() and seller_verified = true)
+  );
+
+create policy "Sellers update own products"
+  on listings for update
+  using (
+    auth.uid() = seller_id and
+    exists (select 1 from profiles where id = auth.uid() and seller_verified = true)
+  );
+
+create policy "Sellers delete own products"
+  on listings for delete
+  using (auth.uid() = seller_id);
+
+-- Users can post reviews (must be authenticated)
+create policy "Authenticated users insert reviews"
+  on reviews for insert
+  with check (auth.role() = 'authenticated');
+
+-- ── Admin helper function ─────────────────────────────────────
+-- Call this from Supabase Dashboard or service_role client to approve a seller:
+-- select approve_seller('user-uuid-here');
+create or replace function approve_seller(target_user_id uuid)
+returns void language plpgsql security definer as $$
+begin
+  update profiles
+    set is_seller = true, seller_verified = true, updated_at = now()
+    where id = target_user_id;
+
+  update seller_applications
+    set status = 'approved', reviewed_at = now()
+    where user_id = target_user_id and status = 'pending';
+end;
+$$;
+
+create or replace function reject_seller(target_user_id uuid)
+returns void language plpgsql security definer as $$
+begin
+  update profiles
+    set is_seller = false, seller_verified = false, updated_at = now()
+    where id = target_user_id;
+
+  update seller_applications
+    set status = 'rejected', reviewed_at = now()
+    where user_id = target_user_id and status = 'pending';
+end;
+$$;
