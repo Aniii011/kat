@@ -1,5 +1,5 @@
 -- ============================================================
--- Dripp Marketplace — Supabase Database Setup
+-- KAT Marketplace — Supabase Database Setup
 -- Nigerian Fashion, Beauty & Lifestyle Marketplace
 -- Run this in your Supabase SQL Editor
 -- ============================================================
