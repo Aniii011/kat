@@ -8,7 +8,7 @@ export interface ThriftHold {
   depositPaid: number;
 }
 
-const STORAGE_KEY = "dripp_thrift_holds";
+const STORAGE_KEY = "kat_thrift_holds";
 const HOLD_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 function loadHolds(): ThriftHold[] {

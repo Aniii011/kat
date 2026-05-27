@@ -8,7 +8,7 @@ export interface Board {
   itemIds: number[];
 }
 
-const STORAGE_KEY = "dripp_boards";
+const STORAGE_KEY = "kat_boards";
 
 const DEFAULT_BOARDS: Board[] = [
   { id: "b-vacation", name: "Vacation Fits", emoji: "🌴", createdAt: new Date().toISOString(), itemIds: [7, 8] },

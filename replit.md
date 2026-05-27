@@ -1,10 +1,10 @@
-# Dripp
+# KAT
 
 Nigeria's favourite fashion, beauty & lifestyle marketplace — a mobile-first marketplace app for Nigerian women to shop and slay.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/nearbuy run dev` — run the Dripp frontend (port auto-assigned via $PORT)
+- `pnpm --filter @workspace/nearbuy run dev` — run the KAT frontend (port auto-assigned via $PORT)
 - `pnpm --filter @workspace/nearbuy run typecheck` — typecheck the frontend
 - `pnpm run typecheck` — full typecheck across all packages
 - Required env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` — Supabase credentials (injected via Vite `define`)
@@ -55,7 +55,7 @@ artifacts/nearbuy/
 
 ## User preferences
 
-- Brand name: **Dripp** (lowercase, stylised as `dripp.`)
+- Brand name: **KAT** (stylised as `KAT`)
 - Currency: Nigerian Naira (₦)
 - Target audience: Nigerian women, fashion-forward, mobile-first
 - Keep the static data fallback — don't require Supabase for the app to work

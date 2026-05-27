@@ -416,8 +416,8 @@ html { scroll-behavior: smooth; }
 .product-card:hover .product-img { transform: scale(1.05); }
 
 /* ── Pulse badge ───────────────────────────────────────────── */
-@keyframes dripp-pulse {
+@keyframes kat-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
 }
-.dripp-pulse { animation: dripp-pulse 2s ease-in-out infinite; }
+.kat-pulse { animation: kat-pulse 2s ease-in-out infinite; }
