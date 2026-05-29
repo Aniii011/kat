@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { listings as staticListings } from "@/data/listings";
+import { listings as staticListings, TOP_CATEGORIES, SUBCATEGORIES, AESTHETICS } from "@/data/listings";
 import ThemeSwitcher from "@/components/theme-switcher";
 import { useAuth } from "@/context/auth-context";
 import AuthModal from "@/components/auth-modal";
@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -29,15 +30,57 @@ const MOCK_ORDERS = [
   { id: "KAT-7712", buyer: "Funmi B.", item: "Lace Front Wig", amount: 48000, status: "Delivered", date: "May 10" },
 ];
 
-const STATUS = { Shipped: "bg-blue-100 text-blue-700", Pending: "bg-amber-100 text-amber-700", Delivered: "bg-emerald-100 text-emerald-700" };
+const STATUS = {
+  Shipped: "bg-blue-100 text-blue-700",
+  Pending: "bg-amber-100 text-amber-700",
+  Delivered: "bg-emerald-100 text-emerald-700",
+};
+
+const EXTRA_STYLE_TAGS = ["Vintage", "Y2K", "Minimalist", "Alt", "Coquette", "Corporate", "Ankara"];
+const ALL_STYLE_TAGS = [...AESTHETICS.map(a => a.label), ...EXTRA_STYLE_TAGS];
+const UPLOADABLE_CATS = TOP_CATEGORIES.filter(c => c !== "Deals");
+
+function resetUploadState() {
+  return {
+    title: "", price: "", description: "", originalPrice: "",
+    mainCat: "", subCat: "", styleTags: new Set<string>(),
+    stock: "1", isThrift: false, deposit: "",
+  };
+}
 
 export default function Seller() {
   const { user } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+
   const [newTitle, setNewTitle] = useState("");
   const [newPrice, setNewPrice] = useState("");
-  const [newCategory, setNewCategory] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [newOriginalPrice, setNewOriginalPrice] = useState("");
+  const [newMainCat, setNewMainCat] = useState("");
+  const [newSubCat, setNewSubCat] = useState("");
+  const [newStyleTags, setNewStyleTags] = useState<Set<string>>(new Set());
+  const [newStock, setNewStock] = useState("1");
+  const [newIsThrift, setNewIsThrift] = useState(false);
+  const [newDeposit, setNewDeposit] = useState("");
+
+  function closeUpload() {
+    const r = resetUploadState();
+    setNewTitle(r.title); setNewPrice(r.price); setNewDescription(r.description);
+    setNewOriginalPrice(r.originalPrice); setNewMainCat(r.mainCat); setNewSubCat(r.subCat);
+    setNewStyleTags(r.styleTags); setNewStock(r.stock); setNewIsThrift(r.isThrift);
+    setNewDeposit(r.deposit); setShowUpload(false);
+  }
+
+  function toggleStyleTag(tag: string) {
+    setNewStyleTags(prev => {
+      const next = new Set(prev);
+      if (next.has(tag)) next.delete(tag); else next.add(tag);
+      return next;
+    });
+  }
+
+  const subcats = (SUBCATEGORIES as Record<string, string[]>)[newMainCat] ?? [];
 
   if (!user) {
     return (
@@ -157,7 +200,6 @@ export default function Seller() {
             <TabsTrigger value="analytics" className="rounded-full flex-1 text-xs">Analytics</TabsTrigger>
           </TabsList>
 
-          {/* Products tab */}
           <TabsContent value="products" className="mt-4 space-y-3">
             {myProducts.map((p, i) => (
               <motion.div key={p.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
@@ -184,8 +226,10 @@ export default function Seller() {
             ))}
           </TabsContent>
 
-          {/* Orders tab */}
           <TabsContent value="orders" className="mt-4 space-y-3">
+            <p className="text-xs text-muted-foreground text-center mb-2">
+              Order fulfilment is managed by KAT admin. Contact <span className="text-primary font-medium">support@kat.com</span> for delivery queries.
+            </p>
             {MOCK_ORDERS.map((o, i) => (
               <motion.div key={o.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
                 className="bg-card border border-card-border rounded-2xl p-4">
@@ -199,15 +243,12 @@ export default function Seller() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="font-black text-primary">{formatNaira(o.amount)}</span>
-                  <Button size="sm" variant="outline" className="rounded-full text-xs h-7">
-                    {o.status === "Pending" ? "Ship Now" : "View Details"}
-                  </Button>
+                  <Button size="sm" variant="outline" className="rounded-full text-xs h-7">View Details</Button>
                 </div>
               </motion.div>
             ))}
           </TabsContent>
 
-          {/* Thrift tab */}
           <TabsContent value="thrift" className="mt-4">
             <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-2xl p-4 mb-4">
               <p className="font-bold text-sm text-purple-700 dark:text-purple-300 flex items-center gap-2">
@@ -217,7 +258,7 @@ export default function Seller() {
                 Each thrift item is one-of-one. Items refresh hourly. First buyer to pay deposit secures the item.
               </p>
             </div>
-            {staticListings.filter((l) => l.isThrift).map((l, i) => (
+            {staticListings.filter(l => l.isThrift).map((l, i) => (
               <motion.div key={l.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
                 className="bg-card border border-card-border rounded-2xl p-3 flex gap-3 mb-3">
                 <img src={l.imageUrl} alt={l.title} className="w-14 h-16 rounded-xl object-cover shrink-0" />
@@ -225,7 +266,9 @@ export default function Seller() {
                   <p className="text-sm font-semibold line-clamp-1">{l.title}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-xs font-black text-primary">{formatNaira(l.price)}</span>
-                    <span className="text-[10px] bg-purple-100 dark:bg-purple-950/40 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded-full">Deposit: {l.depositAmount ? formatNaira(l.depositAmount) : "–"}</span>
+                    <span className="text-[10px] bg-purple-100 dark:bg-purple-950/40 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded-full">
+                      Deposit: {l.depositAmount ? formatNaira(l.depositAmount) : "–"}
+                    </span>
                   </div>
                   <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full inline-block mt-1">Available</span>
                 </div>
@@ -234,12 +277,12 @@ export default function Seller() {
                 </button>
               </motion.div>
             ))}
-            <Button variant="outline" className="w-full rounded-2xl gap-2 border-purple-300 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20">
+            <Button variant="outline" className="w-full rounded-2xl gap-2 border-purple-300 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+              onClick={() => { setNewIsThrift(true); setShowUpload(true); }}>
               <Plus className="w-4 h-4" /> Add Thrift Item
             </Button>
           </TabsContent>
 
-          {/* Analytics tab */}
           <TabsContent value="analytics" className="mt-4">
             <div className="grid grid-cols-2 gap-3">
               {[
@@ -247,7 +290,7 @@ export default function Seller() {
                 { label: "Conversion rate", value: "4.2%", change: "+0.8%" },
                 { label: "Avg order value", value: "₦24,300", change: "+₦2,100" },
                 { label: "Return rate", value: "2.1%", change: "-0.4%" },
-              ].map((m) => (
+              ].map(m => (
                 <div key={m.label} className="bg-card border border-card-border rounded-2xl p-4">
                   <p className="text-xs text-muted-foreground">{m.label}</p>
                   <p className="text-2xl font-black mt-1">{m.value}</p>
@@ -256,7 +299,9 @@ export default function Seller() {
               ))}
             </div>
             <div className="bg-card border border-card-border rounded-2xl p-4 mt-3">
-              <p className="font-bold text-sm mb-3 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" /> Top performing products</p>
+              <p className="font-bold text-sm mb-3 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-primary" /> Top performing products
+              </p>
               {myProducts.slice(0, 3).map((p, i) => (
                 <div key={p.id} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
                   <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
@@ -269,26 +314,154 @@ export default function Seller() {
         </Tabs>
       </main>
 
-      {/* Upload product dialog */}
-      <Dialog open={showUpload} onOpenChange={setShowUpload}>
-        <DialogContent className="rounded-3xl max-w-sm mx-auto">
+      {/* ── Add Product Dialog ── */}
+      <Dialog open={showUpload} onOpenChange={open => { if (!open) closeUpload(); }}>
+        <DialogContent className="rounded-3xl max-w-md mx-auto max-h-[88vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-base font-black flex items-center gap-2">
               <Upload className="w-4 h-4 text-primary" /> Add New Product
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            <div className="border-2 border-dashed border-border rounded-2xl p-8 text-center hover:border-primary transition-colors cursor-pointer">
-              <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+
+          <div className="space-y-5 pb-2">
+            {/* Photo upload */}
+            <div className="border-2 border-dashed border-border rounded-2xl p-6 text-center hover:border-primary transition-colors cursor-pointer">
+              <Upload className="w-7 h-7 text-muted-foreground mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">Click to upload photos</p>
-              <p className="text-[10px] text-muted-foreground mt-1">Up to 8 images, max 5MB each</p>
+              <p className="text-[10px] text-muted-foreground mt-1">JPG / PNG only · up to 8 images · max 5 MB each</p>
             </div>
-            <Input placeholder="Product title" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} className="rounded-xl" />
-            <div className="grid grid-cols-2 gap-2">
-              <Input placeholder="Price (₦)" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} className="rounded-xl" type="number" />
-              <Input placeholder="Category" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="rounded-xl" />
+
+            {/* Basic info */}
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Product Info</p>
+              <Input
+                placeholder="Product title *"
+                value={newTitle}
+                onChange={e => setNewTitle(e.target.value)}
+                className="rounded-xl"
+              />
+              <Textarea
+                placeholder="Description — fabric, fit, occasion, care instructions..."
+                value={newDescription}
+                onChange={e => setNewDescription(e.target.value)}
+                className="rounded-xl resize-none text-sm min-h-[72px]"
+              />
             </div>
-            <Button className="w-full rounded-full font-bold" onClick={() => setShowUpload(false)}>
+
+            {/* Category */}
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Category *</p>
+              <select
+                value={newMainCat}
+                onChange={e => { setNewMainCat(e.target.value); setNewSubCat(""); }}
+                className="w-full text-sm bg-background border border-input rounded-xl px-3 h-9 focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="">Select main category</option>
+                {UPLOADABLE_CATS.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              {newMainCat && subcats.length > 0 && (
+                <select
+                  value={newSubCat}
+                  onChange={e => setNewSubCat(e.target.value)}
+                  className="w-full text-sm bg-background border border-input rounded-xl px-3 h-9 focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="">Select subcategory</option>
+                  {subcats.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Style tags */}
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Style Tags</p>
+              <div className="flex flex-wrap gap-1.5">
+                {ALL_STYLE_TAGS.map(tag => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => toggleStyleTag(tag)}
+                    className={`text-[11px] px-2.5 py-1 rounded-full font-semibold border transition-all ${
+                      newStyleTags.has(tag)
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-border text-muted-foreground hover:border-primary hover:text-primary"
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Pricing */}
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Pricing</p>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  placeholder="Selling price (₦) *"
+                  value={newPrice}
+                  onChange={e => setNewPrice(e.target.value)}
+                  className="rounded-xl"
+                  type="number"
+                  min="0"
+                />
+                <Input
+                  placeholder="Original price (₦)"
+                  value={newOriginalPrice}
+                  onChange={e => setNewOriginalPrice(e.target.value)}
+                  className="rounded-xl"
+                  type="number"
+                  min="0"
+                />
+              </div>
+            </div>
+
+            {/* Stock */}
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Inventory</p>
+              <Input
+                placeholder="Stock quantity"
+                value={newStock}
+                onChange={e => setNewStock(e.target.value)}
+                className="rounded-xl"
+                type="number"
+                min="1"
+              />
+            </div>
+
+            {/* Thrift toggle */}
+            <div className="flex items-center justify-between p-3 rounded-2xl border border-border">
+              <div>
+                <p className="text-sm font-semibold">Thrift / Pre-loved item</p>
+                <p className="text-[11px] text-muted-foreground">Buyer pays a deposit to hold the item</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNewIsThrift(!newIsThrift)}
+                className={`w-10 h-6 rounded-full transition-colors relative shrink-0 ${newIsThrift ? "bg-primary" : "bg-muted"}`}
+              >
+                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${newIsThrift ? "translate-x-5" : "translate-x-1"}`} />
+              </button>
+            </div>
+            {newIsThrift && (
+              <Input
+                placeholder="Deposit amount (₦)"
+                value={newDeposit}
+                onChange={e => setNewDeposit(e.target.value)}
+                className="rounded-xl"
+                type="number"
+                min="0"
+              />
+            )}
+
+            <Button
+              className="w-full rounded-full font-bold h-11"
+              disabled={!newTitle || !newPrice || !newMainCat}
+              onClick={closeUpload}
+            >
               List Product
             </Button>
           </div>

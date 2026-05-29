@@ -38,12 +38,8 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
 function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
 
 const THEME_OPTIONS: { value: AppTheme; label: string; swatch: string }[] = [
-  { value: "light", label: "Light", swatch: "#fdf2f8" },
-  { value: "dark", label: "Dark", swatch: "#0f0f0f" },
-  { value: "pink", label: "Pink", swatch: "#ec4899" },
-  { value: "blue", label: "Blue", swatch: "#3b82f6" },
-  { value: "beige", label: "Beige", swatch: "#c2612e" },
-  { value: "black-luxury", label: "Luxury", swatch: "#d4af37" },
+  { value: "light", label: "Light", swatch: "#ffffff" },
+  { value: "dark", label: "Dark", swatch: "#0d0d0d" },
 ];
 
 export default function Me() {

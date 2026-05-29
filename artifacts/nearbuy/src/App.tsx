@@ -15,6 +15,7 @@ import Search from "@/pages/search";
 import Me from "@/pages/me";
 import Seller from "@/pages/seller";
 import AdminSellers from "@/pages/admin-sellers";
+import AdminOrders from "@/pages/admin-orders";
 import BottomNav from "@/components/bottom-nav";
 import AiAssistant from "@/components/ai-assistant";
 
@@ -33,6 +34,7 @@ function Router() {
       <Route path="/me" component={Me} />
       <Route path="/seller" component={Seller} />
       <Route path="/admin/sellers" component={AdminSellers} />
+      <Route path="/admin/orders" component={AdminOrders} />
       <Route component={NotFound} />
     </Switch>
   );

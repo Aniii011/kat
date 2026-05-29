@@ -571,3 +571,123 @@ begin
     where user_id = target_user_id and status = 'pending';
 end;
 $$;
+
+-- ============================================================
+-- ORDERS & ADMIN SYSTEM
+-- Run these AFTER the previous sections
+-- ============================================================
+
+-- ── Add is_admin to profiles ─────────────────────────────────
+alter table profiles
+  add column if not exists is_admin boolean not null default false;
+
+-- ── Orders table ─────────────────────────────────────────────
+create table if not exists orders (
+  id               bigint generated always as identity primary key,
+  order_number     text        not null default ('KAT-' || floor(random() * 900000 + 100000)::text),
+  buyer_id         uuid        references auth.users(id),
+  buyer_name       text        not null,
+  buyer_email      text        not null,
+  buyer_phone      text,
+  delivery_address text        not null,
+  city             text        not null,
+  state            text        not null,
+  country          text        not null default 'Nigeria',
+  items            jsonb       not null default '[]',
+  subtotal         numeric     not null,
+  delivery_fee     numeric     not null default 0,
+  total            numeric     not null,
+  status           text        not null default 'processing'
+                               check (status in ('processing','shipped','out_for_delivery','delivered','cancelled')),
+  notes            text,
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
+);
+
+alter table orders enable row level security;
+
+-- Buyers can view their own orders
+create policy "Buyers view own orders"
+  on orders for select
+  using (auth.uid() = buyer_id);
+
+-- Buyers can create orders
+create policy "Buyers create orders"
+  on orders for insert
+  with check (auth.uid() = buyer_id);
+
+-- Admins can view and update all orders (via service_role or is_admin check)
+create policy "Admins manage all orders"
+  on orders for all
+  using (
+    exists (select 1 from profiles where id = auth.uid() and is_admin = true)
+  );
+
+-- ── Admin management functions ───────────────────────────────
+-- Grant or revoke admin access. Call from Supabase Dashboard or service_role client.
+-- Example: select set_admin('user-uuid-here', true);
+create or replace function set_admin(target_user_id uuid, admin_value boolean)
+returns void language plpgsql security definer as $$
+begin
+  update profiles set is_admin = admin_value, updated_at = now()
+  where id = target_user_id;
+end;
+$$;
+
+-- ── Order status updater ──────────────────────────────────────
+-- Allows admin to progress order status from service_role:
+-- select update_order_status('KAT-123456', 'shipped');
+create or replace function update_order_status(order_num text, new_status text)
+returns void language plpgsql security definer as $$
+begin
+  update orders
+    set status = new_status, updated_at = now()
+    where order_number = order_num
+      and new_status in ('processing','shipped','out_for_delivery','delivered','cancelled');
+end;
+$$;
+
+-- ── Supabase Storage Policies ────────────────────────────────
+-- Run these AFTER creating a 'product-images' storage bucket in:
+-- Supabase Dashboard → Storage → New Bucket → name: product-images
+-- Settings: Public bucket = NO (serve via signed URLs)
+-- Then run in SQL Editor:
+
+/*
+-- Allow verified sellers to upload images to their own folder
+create policy "Sellers upload product images"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'product-images'
+    and (storage.foldername(name))[1] = auth.uid()::text
+    and exists (select 1 from public.profiles where id = auth.uid() and seller_verified = true)
+    and lower(storage.extension(name)) in ('jpg','jpeg','png','webp')
+  );
+
+-- Sellers can delete their own uploads
+create policy "Sellers delete own images"
+  on storage.objects for delete
+  using (
+    bucket_id = 'product-images'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- Public can read product images (via signed URL or if bucket is public)
+create policy "Public read product images"
+  on storage.objects for select
+  using (bucket_id = 'product-images');
+*/
+
+-- ── Rate Limiting ─────────────────────────────────────────────
+-- Enable Supabase Auth rate limiting in:
+-- Dashboard → Authentication → Rate Limits
+-- Recommended settings:
+--   Sign ups:             10 per hour per IP
+--   Sign in attempts:     30 per hour per email/IP
+--   Password reset:       3 per hour per email
+--   OTP / Magic link:     10 per hour per email
+
+-- ── Nigeria-only delivery enforcement ────────────────────────
+-- Add a check constraint to ensure Nigeria-only orders:
+alter table orders
+  add constraint orders_nigeria_only check (country = 'Nigeria');

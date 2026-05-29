@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/context/auth-context";
 import {
   ArrowLeft, ShieldCheck, Check, X, Store,
-  Clock, Mail, Calendar, Search, Filter,
+  Clock, Mail, Calendar, Search, Truck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -96,6 +96,11 @@ export default function AdminSellers() {
             </h1>
             <p className="text-[11px] text-muted-foreground">Admin Panel · KAT</p>
           </div>
+          <Link href="/admin/orders">
+            <Button size="sm" variant="outline" className="rounded-full gap-1.5 text-xs font-semibold shrink-0">
+              <Truck className="w-3.5 h-3.5" /> Orders
+            </Button>
+          </Link>
         </div>
       </header>
 

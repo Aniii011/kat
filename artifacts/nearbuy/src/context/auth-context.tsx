@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import type { User } from "@supabase/supabase-js";
 
 export interface KatUser {
   id: string;
@@ -36,6 +37,36 @@ function saveDemoUser(u: KatUser | null) {
   else localStorage.removeItem(DEMO_KEY);
 }
 
+async function fetchKatUser(u: User): Promise<KatUser> {
+  let isSeller = Boolean(u.user_metadata?.is_seller);
+  let sellerVerified = Boolean(u.user_metadata?.seller_verified);
+  let isAdmin = ADMIN_EMAILS.includes(u.email ?? "");
+
+  try {
+    const { data } = await supabase
+      .from("profiles")
+      .select("is_admin, is_seller, seller_verified, full_name")
+      .eq("id", u.id)
+      .single();
+    if (data) {
+      isAdmin = Boolean(data.is_admin);
+      isSeller = Boolean(data.is_seller);
+      sellerVerified = Boolean(data.seller_verified);
+    }
+  } catch {
+    // profiles table may not exist yet — fall back to email check + metadata
+  }
+
+  return {
+    id: u.id,
+    email: u.email ?? "",
+    name: u.user_metadata?.full_name ?? u.email?.split("@")[0] ?? "User",
+    isSeller,
+    sellerVerified,
+    isAdmin,
+  };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<KatUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,32 +78,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        const u = session.user;
-        setUser({
-          id: u.id,
-          email: u.email ?? "",
-          name: u.user_metadata?.full_name ?? u.email?.split("@")[0] ?? "User",
-          isSeller: Boolean(u.user_metadata?.is_seller),
-          sellerVerified: Boolean(u.user_metadata?.seller_verified),
-          isAdmin: ADMIN_EMAILS.includes(u.email ?? ""),
-        });
+        const katUser = await fetchKatUser(session.user);
+        setUser(katUser);
       }
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        const u = session.user;
-        setUser({
-          id: u.id,
-          email: u.email ?? "",
-          name: u.user_metadata?.full_name ?? u.email?.split("@")[0] ?? "User",
-          isSeller: Boolean(u.user_metadata?.is_seller),
-          sellerVerified: Boolean(u.user_metadata?.seller_verified),
-          isAdmin: ADMIN_EMAILS.includes(u.email ?? ""),
-        });
+        const katUser = await fetchKatUser(session.user);
+        setUser(katUser);
       } else {
         setUser(null);
       }

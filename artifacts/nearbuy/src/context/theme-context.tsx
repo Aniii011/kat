@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-export type AppTheme = "light" | "dark" | "pink" | "blue" | "beige" | "black-luxury";
+export type AppTheme = "light" | "dark";
 
 interface ThemeContextValue {
   theme: AppTheme;
@@ -13,27 +13,31 @@ const ThemeContext = createContext<ThemeContextValue>({
 });
 
 const STORAGE_KEY = "kat-theme";
-const THEME_CLASSES: AppTheme[] = ["light", "dark", "pink", "blue", "beige", "black-luxury"];
+
+function resolveTheme(raw: string | null): AppTheme {
+  if (raw === "dark") return "dark";
+  return "light";
+}
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<AppTheme>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY) as AppTheme | null;
-      if (saved && THEME_CLASSES.includes(saved)) return saved;
+      return resolveTheme(localStorage.getItem(STORAGE_KEY));
     } catch {}
     return "light";
   });
 
   useEffect(() => {
     const root = document.documentElement;
-    THEME_CLASSES.forEach((t) => root.classList.remove(t, `theme-${t}`));
+    root.classList.remove("dark", "theme-pink", "theme-blue", "theme-beige", "theme-black-luxury");
     if (theme === "dark") root.classList.add("dark");
-    else if (theme !== "light") root.classList.add(`theme-${theme}`);
     try { localStorage.setItem(STORAGE_KEY, theme); } catch {}
   }, [theme]);
 
+  const setTheme = (t: AppTheme) => setThemeState(t);
+
   return (
-    <ThemeContext.Provider value={{ theme, setTheme: setThemeState }}>
+    <ThemeContext.Provider value={{ theme, setTheme }}>
       {children}
     </ThemeContext.Provider>
   );

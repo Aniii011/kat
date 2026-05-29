@@ -1,0 +1,148 @@
+I need you to do a full security audit, fix all vulnerabilities, AND upgrade features for my KAT marketplace app in one session. Do everything below without breaking the existing Supabase integration, auth system, or deployment setup.
+
+PART 1 — SECURITY FIXES (Do These First)
+1. Supabase RLS (Most Critical)
+
+Enable Row Level Security on ALL tables: orders, products, profiles, seller data, and any other table
+Write proper RLS policies so:
+
+Buyers can only see and edit their own orders
+Sellers can only see and edit their own products and orders
+Admin can access everything
+No user can access another user's data
+
+
+
+2. Admin Route Protection
+
+The /admin route must verify the user is an admin in the database, not just on the frontend
+If someone manually visits /admin without being an admin they must be redirected immediately
+Admin status must be checked from Supabase database, not just local state
+
+3. Seller Verification
+
+The seller_verified check must be enforced in Supabase RLS rules, not just the UI
+Unverified sellers must not be able to upload products even if they bypass the frontend
+Seller approval must only be triggerable by admin
+
+4. Supabase Storage Rules
+
+Validate file types (images only) and file sizes on product image uploads
+Sellers should only be able to delete their own uploads
+No public write access to storage buckets
+
+5. Clean Up Replit-Specific Code
+
+Remove all Replit plugins and references from vite.config.ts for production
+Remove any leftover Dripp branding and replace with KAT everywhere in the codebase
+Clean up any development-only code that should not be in production
+
+6. Environment Variables
+
+Make sure the Supabase service role key is nowhere in the frontend code
+Only the anon key should be exposed to the frontend
+Audit all environment variables for security risks
+
+7. Rate Limiting & Auth Security
+
+Enable Supabase built-in auth rate limiting
+Make sure auth endpoints cannot be abused or spammed
+Ensure password reset and signup flows are secure
+
+
+PART 2 — FEATURE UPGRADES (Do These After Security)
+1. Product Upload System (Seller Improvement)
+
+When sellers upload products they MUST be able to:
+
+Select MAIN category (Women, Men, Shoes, Beauty, Accessories, Kids, Home, Thrift, Deals)
+Select SUBCATEGORY dynamically based on main category selected
+Select multiple STYLE TAGS (90s, Alt, Clean Girl, Y2K, Streetwear, Minimalist, Vintage, etc.)
+
+
+Ensure product model in Supabase supports storing: category, subcategory, style tags array
+Make category selection required before a product can be published
+Style tags should be searchable and filterable on the buyer side
+
+2. Delivery System (Admin Controlled)
+
+Remove delivery control from sellers completely
+Centralize ALL delivery logic under admin system
+Admin delivery dashboard must show for each order:
+
+Buyer full name, address, phone number
+Items purchased with quantities and prices
+Seller source info
+Order status
+
+
+Add admin ability to view all orders in a clean structured table
+Add Print Delivery Sheet / Order Slip view for admin use
+Enforce Nigeria-only delivery validation at checkout (restrict non-Nigerian locations)
+Order statuses: Processing, Shipped, Out for Delivery, Delivered, Cancelled
+Admin can update order status from the dashboard
+
+3. Theme System (Black / White + Pink Accents)
+
+Implement a clean global theme system:
+
+Default theme: white background + black text
+Dark theme: black background + white text
+Accent color: pink used only for buttons, highlights, and active states
+
+
+Theme toggle must be accessible from navbar or settings
+Apply theme consistently across: navbar, product cards, buttons, forms, admin panel, seller dashboard
+Theme switching must not break layout on mobile or desktop
+Store theme preference in localStorage so it persists on refresh
+
+4. UX & Layout Fixes
+
+Remove Pinterest-style layout if still present
+Replace with a clean structured marketplace grid layout
+Make UI feel like a modern professional fashion marketplace not a social feed
+Improve product browsing clarity with proper spacing and hierarchy
+Ensure bottom navigation works consistently on both mobile and desktop
+Gate the Me/Profile section so it redirects to login if user is not authenticated
+Add proper loading states and error messages throughout the app
+
+5. Email Notifications
+
+Set up email notifications using Resend or Brevo:
+
+Order confirmation email to buyer
+Shipping update email to buyer
+Delivery confirmation email to buyer
+New order alert email to seller
+New seller approval notification to admin
+
+
+
+
+KEEP:
+
+Supabase authentication system
+Existing database structure as much as possible
+Seller verification and admin approval logic
+Current Vercel deployment setup
+React + Vite + Tailwind stack
+Mobile-first design approach
+
+DO NOT:
+
+Rewrite the entire project
+Change the framework or stack
+Break existing auth or routing
+Remove the seller verification system
+Expose any secret keys in frontend code
+
+
+HOW TO WORK:
+
+Complete Part 1 security fixes first before touching any features
+Tell me when each numbered section is done before moving to the next
+If any fix requires a Supabase migration, write the SQL and show it to me before running it
+If anything conflicts with the existing structure, tell me and suggest the safest approach
+Test each change before moving on
+
+GOAL: Make KAT a secure, structured, scalable fashion marketplace with proper security, product categorization, centralized delivery management, professional theme system, and clean seller and admin workflows

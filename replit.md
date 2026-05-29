@@ -51,7 +51,10 @@ artifacts/nearbuy/
 - **Listing Detail**: Image gallery, seller profile + follower count, aesthetic badges, ₦ pricing, colour/size selectors, quantity picker, Add to Bag + Buy Now, deposit flow for thrift items, reviews, related products
 - **Thrift Drops**: Dedicated page explaining the deposit model, 3-step guide, thrift item grid, deposit confirmation dialog
 - **AI Stylist**: Floating chat button (bottom-right), slide-up panel, quick-reply chips, keyword-based outfit suggestions with product links
-- **Theme Switcher**: Dropdown with 6 themes (Light, Dark, Pink, Blue, Beige, Black Luxury), persisted in localStorage
+- **Theme Switcher**: Simple Sun/Moon toggle (Light = white/black/pink, Dark = black/white/pink), persisted in localStorage
+- **Seller Dashboard**: Manage products, orders, thrift items, analytics. Upload dialog has main category, subcategory, style tags, pricing, inventory, thrift toggle
+- **Admin → Sellers** (`/admin/sellers`): Approve/reject seller applications, manage verified sellers. Header nav links to Orders page
+- **Admin → Orders** (`/admin/orders`): View all orders, filter by status, expand for buyer/address/items detail, update order status (Processing→Shipped→Out for Delivery→Delivered), print delivery sheet
 
 ## User preferences
 
@@ -59,13 +62,17 @@ artifacts/nearbuy/
 - Currency: Nigerian Naira (₦)
 - Target audience: Nigerian women, fashion-forward, mobile-first
 - Keep the static data fallback — don't require Supabase for the app to work
+- Theme: Light/Dark only (white+black+pink). No other themes.
 
 ## Gotchas
 
 - Supabase 400 errors are expected when tables don't exist — the app uses `staticListings` as fallback. Do NOT show error UI if `fallback` is available.
-- Theme classes go on `document.documentElement` (`<html>`), not `<body>`.
+- Theme classes go on `document.documentElement` (`<html>`), not `<body>`. Only `dark` class is used now; the old `.theme-pink` etc. are removed.
 - All Supabase env vars are injected at build time by Vite's `define` config in `vite.config.ts` — they use `VITE_` prefix.
-- Run `supabase-setup.sql` in Supabase SQL Editor to create tables and seed Nigerian fashion data.
+- Run `supabase-setup.sql` in Supabase SQL Editor to create tables and seed Nigerian fashion data. The file has cumulative sections — run them in order.
+- `is_admin` is DB-sourced (from `profiles.is_admin`). In demo mode (no Supabase), `admin@kat.com` → isAdmin. Email containing "seller" → sellerVerified.
+- Orders are Nigeria-only (`country = 'Nigeria'` constraint in the DB).
+- Storage bucket `product-images` policies are in `supabase-setup.sql` (commented out) — uncomment after creating the bucket in Supabase Dashboard.
 
 ## Pointers
 
