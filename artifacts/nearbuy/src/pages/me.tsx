@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import ThemeSwitcher from "@/components/theme-switcher";
-import { useTheme, type AppTheme } from "@/context/theme-context";
+import { useTheme } from "@/context/theme-context";
 import { useAuth } from "@/context/auth-context";
 import AuthModal from "@/components/auth-modal";
 import {
@@ -24,6 +24,7 @@ import {
   UserCircle2,
   ShieldCheck,
   AlertTriangle,
+  Palette,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,14 +48,21 @@ function formatNaira(n: number) {
   return "₦" + n.toLocaleString("en-NG");
 }
 
-const THEME_OPTIONS: { value: AppTheme; label: string; swatch: string }[] = [
-  { value: "light", label: "Light", swatch: "#ffffff" },
-  { value: "dark", label: "Dark", swatch: "#0d0d0d" },
-  { value: "pink", label: "Pink", swatch: "#ff69b4" },
+const BASE_OPTIONS = [
+  { value: "white" as const, label: "White", bg: "#ffffff" },
+  { value: "black" as const, label: "Black", bg: "#0d0d0d" },
+];
+
+const ACCENT_OPTIONS = [
+  { value: "pink" as const, label: "Pink", color: "#e0508a" },
+  { value: "beige" as const, label: "Beige", color: "#b8966a" },
+  { value: "purple" as const, label: "Purple", color: "#9b59d6" },
+  { value: "sage" as const, label: "Sage", color: "#4a9e6e" },
+  { value: "blue" as const, label: "Blue", color: "#3b82f6" },
 ];
 
 export default function Me() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setBase, setAccent } = useTheme();
   const { user, signOut } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
@@ -140,14 +148,15 @@ export default function Me() {
   }
 
   const menuItems = [
-    { icon: <Package className="w-4 h-4" />, label: "My Orders", tab: "orders" as const },
+    { icon: <Package className="w-4 h-4" />, label: "Orders", tab: "orders" as const },
     { icon: <MapPin className="w-4 h-4" />, label: "Addresses", tab: "addresses" as const },
     { icon: <RotateCcw className="w-4 h-4" />, label: "Returns", tab: "returns" as const },
   ];
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sign Out Confirmation Dialog */}
+
+      {/* Sign Out Confirmation */}
       <AnimatePresence>
         {showSignOutConfirm && (
           <motion.div
@@ -202,6 +211,7 @@ export default function Me() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-4 pb-24 space-y-4">
+
         {/* Profile card */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -216,205 +226,3 @@ export default function Me() {
               {editingName ? (
                 <div className="flex gap-2">
                   <Input
-                    value={nameInput}
-                    onChange={(e) => setNameInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && saveName()}
-                    placeholder="Your name..."
-                    className="rounded-xl text-sm h-8"
-                    autoFocus
-                  />
-                  <Button size="sm" onClick={saveName} className="rounded-xl px-3 h-8">Save</Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <p className="font-bold text-base truncate">{effectiveName || "Set your name"}</p>
-                  {!user?.name && (
-                    <button
-                      onClick={() => { setNameInput(displayName); setEditingName(true); }}
-                      className="w-6 h-6 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0"
-                    >
-                      <Edit3 className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              )}
-              <div className="flex items-center gap-2 mt-0.5">
-                <p className="text-xs text-muted-foreground">{user?.email || "KAT Member"}</p>
-                {user?.sellerVerified && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full">
-                    <BadgeCheck className="w-3 h-3" /> Verified Seller
-                  </span>
-                )}
-                {user?.isAdmin && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                    <ShieldCheck className="w-3 h-3" /> Admin
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Tab nav */}
-        <div className="flex gap-1 bg-muted p-1 rounded-2xl">
-          {menuItems.map(({ icon, label, tab }) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl text-[10px] font-semibold transition-all ${activeTab === tab ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              {icon}
-              <span>{label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Orders */}
-        {activeTab === "orders" && (
-          <div className="bg-card border border-card-border rounded-2xl p-6 text-center">
-            <Package className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-            <p className="font-bold text-sm">No orders yet</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Your orders will appear here once you make a purchase.
-            </p>
-          </div>
-        )}
-
-        {/* Addresses */}
-        {activeTab === "addresses" && (
-          <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
-            <p className="font-bold text-sm flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-primary" /> Delivery Address
-            </p>
-            {editingAddress ? (
-              <div className="space-y-2">
-                <textarea
-                  value={addressInput}
-                  onChange={(e) => setAddressInput(e.target.value)}
-                  placeholder="Enter your full delivery address..."
-                  className="w-full text-sm bg-muted rounded-xl p-3 resize-none h-24 outline-none focus:ring-1 focus:ring-primary border border-transparent focus:border-primary"
-                />
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={saveAddress} className="rounded-full">Save Address</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setEditingAddress(false)} className="rounded-full">Cancel</Button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                {address ? (
-                  <div className="bg-muted rounded-xl p-3 text-sm">{address}</div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No address saved yet</p>
-                )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-3 rounded-full"
-                  onClick={() => { setAddressInput(address); setEditingAddress(true); }}
-                >
-                  {address ? "Edit Address" : "Add Address"}
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Returns */}
-        {activeTab === "returns" && (
-          <div className="bg-card border border-card-border rounded-2xl p-4 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <RotateCcw className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="font-bold text-sm">Return & Refund Policy</p>
-                <p className="text-xs text-muted-foreground">14-day return window</p>
-              </div>
-            </div>
-            <div className="space-y-2 text-sm text-muted-foreground">
-              <p>✓ Items must be unworn and in original condition</p>
-              <p>✓ Include original packaging and tags</p>
-              <p>✓ Refunds processed within 5–7 business days</p>
-              <p>✗ Thrift items are non-refundable once payment is complete</p>
-              <p>✗ Beauty and health items cannot be returned once opened</p>
-            </div>
-            <Button variant="outline" size="sm" className="rounded-full w-full">
-              Start a Return Request
-            </Button>
-          </div>
-        )}
-
-        {/* Theme picker */}
-        <div className="bg-card border border-card-border rounded-2xl p-4">
-          <p className="font-bold text-sm mb-3">App Theme</p>
-          <div className="grid grid-cols-3 gap-2">
-            {THEME_OPTIONS.map((t) => (
-              <button
-                key={t.value}
-                onClick={() => setTheme(t.value)}
-                className={`flex items-center gap-2 p-2.5 rounded-xl border-2 transition-all text-sm font-medium ${theme === t.value ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"}`}
-              >
-                <span
-                  className="w-4 h-4 rounded-full border border-border shadow-sm shrink-0"
-                  style={{ background: t.swatch }}
-                />
-                <span className="text-xs">{t.label}</span>
-                {theme === t.value && <Check className="w-3 h-3 text-primary ml-auto" />}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Help & Support */}
-        <div className="bg-card border border-card-border rounded-2xl overflow-hidden">
-          {[
-            { icon: <HelpCircle className="w-4 h-4" />, label: "Help & Support" },
-            { icon: <Shield className="w-4 h-4" />, label: "Privacy Policy" },
-          ].map(({ icon, label }, i, arr) => (
-            <React.Fragment key={label}>
-              <button className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted transition-colors text-sm">
-                <span className="text-muted-foreground">{icon}</span>
-                <span className="flex-1 text-left font-medium">{label}</span>
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </button>
-              {i < arr.length - 1 && <Separator />}
-            </React.Fragment>
-          ))}
-        </div>
-
-        {/* Admin / Seller quick links */}
-        {(user?.isAdmin || user?.sellerVerified) && (
-          <div className="bg-card border border-card-border rounded-2xl overflow-hidden">
-            {user?.isAdmin && (
-              <Link href="/admin/sellers">
-                <button className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted transition-colors text-sm">
-                  <span className="text-primary"><ShieldCheck className="w-4 h-4" /></span>
-                  <span className="flex-1 text-left font-medium">Admin — Seller Management</span>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                </button>
-              </Link>
-            )}
-            {user?.sellerVerified && (
-              <Link href="/seller">
-                <button className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted transition-colors text-sm border-t border-border first:border-0">
-                  <span className="text-primary"><Store className="w-4 h-4" /></span>
-                  <span className="flex-1 text-left font-medium">My Seller Dashboard</span>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                </button>
-              </Link>
-            )}
-          </div>
-        )}
-
-        {/* Sign Out */}
-        <Button
-          variant="outline"
-          className="w-full rounded-2xl h-12 border-destructive/30 text-destructive hover:bg-destructive/10 font-semibold gap-2"
-          onClick={() => setShowSignOutConfirm(true)}
-        >
-          <LogOut className="w-4 h-4" /> Sign Out
-        </Button>
-      </main>
-    </div>
-  );
-}
