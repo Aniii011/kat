@@ -17,7 +17,7 @@ interface AuthContextType {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
-  signOut: () => void;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -54,7 +54,7 @@ async function fetchKatUser(u: User): Promise<KatUser> {
       sellerVerified = Boolean(data.seller_verified);
     }
   } catch {
-    // profiles table may not exist yet — fall back to email check + metadata
+    // profiles table may not exist yet — fall back to metadata
   }
 
   return {
@@ -78,21 +78,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Get initial session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const katUser = await fetchKatUser(session.user);
-        setUser(katUser);
-      }
-      setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         const katUser = await fetchKatUser(session.user);
         setUser(katUser);
       } else {
         setUser(null);
       }
+      setLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth event:", event);
+      
+      if (event === "SIGNED_OUT") {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      if (event === "SIGNED_IN" && session?.user) {
+        const katUser = await fetchKatUser(session.user);
+        setUser(katUser);
+        setLoading(false);
+        return;
+      }
+
+      if (session?.user) {
+        const katUser = await fetchKatUser(session.user);
+        setUser(katUser);
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -113,14 +133,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(demo);
       return { error: null };
     }
+
+    setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message ?? null };
+    if (error) {
+      setLoading(false);
+      return { error: error.message };
+    }
+    return { error: null };
   }, []);
 
   const signUp = useCallback(async (email: string, password: string, name: string) => {
     if (!isSupabaseConfigured) {
       if (!email || !password || !name) return { error: "All fields are required" };
-      if (password.length < 6) return { error: "Password must be at least 6 characters" };
+      if (password.length < 8) return { error: "Password must be at least 8 characters" };
       const demo: KatUser = {
         id: "demo-" + email,
         email,
@@ -141,13 +167,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error?.message ?? null };
   }, []);
 
-  const signOut = useCallback(() => {
+  const signOut = useCallback(async () => {
     if (!isSupabaseConfigured) {
       saveDemoUser(null);
       setUser(null);
       return;
     }
-    supabase.auth.signOut();
+    setLoading(true);
+    await supabase.auth.signOut();
+    setUser(null);
+    setLoading(false);
   }, []);
 
   return (
