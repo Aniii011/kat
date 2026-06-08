@@ -22,7 +22,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const ADMIN_EMAILS = ["admin@kat.com"];
+const ADMIN_EMAILS = ["youremail@gmail.com"];
 const DEMO_KEY = "kat_demo_user";
 
 function loadDemoUser(): KatUser | null {
@@ -38,9 +38,10 @@ function saveDemoUser(u: KatUser | null) {
 }
 
 async function fetchKatUser(u: User): Promise<KatUser> {
-  let isSeller = Boolean(u.user_metadata?.is_seller);
-  let sellerVerified = Boolean(u.user_metadata?.seller_verified);
+  let isSeller = false;
+  let sellerVerified = false;
   let isAdmin = ADMIN_EMAILS.includes(u.email ?? "");
+  let name = u.user_metadata?.full_name ?? u.email?.split("@")[0] ?? "User";
 
   try {
     const { data } = await supabase
@@ -52,15 +53,16 @@ async function fetchKatUser(u: User): Promise<KatUser> {
       isAdmin = Boolean(data.is_admin);
       isSeller = Boolean(data.is_seller);
       sellerVerified = Boolean(data.seller_verified);
+      if (data.full_name) name = data.full_name;
     }
   } catch {
-    // profiles table may not exist yet — fall back to metadata
+    // profiles table may not exist yet
   }
 
   return {
     id: u.id,
     email: u.email ?? "",
-    name: u.user_metadata?.full_name ?? u.email?.split("@")[0] ?? "User",
+    name,
     isSeller,
     sellerVerified,
     isAdmin,
@@ -78,44 +80,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Get initial session
+    let mounted = true;
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mounted) return;
       if (session?.user) {
         const katUser = await fetchKatUser(session.user);
-        setUser(katUser);
+        if (mounted) setUser(katUser);
       } else {
-        setUser(null);
+        if (mounted) setUser(null);
       }
-      setLoading(false);
+      if (mounted) setLoading(false);
     });
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth event:", event);
-      
-      if (event === "SIGNED_OUT") {
-        setUser(null);
-        setLoading(false);
-        return;
-      }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!mounted) return;
 
-      if (event === "SIGNED_IN" && session?.user) {
-        const katUser = await fetchKatUser(session.user);
-        setUser(katUser);
-        setLoading(false);
-        return;
-      }
+        if (event === "SIGNED_OUT") {
+          setUser(null);
+          setLoading(false);
+          return;
+        }
 
-      if (session?.user) {
-        const katUser = await fetchKatUser(session.user);
-        setUser(katUser);
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    });
+        if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+          if (session?.user) {
+            const katUser = await fetchKatUser(session.user);
+            if (mounted) {
+              setUser(katUser);
+              setLoading(false);
+            }
+          }
+          return;
+        }
 
-    return () => subscription.unsubscribe();
+        if (session?.user) {
+          const katUser = await fetchKatUser(session.user);
+          if (mounted) setUser(katUser);
+        } else {
+          if (mounted) setUser(null);
+        }
+        if (mounted) setLoading(false);
+      }
+    );
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
@@ -124,9 +136,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const demo: KatUser = {
         id: "demo-" + email,
         email,
-        name: email.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
-        isSeller: email.toLowerCase().includes("seller"),
-        sellerVerified: email.toLowerCase().includes("seller"),
+        name: email.split("@")[0],
+        isSeller: false,
+        sellerVerified: false,
         isAdmin: ADMIN_EMAILS.includes(email.toLowerCase()),
       };
       saveDemoUser(demo);
@@ -134,19 +146,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: null };
     }
 
-    setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setLoading(false);
-      return { error: error.message };
-    }
+    if (error) return { error: error.message };
     return { error: null };
   }, []);
 
   const signUp = useCallback(async (email: string, password: string, name: string) => {
     if (!isSupabaseConfigured) {
       if (!email || !password || !name) return { error: "All fields are required" };
-      if (password.length < 8) return { error: "Password must be at least 8 characters" };
       const demo: KatUser = {
         id: "demo-" + email,
         email,
@@ -159,6 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(demo);
       return { error: null };
     }
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -173,10 +181,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       return;
     }
-    setLoading(true);
-    await supabase.auth.signOut();
     setUser(null);
-    setLoading(false);
+    await supabase.auth.signOut();
   }, []);
 
   return (
