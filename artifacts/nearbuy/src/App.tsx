@@ -16,6 +16,7 @@ import Me from "@/pages/me";
 import Seller from "@/pages/seller";
 import AdminSellers from "@/pages/admin-sellers";
 import AdminOrders from "@/pages/admin-orders";
+import ResetPassword from "@/pages/reset-password";
 import BottomNav from "@/components/bottom-nav";
 import AiAssistant from "@/components/ai-assistant";
 
@@ -48,6 +49,7 @@ function Router() {
       <Route path="/seller" component={Seller} />
       <Route path="/admin/sellers" component={AdminSellers} />
       <Route path="/admin/orders" component={AdminOrders} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route component={NotFound} />
     </Switch>
   );
