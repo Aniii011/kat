@@ -83,15 +83,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let mounted = true;
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!mounted) return;
-      if (session?.user) {
-        const katUser = await fetchKatUser(session.user);
-        if (mounted) setUser(katUser);
-      } else {
-        if (mounted) setUser(null);
-      }
-      if (mounted) setLoading(false);
-    });
+  if (!mounted) return;
+  try {
+    if (session?.user) {
+      const katUser = await fetchKatUser(session.user);
+      if (mounted) setUser(katUser);
+    } else {
+      if (mounted) setUser(null);
+    }
+  } catch {
+    if (mounted) setUser(null);
+  } finally {
+    if (mounted) setLoading(false);
+  }
+});
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
