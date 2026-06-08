@@ -22,7 +22,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const ADMIN_EMAILS = ["youremail@gmail.com"];
+const ADMIN_EMAILS = ["tiamiyukabirat0@gmail.com"];
 const DEMO_KEY = "kat_demo_user";
 
 function loadDemoUser(): KatUser | null {
