@@ -9,7 +9,8 @@ export const supabase = supabaseUrl && supabaseAnonKey
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
-        storageKey: "kat-auth-session",
+        storage: window.localStorage,
+        storageKey: "kat-auth-token",
       },
     })
   : createClient("https://placeholder.supabase.co", "placeholder-key");
