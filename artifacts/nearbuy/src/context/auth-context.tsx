@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 
@@ -72,7 +72,6 @@ async function fetchKatUser(u: User): Promise<KatUser> {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<KatUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const initialCheckDone = useRef(false);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -83,49 +82,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     let mounted = true;
 
-    // Only use loading for the very first session check
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!mounted) return;
-      try {
-        if (session?.user) {
-          const katUser = await fetchKatUser(session.user);
-          if (mounted) setUser(katUser);
-        } else {
-          if (mounted) setUser(null);
-        }
-      } catch {
-        if (mounted) setUser(null);
-      } finally {
-        if (mounted) {
-          setLoading(false);
-          initialCheckDone.current = true;
-        }
-      }
-    });
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
 
-        // Never set loading to true after initial check
-        if (event === "SIGNED_OUT") {
-          setUser(null);
-          return;
-        }
-
-        if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-          if (session?.user) {
-            const katUser = await fetchKatUser(session.user);
-            if (mounted) setUser(katUser);
-          }
-          return;
-        }
-
         if (session?.user) {
           const katUser = await fetchKatUser(session.user);
-          if (mounted) setUser(katUser);
+          if (mounted) {
+            setUser(katUser);
+            setLoading(false);
+          }
         } else {
-          if (mounted) setUser(null);
+          if (mounted) {
+            setUser(null);
+            setLoading(false);
+          }
         }
       }
     );
