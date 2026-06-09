@@ -82,22 +82,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     let mounted = true;
 
+    // First check existing session immediately
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mounted) return;
+      try {
+        if (session?.user) {
+          const katUser = await fetchKatUser(session.user);
+          if (mounted) setUser(katUser);
+        } else {
+          if (mounted) setUser(null);
+        }
+      } catch {
+        if (mounted) setUser(null);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    });
+
+    // Then listen for changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
 
-        if (session?.user) {
-          const katUser = await fetchKatUser(session.user);
-          if (mounted) {
-            setUser(katUser);
-            setLoading(false);
-          }
-        } else {
+        if (event === "SIGNED_OUT") {
           if (mounted) {
             setUser(null);
             setLoading(false);
           }
+          return;
         }
+
+        if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+          if (session?.user) {
+            try {
+              const katUser = await fetchKatUser(session.user);
+              if (mounted) {
+                setUser(katUser);
+                setLoading(false);
+              }
+            } catch {
+              if (mounted) setLoading(false);
+            }
+          }
+          return;
+        }
+
+        if (session?.user) {
+          try {
+            const katUser = await fetchKatUser(session.user);
+            if (mounted) setUser(katUser);
+          } catch {
+            // keep existing user
+          }
+        } else {
+          if (mounted) setUser(null);
+        }
+        if (mounted) setLoading(false);
       }
     );
 
@@ -122,9 +162,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(demo);
       return { error: null };
     }
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: error.message };
-    return { error: null };
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return { error: error.message };
+      return { error: null };
+    } catch {
+      return { error: "Something went wrong. Please try again." };
+    }
   }, []);
 
   const signUp = useCallback(async (email: string, password: string, name: string) => {
@@ -142,12 +186,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(demo);
       return { error: null };
     }
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: name } },
-    });
-    return { error: error?.message ?? null };
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name: name } },
+      });
+      return { error: error?.message ?? null };
+    } catch {
+      return { error: "Something went wrong. Please try again." };
+    }
   }, []);
 
   const signOut = useCallback(async () => {
@@ -156,8 +204,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       return;
     }
-    setUser(null);
-    await supabase.auth.signOut();
+    try {
+      setUser(null);
+      localStorage.removeItem("kat-auth-token");
+      localStorage.removeItem(DEMO_KEY);
+      await supabase.auth.signOut();
+      window.location.href = "/";
+    } catch {
+      window.location.href = "/";
+    }
   }, []);
 
   return (
