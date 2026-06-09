@@ -2,7 +2,7 @@
 
 Nigeria's favourite fashion, beauty & lifestyle marketplace — a mobile-first marketplace app for Nigerian women to shop and slay.
 
-## Run & Operate
+## Run & Operate 
 
 - `pnpm --filter @workspace/nearbuy run dev` — run the KAT frontend (port auto-assigned via $PORT)
 - `pnpm --filter @workspace/nearbuy run typecheck` — typecheck the frontend
