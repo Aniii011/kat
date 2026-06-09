@@ -1,203 +1,81 @@
-// auth/context.tsx
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import type { User } from "@supabase/supabase-js";
-
-export interface KatUser {
-  id: string;
-  email: string;
-  name: string;
-  avatarUrl?: string;
-  isSeller: boolean;
-  sellerVerified: boolean;
-  isAdmin: boolean;
-}
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { supabase } from "@/lib/supabase";
 
 interface AuthContextType {
-  user: KatUser | null;
+  user: any | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  loading: true,
+  signIn: async () => ({ error: "Not initialized" }),
+  signUp: async () => ({ error: "Not initialized" }),
+  signOut: async () => {},
+});
 
-const ADMIN_EMAILS = ["tiamiyukabirat0@gmail.com"];
-const DEMO_KEY = "kat_demo_user";
-
-function loadDemoUser(): KatUser | null {
-  try {
-    const raw = localStorage.getItem(DEMO_KEY);
-    return raw ? (JSON.parse(raw) as KatUser) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveDemoUser(u: KatUser | null) {
-  if (u) localStorage.setItem(DEMO_KEY, JSON.stringify(u));
-  else localStorage.removeItem(DEMO_KEY);
-}
-
-async function fetchKatUser(u: User): Promise<KatUser> {
-  let isSeller = false;
-  let sellerVerified = false;
-  let isAdmin = ADMIN_EMAILS.includes(u.email ?? "");
-  let name = u.user_metadata?.full_name ?? u.email?.split("@")[0] ?? "User";
-
-  try {
-    const { data } = await supabase
-      .from("profiles")
-      .select("is_admin, is_seller, seller_verified, full_name")
-      .eq("id", u.id)
-      .single();
-    if (data) {
-      isAdmin = Boolean(data.is_admin);
-      isSeller = Boolean(data.is_seller);
-      sellerVerified = Boolean(data.seller_verified);
-      if (data.full_name) name = data.full_name;
-    }
-  } catch {
-    // profiles table may not exist yet
-  }
-
-  return { id: u.id, email: u.email ?? "", name, isSeller, sellerVerified, isAdmin };
-}
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<KatUser | null>(null);
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Initialize user and listen to auth changes
+  // Listen to auth changes
   useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setUser(loadDemoUser());
+    const session = supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
       setLoading(false);
-      return;
-    }
-
-    let mounted = true;
-
-    async function initUser() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!mounted) return;
-
-        if (session?.user) {
-          const katUser = await fetchKatUser(session.user);
-          setUser(katUser);
-        } else {
-          setUser(null);
-        }
-      } catch {
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    initUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return;
-      if (session?.user) {
-        const katUser = await fetchKatUser(session.user);
-        setUser(katUser);
-      } else {
-        setUser(null);
-      }
     });
 
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
     return () => {
-      mounted = false;
-      subscription.unsubscribe();
+      listener.subscription.unsubscribe();
     };
   }, []);
 
-  // ✅ SignIn now sets user immediately
-  const signIn = useCallback(async (email: string, password: string) => {
-    if (!isSupabaseConfigured) {
-      const demo: KatUser = {
-        id: "demo-" + email,
-        email,
-        name: email.split("@")[0],
-        isSeller: false,
-        sellerVerified: false,
-        isAdmin: ADMIN_EMAILS.includes(email.toLowerCase()),
-      };
-      saveDemoUser(demo);
-      setUser(demo);
-      return { error: null };
-    }
-
+  const signIn = async (email: string, password: string) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
       if (error) return { error: error.message };
-      if (data.session?.user) {
-        const katUser = await fetchKatUser(data.session.user);
-        setUser(katUser); // ✅ fix: set user immediately
-      }
       return { error: null };
-    } catch {
-      return { error: "Something went wrong. Please try again." };
+    } catch (err) {
+      return { error: "Failed to sign in." };
     }
-  }, []);
+  };
 
-  // ✅ SignUp also sets user after registration
-  const signUp = useCallback(async (email: string, password: string, name: string) => {
-    if (!isSupabaseConfigured) {
-      const demo: KatUser = { id: "demo-" + email, email, name, isSeller: false, sellerVerified: false, isAdmin: ADMIN_EMAILS.includes(email.toLowerCase()) };
-      saveDemoUser(demo);
-      setUser(demo);
-      return { error: null };
-    }
-
+  const signUp = async (email: string, password: string, name: string) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: name } },
+        options: { data: { name } },
       });
-
       if (error) return { error: error.message };
-
-      if (data.user) {
-        const katUser = await fetchKatUser(data.user);
-        setUser(katUser); // ✅ set user after signUp
-      }
-
       return { error: null };
-    } catch {
-      return { error: "Something went wrong. Please try again." };
+    } catch (err) {
+      return { error: "Failed to sign up." };
     }
-  }, []);
+  };
 
-  // ✅ SignOut clears state
-  const signOut = useCallback(async () => {
-    if (!isSupabaseConfigured) {
-      saveDemoUser(null);
-      setUser(null);
-      return;
-    }
-    try {
-      await supabase.auth.signOut();
-      setUser(null);
-      localStorage.removeItem(DEMO_KEY);
-    } catch {
-      setUser(null);
-    }
-  }, []);
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  };
 
   return (
     <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
-  return ctx;
-}
+export const useAuth = () => useContext(AuthContext);
