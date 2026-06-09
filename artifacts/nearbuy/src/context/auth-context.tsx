@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 
@@ -22,7 +22,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const ADMIN_EMAILS = ["tiamiyukabirat0@gmail.com"];
+const ADMIN_EMAILS = ["youremail@gmail.com"];
 const DEMO_KEY = "kat_demo_user";
 
 function loadDemoUser(): KatUser | null {
@@ -72,6 +72,7 @@ async function fetchKatUser(u: User): Promise<KatUser> {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<KatUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const initialCheckDone = useRef(false);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -82,39 +83,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     let mounted = true;
 
+    // Only use loading for the very first session check
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-  if (!mounted) return;
-  try {
-    if (session?.user) {
-      const katUser = await fetchKatUser(session.user);
-      if (mounted) setUser(katUser);
-    } else {
-      if (mounted) setUser(null);
-    }
-  } catch {
-    if (mounted) setUser(null);
-  } finally {
-    if (mounted) setLoading(false);
-  }
-});
+      if (!mounted) return;
+      try {
+        if (session?.user) {
+          const katUser = await fetchKatUser(session.user);
+          if (mounted) setUser(katUser);
+        } else {
+          if (mounted) setUser(null);
+        }
+      } catch {
+        if (mounted) setUser(null);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+          initialCheckDone.current = true;
+        }
+      }
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
 
+        // Never set loading to true after initial check
         if (event === "SIGNED_OUT") {
           setUser(null);
-          setLoading(false);
           return;
         }
 
         if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
           if (session?.user) {
             const katUser = await fetchKatUser(session.user);
-            if (mounted) {
-              setUser(katUser);
-              setLoading(false);
-            }
+            if (mounted) setUser(katUser);
           }
           return;
         }
@@ -125,7 +127,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           if (mounted) setUser(null);
         }
-        if (mounted) setLoading(false);
       }
     );
 
@@ -150,7 +151,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(demo);
       return { error: null };
     }
-
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: error.message };
     return { error: null };
@@ -171,7 +171,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(demo);
       return { error: null };
     }
-
     const { error } = await supabase.auth.signUp({
       email,
       password,
