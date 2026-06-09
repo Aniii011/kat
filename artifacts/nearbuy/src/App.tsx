@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/context/theme-context";
-import { AuthProvider } from "@/context/auth-context";
+import { AuthProvider, useAuth } from "@/context/auth-context";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import ListingDetail from "@/pages/listing-detail";
@@ -19,10 +19,40 @@ import AdminOrders from "@/pages/admin-orders";
 import ResetPassword from "@/pages/reset-password";
 import BottomNav from "@/components/bottom-nav";
 import AiAssistant from "@/components/ai-assistant";
+import { useEffect, useRef, useState } from "react";
 
 const queryClient = new QueryClient();
 
 function Router() {
+  const { loading } = useAuth();
+  const [show, setShow] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    timerRef.current = setTimeout(() => setShow(true), 2000);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!loading) {
+      setShow(true);
+      if (timerRef.current) clearTimeout(timerRef.current);
+    }
+  }, [loading]);
+
+  if (!show) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <span className="text-3xl font-black text-primary">KAT</span>
+          <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Switch>
       <Route path="/" component={Home} />
