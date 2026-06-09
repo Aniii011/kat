@@ -12,14 +12,7 @@ interface AuthModalProps {
   defaultMode?: "login" | "signup";
 }
 
-interface PasswordStrength {
-  score: number;
-  label: string;
-  color: string;
-  barColor: string;
-}
-
-function getPasswordStrength(password: string): PasswordStrength {
+function getPasswordStrength(password: string) {
   const checks = {
     length: password.length >= 8,
     uppercase: /[A-Z]/.test(password),
@@ -94,22 +87,32 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
     if (mode === "signup" && !isPasswordValid) {
       setError("Please choose a stronger password that meets all requirements.");
       return;
     }
+
     setLoading(true);
-    const result = mode === "login"
-      ? await signIn(email, password)
-      : await signUp(email, password, name);
-    setLoading(false);
-    if (result.error) {
-      setError(result.error);
-    } else {
-      setSuccess(true);
-      if (mode === "login") {
-        setTimeout(() => { onClose(); reset(); }, 800);
+
+    try {
+      const result = mode === "login"
+        ? await signIn(email, password)
+        : await signUp(email, password, name);
+
+      if (result.error) {
+        setError(result.error);
+        setLoading(false);
+      } else {
+        setSuccess(true);
+        setLoading(false);
+        if (mode === "login") {
+          setTimeout(() => { onClose(); reset(); }, 500);
+        }
       }
+    } catch (err) {
+      setError("Something went wrong. Please try again.");
+      setLoading(false);
     }
   };
 
@@ -118,14 +121,19 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
     if (!email) { setError("Please enter your email address."); return; }
     setLoading(true);
     setError(null);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    setLoading(false);
-    if (error) {
-      setError(error.message);
-    } else {
-      setForgotSent(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      setLoading(false);
+      if (error) {
+        setError(error.message);
+      } else {
+        setForgotSent(true);
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+      setLoading(false);
     }
   };
 
@@ -160,11 +168,14 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
         Enter your email and we'll send you a reset link.
       </p>
       <Input
+        id="forgot-email"
+        name="email"
         type="email"
         placeholder="Email address"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         className="rounded-xl h-11"
+        autoComplete="email"
         required
       />
       {error && (
@@ -214,31 +225,40 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
   );
 
   const renderMainForm = () => (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} className="space-y-3" autoComplete="on">
       {mode === "signup" && (
         <Input
+          id="signup-name"
+          name="name"
           placeholder="Your name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="rounded-xl h-11"
+          autoComplete="name"
           required
         />
       )}
       <Input
+        id="auth-email"
+        name="email"
         type="email"
         placeholder="Email address"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         className="rounded-xl h-11"
+        autoComplete="email"
         required
       />
       <div className="relative">
         <Input
+          id="auth-password"
+          name="password"
           type={showPw ? "text" : "password"}
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="rounded-xl h-11 pr-11"
+          autoComplete={mode === "login" ? "current-password" : "new-password"}
           required
         />
         <button
@@ -348,6 +368,7 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
                 {(["login", "signup"] as const).map((m) => (
                   <button
                     key={m}
+                    type="button"
                     onClick={() => switchMode(m)}
                     className={`flex-1 text-xs font-semibold py-2 rounded-xl transition-all ${
                       mode === m
@@ -373,6 +394,7 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
               <p className="text-center text-[11px] text-muted-foreground mt-4">
                 {mode === "login" ? "New to KAT? " : "Already have an account? "}
                 <button
+                  type="button"
                   className="text-primary font-semibold hover:underline"
                   onClick={() => switchMode(mode === "login" ? "signup" : "login")}
                 >
