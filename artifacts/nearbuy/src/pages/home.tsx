@@ -14,7 +14,7 @@ import SaveToBoardModal from "@/components/save-to-board-modal";
 import AuthModal from "@/components/auth-modal";
 import {
   Search, ShoppingBag, Star, BadgeCheck, Flame, Sparkles,
-  ChevronRight, Bookmark, Heart, LogIn, UserCircle2,
+  ChevronRight, Bookmark, Heart, LogIn,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,7 +29,15 @@ const BADGE_STYLES: Record<string, string> = {
   "Limited":     "bg-purple-600 text-white",
 };
 
-// ── Clean product card (uniform, commerce-style) ─────────────
+const ANNOUNCEMENT_ITEMS = [
+  "🛍️ Shop the latest drops",
+  "✨ New arrivals daily",
+  "🔒 Secure checkout",
+  "💜 Verified sellers only",
+  "📦 Fast delivery across Nigeria",
+  "🌟 Trusted by thousands",
+];
+
 function ProductCard({
   listing, index, onQuickView, onSave, saved,
 }: {
@@ -48,7 +56,6 @@ function ProductCard({
         className="group bg-card rounded-2xl overflow-hidden cursor-pointer border border-border hover:shadow-md transition-all duration-300"
         onClick={() => onQuickView(listing)}
       >
-        {/* Image — fixed aspect ratio for clean grid alignment */}
         <div className="relative aspect-[3/4] overflow-hidden bg-muted">
           <img
             src={listing.imageUrl}
@@ -56,8 +63,6 @@ function ProductCard({
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             loading="lazy"
           />
-
-          {/* Top-left badge */}
           <div className="absolute top-2 left-2 flex flex-col gap-1">
             {listing.isThrift && (
               <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-purple-500 text-white leading-tight">
@@ -70,38 +75,26 @@ function ProductCard({
               </span>
             )}
           </div>
-
-          {/* Discount chip bottom-left */}
           {listing.discount && (
             <span className="absolute bottom-2 left-2 text-[9px] px-1.5 py-0.5 rounded-md bg-primary text-primary-foreground font-bold">
               -{listing.discount}%
             </span>
           )}
-
-          {/* Wishlist button top-right */}
           <motion.button
             onClick={(e) => onSave(e, listing)}
             whileTap={{ scale: 0.8 }}
             className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center shadow transition-all ${
-              saved
-                ? "bg-primary shadow-primary/30"
-                : "bg-white/90 hover:bg-white"
+              saved ? "bg-primary shadow-primary/30" : "bg-white/90 hover:bg-white"
             }`}
           >
-            <Heart
-              className={`w-3.5 h-3.5 ${saved ? "fill-white text-white" : "text-gray-700"}`}
-            />
+            <Heart className={`w-3.5 h-3.5 ${saved ? "fill-white text-white" : "text-gray-700"}`} />
           </motion.button>
-
-          {/* Quick view overlay on hover (desktop only) */}
           <div className="absolute inset-x-0 bottom-0 hidden sm:flex justify-center pb-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
             <span className="bg-background/90 backdrop-blur-sm text-foreground text-[11px] font-semibold px-3 py-1.5 rounded-full shadow">
               Quick View
             </span>
           </div>
         </div>
-
-        {/* Card body */}
         <div className="p-2.5 space-y-1">
           <div className="flex items-center gap-1">
             <span className="text-[10px] text-muted-foreground truncate flex-1 leading-tight">
@@ -111,18 +104,14 @@ function ProductCard({
               <BadgeCheck className="w-3 h-3 text-primary shrink-0" />
             )}
           </div>
-
           <p className="text-[12px] font-semibold leading-snug line-clamp-2 text-foreground">
             {listing.title}
           </p>
-
           {listing.aesthetics && listing.aesthetics.length > 0 && (
             <span className="inline-block text-[9px] bg-accent text-accent-foreground px-1.5 py-0.5 rounded-md font-medium">
               {listing.aesthetics[0]}
             </span>
           )}
-
-          {/* Price row */}
           <div className="flex items-center justify-between pt-0.5">
             <div className="flex items-baseline gap-1 flex-wrap">
               <span className="text-[13px] font-extrabold text-primary leading-none">
@@ -141,7 +130,6 @@ function ProductCard({
               </span>
             </div>
           </div>
-
           {listing.isThrift && listing.depositAmount && (
             <p className="text-[9px] text-purple-500 font-semibold leading-tight">
               Deposit {formatNaira(listing.depositAmount)} to hold
@@ -166,7 +154,6 @@ function CardSkeleton() {
   );
 }
 
-// ── Main page ────────────────────────────────────────────────
 export default function Home() {
   const [topCategory, setTopCategory] = useState<TopCategory | "All">("All");
   const [subCategory, setSubCategory] = useState<string | null>(null);
@@ -176,6 +163,7 @@ export default function Home() {
   const [saveTarget, setSaveTarget] = useState<Listing | null>(null);
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [announcementIndex, setAnnouncementIndex] = useState(0);
 
   const { user } = useAuth();
   const { listings: remoteListings, loading } = useListings();
@@ -184,6 +172,9 @@ export default function Home() {
 
   const openLogin = () => { setAuthMode("login"); setShowAuth(true); };
   const openSignup = () => { setAuthMode("signup"); setShowAuth(true); };
+
+  const userName = (user?.name || user?.email || "User").split(" ")[0];
+  const userInitials = (user?.name || user?.email || "KA").slice(0, 2).toUpperCase();
 
   const subcats =
     topCategory !== "All" ? (SUBCATEGORIES[topCategory as TopCategory] ?? []) : [];
@@ -234,25 +225,41 @@ export default function Home() {
     setSelectedAesthetic(null);
   };
 
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setAnnouncementIndex((prev) => (prev + 1) % ANNOUNCEMENT_ITEMS.length);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
 
-      {/* Announcement bar */}
-      <div className="bg-primary text-primary-foreground text-center text-[11px] py-2 px-4 font-medium tracking-wide shrink-0">
-        🚚 Free delivery over ₦25,000 &nbsp;·&nbsp; 💳 Pay on delivery &nbsp;·&nbsp; ✨ 100% authentic
+      {/* Rotating announcement bar */}
+      <div className="bg-primary text-primary-foreground text-center text-[11px] py-2 px-4 font-medium tracking-wide shrink-0 overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.span
+            key={announcementIndex}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.3 }}
+            className="block"
+          >
+            {ANNOUNCEMENT_ITEMS[announcementIndex]}
+          </motion.span>
+        </AnimatePresence>
       </div>
 
       {/* Sticky header */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border shrink-0">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-3">
-          {/* Logo */}
           <Link href="/">
             <span className="text-2xl font-black tracking-tight text-primary cursor-pointer select-none">
               KAT
             </span>
           </Link>
 
-          {/* Search bar */}
           <Link href="/search" className="flex-1 max-w-lg mx-auto">
             <div className="flex items-center gap-2 h-9 rounded-full bg-muted px-4 text-muted-foreground text-sm cursor-pointer hover:bg-accent transition-colors">
               <Search className="w-4 h-4 shrink-0" />
@@ -260,7 +267,6 @@ export default function Home() {
             </div>
           </Link>
 
-          {/* Header actions */}
           <div className="flex items-center gap-0.5">
             <ThemeSwitcher />
             <Link href="/boards">
@@ -274,17 +280,16 @@ export default function Home() {
               </Button>
             </Link>
 
-            {/* Auth buttons — desktop only */}
             {user ? (
               <Link href="/me">
                 <button className="hidden sm:flex items-center gap-2 ml-1 h-9 px-3 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors">
                   <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center shrink-0">
                     <span className="text-[10px] font-black text-primary-foreground leading-none">
-                      {user.name.slice(0, 2).toUpperCase()}
+                      {userInitials}
                     </span>
                   </div>
                   <span className="text-xs font-semibold text-foreground truncate max-w-[80px]">
-                    {user.name.split(" ")[0]}
+                    {userName}
                   </span>
                 </button>
               </Link>
@@ -361,10 +366,8 @@ export default function Home() {
         </AnimatePresence>
       </header>
 
-      {/* Page content */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-4 pb-28">
 
-        {/* Hero — only on All/no-filter */}
         {topCategory === "All" && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
@@ -399,7 +402,6 @@ export default function Home() {
           </motion.div>
         )}
 
-        {/* Deals banner */}
         {topCategory === "Deals" && (
           <div className="mt-4 mb-5 rounded-3xl bg-gradient-to-r from-rose-500 to-orange-400 p-5 text-white">
             <p className="text-2xl font-black">🔥 Deals & Offers</p>
@@ -407,16 +409,12 @@ export default function Home() {
           </div>
         )}
 
-        {/* Aesthetic filter pills */}
         {topCategory === "All" && (
           <section className="mb-4">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-sm font-bold">✨ Shop by Vibe</h2>
               {selectedAesthetic && (
-                <button
-                  onClick={() => setSelectedAesthetic(null)}
-                  className="text-xs text-primary font-semibold"
-                >
+                <button onClick={() => setSelectedAesthetic(null)} className="text-xs text-primary font-semibold">
                   Clear
                 </button>
               )}
@@ -425,9 +423,7 @@ export default function Home() {
               {AESTHETICS.map(({ label, emoji }) => (
                 <button
                   key={label}
-                  onClick={() =>
-                    setSelectedAesthetic(selectedAesthetic === label ? null : label)
-                  }
+                  onClick={() => setSelectedAesthetic(selectedAesthetic === label ? null : label)}
                   className={`shrink-0 flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-full font-semibold border transition-all whitespace-nowrap ${
                     selectedAesthetic === label
                       ? "bg-primary text-primary-foreground border-primary shadow-sm"
@@ -441,12 +437,9 @@ export default function Home() {
           </section>
         )}
 
-        {/* Sort + count bar */}
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs text-muted-foreground">
-            {loading
-              ? "Loading..."
-              : `${filteredListings.length} item${filteredListings.length !== 1 ? "s" : ""}`}
+            {loading ? "Loading..." : `${filteredListings.length} item${filteredListings.length !== 1 ? "s" : ""}`}
           </p>
           <select
             value={sortBy}
@@ -461,23 +454,15 @@ export default function Home() {
           </select>
         </div>
 
-        {/* ── Product grid (clean, uniform) ── */}
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <CardSkeleton key={i} />
-            ))}
+            {Array.from({ length: 10 }).map((_, i) => <CardSkeleton key={i} />)}
           </div>
         ) : filteredListings.length === 0 ? (
           <div className="text-center py-20">
             <p className="text-5xl mb-4">🔍</p>
             <p className="font-bold text-base">No items found</p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-5 rounded-full"
-              onClick={() => { selectTop("All"); setSelectedAesthetic(null); }}
-            >
+            <Button variant="outline" size="sm" className="mt-5 rounded-full" onClick={() => { selectTop("All"); setSelectedAesthetic(null); }}>
               Clear filters
             </Button>
           </div>
@@ -496,7 +481,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Thrift preview section */}
         {topCategory === "All" && thriftPreview.length > 0 && (
           <section className="mt-12 mb-4">
             <div className="flex items-center justify-between mb-4">
@@ -507,11 +491,7 @@ export default function Home() {
                 </p>
               </div>
               <Link href="/thrift-drops">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="rounded-full gap-1 text-xs font-semibold border-purple-300 text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950/20"
-                >
+                <Button variant="outline" size="sm" className="rounded-full gap-1 text-xs font-semibold border-purple-300 text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950/20">
                   View All <ChevronRight className="w-3.5 h-3.5" />
                 </Button>
               </Link>
@@ -532,10 +512,7 @@ export default function Home() {
         )}
       </main>
 
-      <QuickViewModal
-        listing={quickViewListing}
-        onClose={() => setQuickViewListing(null)}
-      />
+      <QuickViewModal listing={quickViewListing} onClose={() => setQuickViewListing(null)} />
       {saveTarget && (
         <SaveToBoardModal
           open={!!saveTarget}
@@ -544,11 +521,7 @@ export default function Home() {
           listingTitle={saveTarget.title}
         />
       )}
-      <AuthModal
-        open={showAuth}
-        onClose={() => setShowAuth(false)}
-        defaultMode={authMode}
-      />
+      <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
     </div>
   );
 }
