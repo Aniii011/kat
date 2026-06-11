@@ -1,18 +1,18 @@
 import { useEffect } from "react";
-import { supabase } from "../supabase";
+import { supabase } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom";
 
 export default function AuthCallback() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const getSession = async () => {
-      const { data, error } = await supabase.auth.getSessionFromUrl();
-      if (error) console.error(error);
-      else if (data.session) navigate("/dashboard"); // redirect after login
+    const finishLogin = async () => {
+      await supabase.auth.exchangeCodeForSession(window.location.href);
+      navigate("/");
     };
-    getSession();
+
+    finishLogin();
   }, []);
 
-  return <div>Logging in...</div>;
+  return <div>Signing you in...</div>;
 }
