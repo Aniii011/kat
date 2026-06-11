@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 
 interface KatUser {
@@ -30,93 +30,37 @@ const AuthContext = createContext<AuthContextType>({
 
 const ADMIN_EMAILS = ["tiamiyukabirat0@gmail.com"];
 
-async function mapUser(u: any): Promise<KatUser | null> {
+const mapUser = (u: any): KatUser | null => {
   if (!u) return null;
-
-  let isSeller = false;
-  let sellerVerified = false;
-  let isAdmin = ADMIN_EMAILS.includes(u.email ?? "");
-  let name = u.user_metadata?.name ?? u.user_metadata?.full_name ?? u.email?.split("@")[0] ?? "User";
-
-  try {
-    const { data } = await supabase
-      .from("profiles")
-      .select("is_admin, is_seller, seller_verified, full_name")
-      .eq("id", u.id)
-      .single();
-    if (data) {
-      isAdmin = Boolean(data.is_admin);
-      isSeller = Boolean(data.is_seller);
-      sellerVerified = Boolean(data.seller_verified);
-      if (data.full_name) name = data.full_name;
-    }
-  } catch {
-    // profiles table may not exist yet
-  }
-
   return {
     id: u.id,
     email: u.email ?? "",
-    name,
-    isSeller,
-    sellerVerified,
-    isAdmin,
+    name: u.user_metadata?.name ?? u.user_metadata?.full_name ?? u.email?.split("@")[0] ?? "User",
+    isSeller: false,
+    sellerVerified: false,
+    isAdmin: ADMIN_EMAILS.includes(u.email ?? ""),
   };
-}
+};
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<KatUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let mounted = true;
-
-    // Safety timeout — never stay loading more than 3 seconds
-    const timeout = setTimeout(() => {
-      if (mounted) setLoading(false);
-    }, 3000);
-
-    // Get initial session
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!mounted) return;
-      try {
-        const mapped = await mapUser(data.session?.user ?? null);
-        if (mounted) setUser(mapped);
-      } catch {
-        if (mounted) setUser(null);
-      } finally {
-        if (mounted) setLoading(false);
-        clearTimeout(timeout);
-      }
-    }).catch(() => {
-      if (mounted) {
-        setUser(null);
-        setLoading(false);
-        clearTimeout(timeout);
-      }
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(mapUser(data.session?.user ?? null));
+      setLoading(false);
     });
 
-    // Listen for auth changes
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return;
-      try {
-        const mapped = await mapUser(session?.user ?? null);
-        if (mounted) setUser(mapped);
-      } catch {
-        if (mounted) setUser(null);
-      } finally {
-        if (mounted) setLoading(false);
-      }
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(mapUser(session?.user ?? null));
+      setLoading(false);
     });
 
-    return () => {
-      mounted = false;
-      clearTimeout(timeout);
-      listener.subscription.unsubscribe();
-    };
+    return () => listener.subscription.unsubscribe();
   }, []);
 
-  const signIn = useCallback(async (email: string, password: string) => {
+  const signIn = async (email: string, password: string) => {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) return { error: error.message };
@@ -124,9 +68,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch {
       return { error: "Failed to sign in. Please try again." };
     }
-  }, []);
+  };
 
-  const signUp = useCallback(async (email: string, password: string, name: string) => {
+  const signUp = async (email: string, password: string, name: string) => {
     try {
       const { error } = await supabase.auth.signUp({
         email,
@@ -135,11 +79,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       if (error) {
         const msg = error.message.toLowerCase();
-        if (
-          msg.includes("already registered") ||
-          msg.includes("already exists") ||
-          msg.includes("user already")
-        ) {
+        if (msg.includes("already registered") || msg.includes("already exists")) {
           return { error: "An account with this email already exists. Please sign in instead." };
         }
         return { error: error.message };
@@ -148,31 +88,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch {
       return { error: "Failed to sign up. Please try again." };
     }
-  }, []);
+  };
 
-  const signOut = useCallback(async () => {
-    try {
-      await supabase.auth.signOut();
-      setUser(null);
-      localStorage.removeItem("kat-auth-token");
-      window.location.href = "/";
-    } catch {
-      window.location.href = "/";
-    }
-  }, []);
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    window.location.href = "/";
+  };
 
-  const signInWithGoogle = useCallback(async () => {
-    try {
-      await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/`,
-        },
-      });
-    } catch {
-      console.error("Google sign in failed");
-    }
-  }, []);
+  const signInWithGoogle = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/`,
+      },
+    });
+  };
 
   return (
     <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut, signInWithGoogle }}>
