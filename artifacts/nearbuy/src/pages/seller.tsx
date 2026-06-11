@@ -9,9 +9,7 @@ import {
   ShoppingCart,
   TrendingUp,
   Eye,
-  Edit,
   Trash2,
-  Upload,
   Lock,
   LogIn,
 } from "lucide-react";
@@ -34,6 +32,9 @@ export default function Seller() {
   const { user } = useAuth();
 
   const [products, setProducts] = useState<any[]>([]);
+  const [ordersCount, setOrdersCount] = useState(0);
+  const [revenue, setRevenue] = useState(0);
+  const [views, setViews] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const [showUpload, setShowUpload] = useState(false);
@@ -45,18 +46,46 @@ export default function Seller() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
 
-  // ───────── FETCH PRODUCTS ─────────
+  // ───────── FETCH PRODUCTS & STATS ─────────
   useEffect(() => {
     const fetchProducts = async () => {
       if (!user) return;
 
-      const { data, error } = await supabase
+      setLoading(true);
+
+      // fetch products
+      const { data: productsData, error: productsError } = await supabase
         .from("products")
         .select("*")
         .eq("seller_id", user.id)
         .order("created_at", { ascending: false });
 
-      if (!error) setProducts(data || []);
+      if (!productsError) setProducts(productsData || []);
+
+      // fetch orders
+      const { data: ordersData, error: ordersError } = await supabase
+        .from("orders")
+        .select("*", { count: "exact" })
+        .eq("seller_id", user.id);
+
+      if (!ordersError && ordersData) setOrdersCount(ordersData.length);
+
+      // calculate revenue
+      const totalRevenue =
+        ordersData?.reduce((sum, order) => sum + (order.total || 0), 0) || 0;
+      setRevenue(totalRevenue);
+
+      // fetch views (if you track them)
+      const { data: viewsData, error: viewsError } = await supabase
+        .from("product_views")
+        .select("*", { count: "exact" })
+        .in(
+          "product_id",
+          (productsData || []).map((p) => p.id)
+        );
+
+      if (!viewsError && viewsData) setViews(viewsData.length);
+
       setLoading(false);
     };
 
@@ -89,24 +118,28 @@ export default function Seller() {
   const addProduct = async () => {
     const imageUrl = await uploadImage();
 
-    const { error } = await supabase.from("products").insert({
-      title,
-      description,
-      price: Number(price),
-      seller_id: user?.id,
-      image_url: imageUrl,
-    });
+    const { data, error } = await supabase
+      .from("products")
+      .insert({
+        title,
+        description,
+        price: Number(price),
+        seller_id: user?.id,
+        image_url: imageUrl,
+      })
+      .select()
+      .single();
 
-    if (!error) {
+    if (!error && data) {
+      setProducts((prev) => [data, ...prev]); // update UI instantly
       setShowUpload(false);
       setTitle("");
       setPrice("");
       setDescription("");
       setImageFile(null);
       setImagePreview("");
-      window.location.reload();
     } else {
-      console.log(error.message);
+      console.log(error?.message);
     }
   };
 
@@ -166,15 +199,15 @@ export default function Seller() {
         </div>
         <div className="p-3 border rounded-xl">
           <ShoppingCart />
-          <p>0 Orders</p>
+          <p>{ordersCount} Orders</p>
         </div>
         <div className="p-3 border rounded-xl">
           <TrendingUp />
-          <p>₦0 Revenue</p>
+          <p>{formatNaira(revenue)}</p>
         </div>
         <div className="p-3 border rounded-xl">
           <Eye />
-          <p>0 Views</p>
+          <p>{views} Views</p>
         </div>
       </div>
 
@@ -241,7 +274,6 @@ export default function Seller() {
               onChange={(e) => setDescription(e.target.value)}
             />
 
-            {/* image upload */}
             <input
               type="file"
               accept="image/*"
@@ -255,17 +287,4 @@ export default function Seller() {
 
             {imagePreview && (
               <img
-                src={imagePreview}
-                className="w-full h-40 object-cover rounded-lg"
-              />
-            )}
-
-            <Button onClick={addProduct} className="w-full">
-              Save Product
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
+               
