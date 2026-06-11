@@ -104,29 +104,24 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
     e.preventDefault();
     if (loading) return;
     setError(null);
-
     if (mode === "signup" && !name.trim()) {
       setError("Please enter your name.");
       return;
     }
-
     if (mode === "signup" && !isPasswordValid) {
       setError("Please choose a stronger password that meets all requirements.");
       return;
     }
-
     setLoading(true);
     try {
       const result = mode === "login"
         ? await signIn(email, password)
         : await signUp(email, password, name);
-
       if (result.error) {
         setError(result.error);
         setLoading(false);
         return;
       }
-
       setLoading(false);
       if (mode === "signup") {
         setSignupSuccess(true);
@@ -189,7 +184,7 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
   const renderForgotForm = () => (
     <form onSubmit={handleForgotPassword} className="space-y-3">
       <p className="text-xs text-muted-foreground text-center mb-2">
-        Enter your email and we'll send you a reset link.
+        Enter your email and we will send you a reset link.
       </p>
       <Input
         id="forgot-email"
@@ -212,14 +207,16 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
         className="w-full rounded-full h-11 font-bold"
         disabled={loading}
       >
-        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send Reset Link"}
+        {loading
+          ? <Loader2 className="w-4 h-4 animate-spin" />
+          : "Send Reset Link"}
       </Button>
       <button
         type="button"
         className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
         onClick={() => switchMode("login")}
       >
-        ← Back to Sign In
+        Back to Sign In
       </button>
     </form>
   );
@@ -233,7 +230,7 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
       <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
         <Sparkles className="w-7 h-7 text-primary" />
       </div>
-      <p className="font-bold text-base">Welcome to KAT! 🎉</p>
+      <p className="font-bold text-base">Welcome to KAT!</p>
       <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
         Your account has been created. You can now sign in.
       </p>
@@ -259,22 +256,20 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
         ) : (
           <>
             <svg className="w-4 h-4" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
             </svg>
             Continue with Google
           </>
         )}
       </button>
-
       <div className="flex items-center gap-2">
         <div className="flex-1 h-px bg-border" />
         <span className="text-[10px] text-muted-foreground">or</span>
         <div className="flex-1 h-px bg-border" />
       </div>
-
       {mode === "signup" && (
         <Input
           id="signup-name"
@@ -287,7 +282,6 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
           required
         />
       )}
-
       <Input
         id="auth-email"
         name="email"
@@ -299,7 +293,6 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
         autoComplete="email"
         required
       />
-
       <div className="relative">
         <Input
           id="auth-password"
@@ -320,7 +313,6 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
           {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </button>
       </div>
-
       {mode === "signup" && password.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: -4 }}
@@ -332,9 +324,7 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
               {[1, 2, 3, 4].map((i) => (
                 <div
                   key={i}
-                  className={`h-1.5 flex-1 rounded-full transition-all ${
-                    i <= strength.score ? strength.barColor : "bg-muted"
-                  }`}
+                  className={`h-1.5 flex-1 rounded-full transition-all ${i <= strength.score ? strength.barColor : "bg-muted"}`}
                 />
               ))}
             </div>
@@ -345,7 +335,6 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
           <PasswordRequirements password={password} />
         </motion.div>
       )}
-
       {error && (
         <motion.p
           initial={{ opacity: 0, y: -4 }}
@@ -355,7 +344,6 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
           {error}
         </motion.p>
       )}
-
       <Button
         type="submit"
         className="w-full rounded-full h-11 font-bold text-sm"
@@ -365,18 +353,17 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
           ? <Loader2 className="w-4 h-4 animate-spin" />
           : mode === "login" ? "Sign In" : "Create Account"}
       </Button>
-
       {mode === "login" && (
         <button
           type="button"
           className="w-full text-center text-[11px] text-primary font-semibold hover:underline"
-          onClick={()
-onClick={() => switchMode("forgot")}
-          >
-            Forgot password?
-          </button>
-        </form>
-      );
+          onClick={() => switchMode("forgot")}
+        >
+          Forgot password?
+        </button>
+      )}
+    </form>
+  );
 
   return (
     <AnimatePresence>
@@ -402,18 +389,16 @@ onClick={() => switchMode("forgot")}
             >
               <X className="w-4 h-4" />
             </button>
-
             <div className="text-center mb-5">
               <span className="text-3xl font-black text-primary tracking-tight">KAT</span>
               <p className="text-xs text-muted-foreground mt-1">
                 {mode === "login"
-                  ? "Welcome back 👋"
+                  ? "Welcome back"
                   : mode === "signup"
-                  ? "Join the community ✨"
+                  ? "Join the community"
                   : "Reset your password"}
               </p>
             </div>
-
             {mode !== "forgot" && !signupSuccess && (
               <div className="flex bg-muted rounded-2xl p-1 mb-5">
                 {(["login", "signup"] as const).map((m) => (
@@ -432,7 +417,6 @@ onClick={() => switchMode("forgot")}
                 ))}
               </div>
             )}
-
             {mode === "forgot" && forgotSent
               ? renderForgotSent()
               : mode === "forgot"
@@ -440,7 +424,6 @@ onClick={() => switchMode("forgot")}
               : signupSuccess
               ? renderSignupSuccess()
               : renderMainForm()}
-
             {!signupSuccess && mode !== "forgot" && (
               <p className="text-center text-[11px] text-muted-foreground mt-4">
                 {mode === "login" ? "New to KAT? " : "Already have an account? "}
