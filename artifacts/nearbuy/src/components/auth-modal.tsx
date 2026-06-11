@@ -371,3 +371,91 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
           type="button"
           className="w-full text-center text-[11px] text-primary font-semibold hover:underline"
           onClick={()
+onClick={() => switchMode("forgot")}
+          >
+            Forgot password?
+          </button>
+        </form>
+      );
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={onClose}
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94, y: 16 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.94, y: 16 }}
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            className="relative bg-background rounded-3xl shadow-2xl w-full max-w-sm p-6 z-10 border border-border"
+          >
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-muted hover:bg-accent flex items-center justify-center transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="text-center mb-5">
+              <span className="text-3xl font-black text-primary tracking-tight">KAT</span>
+              <p className="text-xs text-muted-foreground mt-1">
+                {mode === "login"
+                  ? "Welcome back 👋"
+                  : mode === "signup"
+                  ? "Join the community ✨"
+                  : "Reset your password"}
+              </p>
+            </div>
+
+            {mode !== "forgot" && !signupSuccess && (
+              <div className="flex bg-muted rounded-2xl p-1 mb-5">
+                {(["login", "signup"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => switchMode(m)}
+                    className={`flex-1 text-xs font-semibold py-2 rounded-xl transition-all ${
+                      mode === m
+                        ? "bg-background shadow-sm text-foreground"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {m === "login" ? "Sign In" : "Create Account"}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {mode === "forgot" && forgotSent
+              ? renderForgotSent()
+              : mode === "forgot"
+              ? renderForgotForm()
+              : signupSuccess
+              ? renderSignupSuccess()
+              : renderMainForm()}
+
+            {!signupSuccess && mode !== "forgot" && (
+              <p className="text-center text-[11px] text-muted-foreground mt-4">
+                {mode === "login" ? "New to KAT? " : "Already have an account? "}
+                <button
+                  type="button"
+                  className="text-primary font-semibold hover:underline"
+                  onClick={() => switchMode(mode === "login" ? "signup" : "login")}
+                >
+                  {mode === "login" ? "Sign up" : "Sign in"}
+                </button>
+              </p>
+            )}
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+}
