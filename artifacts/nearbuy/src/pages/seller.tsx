@@ -1,9 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "wouter";
-import { motion } from "framer-motion";
-import ThemeSwitcher from "@/components/theme-switcher";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
-import AuthModal from "@/components/auth-modal";
 import {
   ArrowLeft,
   Plus,
@@ -13,19 +11,14 @@ import {
   Eye,
   Edit,
   Trash2,
-  Zap,
-  BarChart3,
-  ChevronRight,
   Upload,
-  Clock,
   Lock,
   LogIn,
-  ShieldCheck,
 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -34,189 +27,240 @@ import {
 } from "@/components/ui/dialog";
 
 function formatNaira(n: number) {
-  return "₦" + n.toLocaleString("en-NG");
+  return "₦" + Number(n || 0).toLocaleString("en-NG");
 }
 
 export default function Seller() {
   const { user } = useAuth();
 
-  const [showAuth, setShowAuth] = useState(false);
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [showUpload, setShowUpload] = useState(false);
 
-  // REAL DATA PLACEHOLDERS (NO FAKE DATA)
-  const myProducts: any[] = [];
-  const orders: any[] = [];
+  // form state
+  const [title, setTitle] = useState("");
+  const [price, setPrice] = useState("");
+  const [description, setDescription] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState("");
 
-  // STATS (REAL SAFE VERSION)
-  const stats = [
-    { label: "Products", value: myProducts.length, icon: <Package className="w-4 h-4" /> },
-    { label: "Orders", value: orders.length, icon: <ShoppingCart className="w-4 h-4" /> },
-    { label: "Revenue", value: "₦0", icon: <TrendingUp className="w-4 h-4" /> },
-    { label: "Views", value: 0, icon: <Eye className="w-4 h-4" /> },
-  ];
+  // ───────── FETCH PRODUCTS ─────────
+  useEffect(() => {
+    const fetchProducts = async () => {
+      if (!user) return;
 
-  // ───────── AUTH GATE ─────────
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("seller_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (!error) setProducts(data || []);
+      setLoading(false);
+    };
+
+    fetchProducts();
+  }, [user]);
+
+  // ───────── IMAGE UPLOAD ─────────
+  const uploadImage = async () => {
+    if (!imageFile) return "";
+
+    const fileName = `${Date.now()}-${imageFile.name}`;
+
+    const { error } = await supabase.storage
+      .from("product-images")
+      .upload(fileName, imageFile);
+
+    if (error) {
+      console.log(error.message);
+      return "";
+    }
+
+    const { data } = supabase.storage
+      .from("product-images")
+      .getPublicUrl(fileName);
+
+    return data.publicUrl;
+  };
+
+  // ───────── ADD PRODUCT ─────────
+  const addProduct = async () => {
+    const imageUrl = await uploadImage();
+
+    const { error } = await supabase.from("products").insert({
+      title,
+      description,
+      price: Number(price),
+      seller_id: user?.id,
+      image_url: imageUrl,
+    });
+
+    if (!error) {
+      setShowUpload(false);
+      setTitle("");
+      setPrice("");
+      setDescription("");
+      setImageFile(null);
+      setImagePreview("");
+      window.location.reload();
+    } else {
+      console.log(error.message);
+    }
+  };
+
+  // ───────── DELETE PRODUCT ─────────
+  const deleteProduct = async (id: string) => {
+    await supabase.from("products").delete().eq("id", id);
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  // ───────── AUTH GUARDS ─────────
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
-        <LogIn className="w-10 h-10 mb-3 text-primary" />
-        <h1 className="text-xl font-bold">Sign in required</h1>
-        <p className="text-sm text-muted-foreground mb-4">
-          You need to be logged in to access Seller Dashboard.
-        </p>
-
-        <Button onClick={() => setShowAuth(true)} className="rounded-full">
-          Sign In
-        </Button>
-
-        <Link href="/" className="mt-3">
-          <Button variant="ghost">Back Home</Button>
+      <div className="min-h-screen flex items-center justify-center flex-col">
+        <LogIn className="w-10 h-10 mb-2" />
+        <p>Sign in required</p>
+        <Link href="/">
+          <Button className="mt-3">Go Home</Button>
         </Link>
-
-        <AuthModal open={showAuth} onClose={() => setShowAuth(false)} />
       </div>
     );
   }
 
-  // ───────── SELLER GATE ─────────
   if (!user.sellerVerified) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
-        <Lock className="w-10 h-10 mb-3 text-amber-500" />
-        <h1 className="text-xl font-bold">Seller Access Required</h1>
-
-        <p className="text-sm text-muted-foreground max-w-sm mb-4">
-          Your account is not approved as a seller yet.
+      <div className="min-h-screen flex items-center justify-center flex-col text-center p-6">
+        <Lock className="w-10 h-10 mb-2 text-amber-500" />
+        <h1 className="font-bold text-lg">Seller Access Required</h1>
+        <p className="text-sm text-muted-foreground">
+          Your account is not approved yet.
         </p>
-
-        <div className="flex gap-2">
-          <Link href="/">
-            <Button>Back to Shop</Button>
-          </Link>
-        </div>
-
-        {user.isAdmin && (
-          <Link href="/admin/sellers" className="mt-4">
-            <Button variant="ghost" className="gap-2">
-              <ShieldCheck className="w-4 h-4" />
-              Admin Panel
-            </Button>
-          </Link>
-        )}
       </div>
     );
   }
 
+  // ───────── UI ─────────
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background p-4">
       {/* HEADER */}
-      <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur">
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Link href="/me">
-            <Button size="icon" variant="ghost">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-          </Link>
+      <div className="flex items-center justify-between mb-4">
+        <Link href="/me">
+          <ArrowLeft />
+        </Link>
 
-          <div className="flex-1">
-            <h1 className="font-bold">Seller Dashboard</h1>
-            <p className="text-xs text-muted-foreground">
-              Manage your store
-            </p>
-          </div>
+        <h1 className="font-bold">Seller Dashboard</h1>
 
-          <ThemeSwitcher />
+        <Button onClick={() => setShowUpload(true)}>
+          <Plus className="w-4 h-4 mr-1" />
+          Add
+        </Button>
+      </div>
 
-          <Button
-            size="sm"
-            className="rounded-full gap-2"
-            onClick={() => setShowUpload(true)}
-          >
-            <Plus className="w-4 h-4" />
-            Add Product
-          </Button>
+      {/* STATS */}
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        <div className="p-3 border rounded-xl">
+          <Package />
+          <p>{products.length} Products</p>
         </div>
-      </header>
+        <div className="p-3 border rounded-xl">
+          <ShoppingCart />
+          <p>0 Orders</p>
+        </div>
+        <div className="p-3 border rounded-xl">
+          <TrendingUp />
+          <p>₦0 Revenue</p>
+        </div>
+        <div className="p-3 border rounded-xl">
+          <Eye />
+          <p>0 Views</p>
+        </div>
+      </div>
 
-      {/* MAIN */}
-      <main className="max-w-5xl mx-auto px-4 py-5 space-y-6">
-        {/* STATS */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {stats.map((s, i) => (
-            <motion.div
-              key={s.label}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className="p-4 rounded-2xl border bg-card"
+      {/* PRODUCTS */}
+      <div className="space-y-3">
+        {loading ? (
+          <p>Loading...</p>
+        ) : products.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No products yet. Add your first product.
+          </p>
+        ) : (
+          products.map((p) => (
+            <div
+              key={p.id}
+              className="border rounded-xl p-3 flex gap-3 items-center"
             >
-              <div className="mb-2 text-primary">{s.icon}</div>
-              <p className="text-lg font-bold">{s.value}</p>
-              <p className="text-xs text-muted-foreground">{s.label}</p>
-            </motion.div>
-          ))}
-        </div>
+              {p.image_url && (
+                <img
+                  src={p.image_url}
+                  className="w-14 h-14 object-cover rounded-lg"
+                />
+              )}
 
-        {/* EMPTY STATE BANNER */}
-        <div className="border rounded-2xl p-4 text-sm text-muted-foreground">
-          No real data yet. Connect Supabase to start tracking products, orders, and revenue.
-        </div>
-
-        {/* TABS */}
-        <Tabs defaultValue="products">
-          <TabsList className="w-full">
-            <TabsTrigger value="products">Products</TabsTrigger>
-            <TabsTrigger value="orders">Orders</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          </TabsList>
-
-          {/* PRODUCTS */}
-          <TabsContent value="products" className="mt-4">
-            {myProducts.length === 0 ? (
-              <div className="text-center py-10 text-sm text-muted-foreground">
-                No products yet. Click “Add Product” to start selling.
+              <div className="flex-1">
+                <p className="font-semibold">{p.title}</p>
+                <p className="text-sm text-muted-foreground">
+                  {formatNaira(p.price)}
+                </p>
               </div>
-            ) : (
-              <div />
-            )}
-          </TabsContent>
 
-          {/* ORDERS */}
-          <TabsContent value="orders" className="mt-4">
-            {orders.length === 0 ? (
-              <div className="text-center py-10 text-sm text-muted-foreground">
-                No orders yet.
-              </div>
-            ) : (
-              <div />
-            )}
-          </TabsContent>
-
-          {/* ANALYTICS */}
-          <TabsContent value="analytics" className="mt-4">
-            <div className="text-center py-10 text-sm text-muted-foreground">
-              Analytics will appear once you connect real sales data.
+              <button onClick={() => deleteProduct(p.id)}>
+                <Trash2 className="w-4 h-4 text-red-500" />
+              </button>
             </div>
-          </TabsContent>
-        </Tabs>
-      </main>
+          ))
+        )}
+      </div>
 
       {/* UPLOAD MODAL */}
       <Dialog open={showUpload} onOpenChange={setShowUpload}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Upload className="w-4 h-4" />
-              Add Product
-            </DialogTitle>
+            <DialogTitle>Add Product</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-3">
-            <Input placeholder="Product title" />
-            <Textarea placeholder="Description" />
-            <Input placeholder="Price" type="number" />
+            <Input
+              placeholder="Title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
 
-            <Button className="w-full rounded-full">
+            <Input
+              placeholder="Price"
+              type="number"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+            />
+
+            <Textarea
+              placeholder="Description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+
+            {/* image upload */}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setImageFile(file);
+                setImagePreview(URL.createObjectURL(file));
+              }}
+            />
+
+            {imagePreview && (
+              <img
+                src={imagePreview}
+                className="w-full h-40 object-cover rounded-lg"
+              />
+            )}
+
+            <Button onClick={addProduct} className="w-full">
               Save Product
             </Button>
           </div>
