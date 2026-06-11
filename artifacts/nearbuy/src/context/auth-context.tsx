@@ -30,15 +30,37 @@ const AuthContext = createContext<AuthContextType>({
 
 const ADMIN_EMAILS = ["tiamiyukabirat0@gmail.com"];
 
-const mapUser = (u: any): KatUser | null => {
+const mapUser = async (u: any): Promise<KatUser | null> => {
   if (!u) return null;
+
+  let isSeller = false;
+  let sellerVerified = false;
+  let isAdmin = ADMIN_EMAILS.includes(u.email ?? "");
+  let name = u.user_metadata?.name ?? u.user_metadata?.full_name ?? u.email?.split("@")[0] ?? "User";
+
+  try {
+    const { data } = await supabase
+      .from("profiles")
+      .select("is_admin, is_seller, seller_verified, full_name")
+      .eq("id", u.id)
+      .single();
+    if (data) {
+      isAdmin = Boolean(data.is_admin);
+      isSeller = Boolean(data.is_seller);
+      sellerVerified = Boolean(data.seller_verified);
+      if (data.full_name) name = data.full_name;
+    }
+  } catch {
+    // profiles table may not exist yet
+  }
+
   return {
     id: u.id,
     email: u.email ?? "",
-    name: u.user_metadata?.name ?? u.user_metadata?.full_name ?? u.email?.split("@")[0] ?? "User",
-    isSeller: false,
-    sellerVerified: false,
-    isAdmin: ADMIN_EMAILS.includes(u.email ?? ""),
+    name,
+    isSeller,
+    sellerVerified,
+    isAdmin,
   };
 };
 
@@ -47,13 +69,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(mapUser(data.session?.user ?? null));
+    supabase.auth.getSession().then(async ({ data }) => {
+      setUser(await mapUser(data.session?.user ?? null));
       setLoading(false);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(mapUser(session?.user ?? null));
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setUser(await mapUser(session?.user ?? null));
       setLoading(false);
     });
 
