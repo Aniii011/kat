@@ -69,7 +69,6 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
     setMode(defaultMode);
   }, [defaultMode]);
 
-  // Close modal when user logs in successfully
   useEffect(() => {
     if (user && open) {
       onClose();
@@ -129,11 +128,9 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
       }
 
       setLoading(false);
-
       if (mode === "signup") {
         setSignupSuccess(true);
       }
-      // For login, the useEffect above will close the modal when user state updates
     } catch {
       setError("Something went wrong. Please try again.");
       setLoading(false);
@@ -142,7 +139,10 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) { setError("Please enter your email address."); return; }
+    if (!email) {
+      setError("Please enter your email address.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -174,7 +174,8 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
       </div>
       <p className="font-bold text-base">Check your email</p>
       <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-        Reset link sent to <span className="font-semibold text-foreground">{email}</span>
+        Reset link sent to{" "}
+        <span className="font-semibold text-foreground">{email}</span>
       </p>
       <button
         className="text-primary font-semibold text-xs mt-4 hover:underline"
@@ -201,8 +202,16 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
         autoComplete="email"
         required
       />
-      {error && <p className="text-xs text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
-      <Button type="submit" className="w-full rounded-full h-11 font-bold" disabled={loading}>
+      {error && (
+        <p className="text-xs text-destructive bg-destructive/10 rounded-xl px-3 py-2">
+          {error}
+        </p>
+      )}
+      <Button
+        type="submit"
+        className="w-full rounded-full h-11 font-bold"
+        disabled={loading}
+      >
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send Reset Link"}
       </Button>
       <button
@@ -239,8 +248,6 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
 
   const renderMainForm = () => (
     <form onSubmit={handleSubmit} className="space-y-3" autoComplete="on">
-
-      {/* Google Sign In */}
       <button
         type="button"
         onClick={handleGoogleSignIn}
@@ -363,6 +370,4 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
         <button
           type="button"
           className="w-full text-center text-[11px] text-primary font-semibold hover:underline"
-          onClick={() => switchMode("forgot")}
-        >
-          Forgot password?
+          onClick={()
