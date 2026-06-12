@@ -1,11 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "@/hooks/use-cart";
 import { useAuth } from "@/context/auth-context";
 import {
   Home, Recycle, Search, ShoppingBag, User,
-  ShieldCheck, Store,
+  ShieldCheck, Store, Menu, X,
 } from "lucide-react";
 
 const TABS = [
@@ -20,6 +20,7 @@ export default function BottomNav() {
   const [location] = useLocation();
   const { totalItems } = useCart();
   const { user } = useAuth();
+  const [expanded, setExpanded] = useState(false);
 
   const allTabs = [
     ...TABS,
@@ -88,13 +89,37 @@ export default function BottomNav() {
       </nav>
 
       {/* ── Desktop left icon rail ── */}
-      <nav className="hidden sm:flex fixed left-0 top-0 h-full z-40 flex-col items-center py-6 gap-1 bg-background/98 backdrop-blur-xl border-r border-border w-16">
-        {/* Logo */}
-        <Link href="/">
-          <span className="text-lg font-black text-primary mb-4 block cursor-pointer">
-            KAT
-          </span>
-        </Link>
+      <nav className="hidden sm:flex fixed left-0 top-0 h-full z-40 flex-col items-center py-4 gap-1 bg-background/98 backdrop-blur-xl border-r border-border w-16">
+
+        {/* Hamburger menu button */}
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-muted transition-colors mb-2 text-muted-foreground hover:text-foreground"
+        >
+          <AnimatePresence mode="wait">
+            {expanded ? (
+              <motion.div
+                key="close"
+                initial={{ rotate: -90, opacity: 0 }}
+                animate={{ rotate: 0, opacity: 1 }}
+                exit={{ rotate: 90, opacity: 0 }}
+                transition={{ duration: 0.15 }}
+              >
+                <X style={{ width: 20, height: 20 }} />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="menu"
+                initial={{ rotate: 90, opacity: 0 }}
+                animate={{ rotate: 0, opacity: 1 }}
+                exit={{ rotate: -90, opacity: 0 }}
+                transition={{ duration: 0.15 }}
+              >
+                <Menu style={{ width: 20, height: 20 }} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </button>
 
         {/* Nav items */}
         {allTabs.map(({ href, icon: Icon, label, thrift }) => {
@@ -127,18 +152,33 @@ export default function BottomNav() {
                   )}
                 </div>
 
-                {/* Label tooltip that slides out on hover */}
-                <motion.div
-                  variants={{
-                    hovered: { opacity: 1, x: 0, display: "flex" },
-                  }}
-                  initial={{ opacity: 0, x: -5, display: "none" }}
-                  className="absolute left-14 bg-background border border-border shadow-lg rounded-xl px-3 py-1.5 whitespace-nowrap z-50"
-                >
-                  <span className="text-sm font-semibold text-foreground">
-                    {label}
-                  </span>
-                </motion.div>
+                {/* Label — shows on hover OR when expanded */}
+                <AnimatePresence>
+                  {expanded ? (
+                    <motion.span
+                      key="expanded"
+                      initial={{ opacity: 0, x: -5 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -5 }}
+                      className="ml-3 text-sm font-semibold whitespace-nowrap"
+                    >
+                      {label}
+                    </motion.span>
+                  ) : (
+                    <motion.div
+                      key="tooltip"
+                      variants={{
+                        hovered: { opacity: 1, x: 0, display: "flex" },
+                      }}
+                      initial={{ opacity: 0, x: -5, display: "none" }}
+                      className="absolute left-14 bg-background border border-border shadow-lg rounded-xl px-3 py-1.5 whitespace-nowrap z-50"
+                    >
+                      <span className="text-sm font-semibold text-foreground">
+                        {label}
+                      </span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             </Link>
           );
@@ -149,7 +189,7 @@ export default function BottomNav() {
           <div className="mt-auto w-full px-2">
             <Link href="/me">
               <motion.div
-                className="group relative flex items-center justify-center rounded-xl py-2 cursor-pointer hover:bg-muted transition-colors"
+                className="group relative flex items-center rounded-xl px-2.5 py-2 cursor-pointer hover:bg-muted transition-colors"
                 whileHover="hovered"
               >
                 <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0">
@@ -157,21 +197,33 @@ export default function BottomNav() {
                     {(user.name || user.email || "KA").slice(0, 2).toUpperCase()}
                   </span>
                 </div>
-                {/* Name tooltip */}
-                <motion.div
-                  variants={{
-                    hovered: { opacity: 1, x: 0, display: "flex" },
-                  }}
-                  initial={{ opacity: 0, x: -5, display: "none" }}
-                  className="absolute left-14 bg-background border border-border shadow-lg rounded-xl px-3 py-2 whitespace-nowrap z-50 flex-col"
-                >
-                  <span className="text-xs font-semibold text-foreground">
-                    {user.name || "User"}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {user.email}
-                  </span>
-                </motion.div>
+
+                <AnimatePresence>
+                  {expanded ? (
+                    <motion.div
+                      key="expanded"
+                      initial={{ opacity: 0, x: -5 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -5 }}
+                      className="ml-3 flex flex-col min-w-0"
+                    >
+                      <span className="text-xs font-semibold truncate">{user.name || "User"}</span>
+                      <span className="text-[10px] text-muted-foreground truncate">{user.email}</span>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="tooltip"
+                      variants={{
+                        hovered: { opacity: 1, x: 0, display: "flex" },
+                      }}
+                      initial={{ opacity: 0, x: -5, display: "none" }}
+                      className="absolute left-14 bg-background border border-border shadow-lg rounded-xl px-3 py-2 whitespace-nowrap z-50 flex-col"
+                    >
+                      <span className="text-xs font-semibold">{user.name || "User"}</span>
+                      <span className="text-[10px] text-muted-foreground">{user.email}</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             </Link>
           </div>
