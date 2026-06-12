@@ -53,7 +53,7 @@ function App() {
             <WouterRouter>
               <div className="flex min-h-screen">
                 <BottomNav />
-                  <main className="flex-1 sm:ml-16 min-w-0">>
+                  <main className="flex-1 sm:ml-16 min-w-0">
                   <Router />
                 </main>
               </div>
