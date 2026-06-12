@@ -20,7 +20,7 @@ export default function BottomNav() {
   const [location] = useLocation();
   const { totalItems } = useCart();
   const { user } = useAuth();
-  const [expanded, setExpanded] = useState(false);
+  const [open, setOpen] = useState(false);
 
   const allTabs = [
     ...TABS,
@@ -88,147 +88,127 @@ export default function BottomNav() {
         </div>
       </nav>
 
-      {/* ── Desktop left icon rail ── */}
-      <nav className="hidden sm:flex fixed left-0 top-0 h-full z-40 flex-col items-center py-4 gap-1 bg-background/98 backdrop-blur-xl border-r border-border w-16">
+      {/* ── Desktop hamburger button ── */}
+      <button
+        onClick={() => setOpen(true)}
+        className="hidden sm:flex fixed top-4 left-4 z-50 w-10 h-10 rounded-xl bg-background border border-border shadow-sm items-center justify-center hover:bg-muted transition-colors"
+      >
+        <Menu className="w-5 h-5 text-foreground" />
+      </button>
 
-        {/* Hamburger menu button */}
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-muted transition-colors mb-2 text-muted-foreground hover:text-foreground"
-        >
-          <AnimatePresence mode="wait">
-            {expanded ? (
-              <motion.div
-                key="close"
-                initial={{ rotate: -90, opacity: 0 }}
-                animate={{ rotate: 0, opacity: 1 }}
-                exit={{ rotate: 90, opacity: 0 }}
-                transition={{ duration: 0.15 }}
-              >
-                <X style={{ width: 20, height: 20 }} />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="menu"
-                initial={{ rotate: 90, opacity: 0 }}
-                animate={{ rotate: 0, opacity: 1 }}
-                exit={{ rotate: -90, opacity: 0 }}
-                transition={{ duration: 0.15 }}
-              >
-                <Menu style={{ width: 20, height: 20 }} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </button>
+      {/* ── Desktop sidebar drawer ── */}
+      <AnimatePresence>
+        {open && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setOpen(false)}
+              className="hidden sm:block fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+            />
 
-        {/* Nav items */}
-        {allTabs.map(({ href, icon: Icon, label, thrift }) => {
-          const active =
-            location === href ||
-            (href !== "/" && location.startsWith(href));
-          const isCart = href === "/cart";
+            {/* Sidebar */}
+            <motion.aside
+              initial={{ x: -280 }}
+              animate={{ x: 0 }}
+              exit={{ x: -280 }}
+              transition={{ type: "spring", stiffness: 400, damping: 35 }}
+              className="hidden sm:flex fixed left-0 top-0 h-full w-64 z-50 bg-background border-r border-border flex-col py-4 shadow-2xl"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 mb-6">
+                <Link href="/" onClick={() => setOpen(false)}>
+                  <span className="text-2xl font-black text-primary cursor-pointer">KAT</span>
+                </Link>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center hover:bg-accent transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
 
-          return (
-            <Link key={href} href={href} className="w-full px-2">
-              <motion.div
-                className={`group relative flex items-center rounded-xl px-2.5 py-2.5 cursor-pointer transition-colors ${
-                  active
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-                whileHover="hovered"
-              >
-                {/* Icon */}
-                <div className="relative shrink-0">
-                  <Icon
-                    style={{ width: 22, height: 22 }}
-                    strokeWidth={active ? 2.4 : 1.9}
-                    className={thrift && !active ? "text-primary/70" : ""}
-                  />
-                  {isCart && totalItems > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] bg-primary text-primary-foreground text-[9px] font-bold rounded-full flex items-center justify-center px-[3px]">
-                      {totalItems > 9 ? "9+" : totalItems}
-                    </span>
-                  )}
+              {/* Nav links */}
+              <div className="flex flex-col gap-1 flex-1 px-3">
+                {allTabs.map(({ href, icon: Icon, label, thrift }) => {
+                  const active =
+                    location === href ||
+                    (href !== "/" && location.startsWith(href));
+                  const isCart = href === "/cart";
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      onClick={() => setOpen(false)}
+                    >
+                      <div className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all cursor-pointer ${
+                        active
+                          ? "bg-primary/10 text-primary font-semibold"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      }`}>
+                        <div className="relative shrink-0">
+                          <Icon
+                            style={{ width: 20, height: 20 }}
+                            strokeWidth={active ? 2.4 : 1.9}
+                            className={thrift && !active ? "text-primary/70" : ""}
+                          />
+                          {isCart && totalItems > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] bg-primary text-primary-foreground text-[9px] font-bold rounded-full flex items-center justify-center px-[3px]">
+                              {totalItems > 9 ? "9+" : totalItems}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-sm font-medium">{label}</span>
+                        {thrift && (
+                          <span className="ml-auto text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
+                            NEW
+                          </span>
+                        )}
+                        {active && (
+                          <motion.div
+                            layoutId="desktop-active"
+                            className="ml-auto w-1.5 h-1.5 rounded-full bg-primary"
+                          />
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {/* User info at bottom */}
+              {user ? (
+                <div className="px-3 mt-auto">
+                  <Link href="/me" onClick={() => setOpen(false)}>
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-muted hover:bg-accent transition-colors cursor-pointer">
+                      <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center shrink-0">
+                        <span className="text-xs font-black text-primary-foreground">
+                          {(user.name || user.email || "KA").slice(0, 2).toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">{user.name || "User"}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
+                      </div>
+                    </div>
+                  </Link>
                 </div>
-
-                {/* Label — shows on hover OR when expanded */}
-                <AnimatePresence>
-                  {expanded ? (
-                    <motion.span
-                      key="expanded"
-                      initial={{ opacity: 0, x: -5 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -5 }}
-                      className="ml-3 text-sm font-semibold whitespace-nowrap"
-                    >
-                      {label}
-                    </motion.span>
-                  ) : (
-                    <motion.div
-                      key="tooltip"
-                      variants={{
-                        hovered: { opacity: 1, x: 0, display: "flex" },
-                      }}
-                      initial={{ opacity: 0, x: -5, display: "none" }}
-                      className="absolute left-14 bg-background border border-border shadow-lg rounded-xl px-3 py-1.5 whitespace-nowrap z-50"
-                    >
-                      <span className="text-sm font-semibold text-foreground">
-                        {label}
-                      </span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            </Link>
-          );
-        })}
-
-        {/* User avatar at bottom */}
-        {user && (
-          <div className="mt-auto w-full px-2">
-            <Link href="/me">
-              <motion.div
-                className="group relative flex items-center rounded-xl px-2.5 py-2 cursor-pointer hover:bg-muted transition-colors"
-                whileHover="hovered"
-              >
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0">
-                  <span className="text-[11px] font-black text-primary-foreground">
-                    {(user.name || user.email || "KA").slice(0, 2).toUpperCase()}
-                  </span>
+              ) : (
+                <div className="px-3 mt-auto">
+                  <Link href="/me" onClick={() => setOpen(false)}>
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-muted hover:bg-accent transition-colors cursor-pointer">
+                      <User className="w-5 h-5 text-muted-foreground" />
+                      <span className="text-sm font-medium text-muted-foreground">Sign In</span>
+                    </div>
+                  </Link>
                 </div>
-
-                <AnimatePresence>
-                  {expanded ? (
-                    <motion.div
-                      key="expanded"
-                      initial={{ opacity: 0, x: -5 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -5 }}
-                      className="ml-3 flex flex-col min-w-0"
-                    >
-                      <span className="text-xs font-semibold truncate">{user.name || "User"}</span>
-                      <span className="text-[10px] text-muted-foreground truncate">{user.email}</span>
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="tooltip"
-                      variants={{
-                        hovered: { opacity: 1, x: 0, display: "flex" },
-                      }}
-                      initial={{ opacity: 0, x: -5, display: "none" }}
-                      className="absolute left-14 bg-background border border-border shadow-lg rounded-xl px-3 py-2 whitespace-nowrap z-50 flex-col"
-                    >
-                      <span className="text-xs font-semibold">{user.name || "User"}</span>
-                      <span className="text-[10px] text-muted-foreground">{user.email}</span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            </Link>
-          </div>
+              )}
+            </motion.aside>
+          </>
         )}
-      </nav>
+      </AnimatePresence>
     </>
   );
 }
