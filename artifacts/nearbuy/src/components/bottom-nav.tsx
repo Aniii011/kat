@@ -3,7 +3,10 @@ import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "@/hooks/use-cart";
 import { useAuth } from "@/context/auth-context";
-import { Home, Recycle, Search, ShoppingBag, User, ShieldCheck, Store } from "lucide-react";
+import {
+  Home, Recycle, Search, ShoppingBag, User,
+  ShieldCheck, Store,
+} from "lucide-react";
 
 const TABS = [
   { href: "/",             icon: Home,        label: "Home",   thrift: false },
@@ -17,6 +20,12 @@ export default function BottomNav() {
   const [location] = useLocation();
   const { totalItems } = useCart();
   const { user } = useAuth();
+
+  const allTabs = [
+    ...TABS,
+    ...(user?.isAdmin ? [{ href: "/admin/sellers", icon: ShieldCheck, label: "Admin", thrift: false }] : []),
+    ...(user?.sellerVerified ? [{ href: "/seller", icon: Store, label: "My Store", thrift: false }] : []),
+  ];
 
   return (
     <>
@@ -38,11 +47,7 @@ export default function BottomNav() {
                 className="flex-1 flex flex-col items-center justify-center gap-[3px] relative select-none"
               >
                 {thrift && (
-                  <span
-                    className={`absolute top-2 left-1/2 -translate-x-1/2 w-10 h-10 rounded-full transition-all duration-300 ${
-                      active ? "bg-primary opacity-20" : "bg-primary/8"
-                    }`}
-                  />
+                  <span className={`absolute top-2 left-1/2 -translate-x-1/2 w-10 h-10 rounded-full transition-all duration-300 ${active ? "bg-primary opacity-20" : "bg-primary/8"}`} />
                 )}
                 <AnimatePresence>
                   {active && (
@@ -59,13 +64,7 @@ export default function BottomNav() {
                   className="relative flex items-center justify-center"
                 >
                   <Icon
-                    className={`transition-colors duration-200 ${
-                      thrift && !active
-                        ? "text-primary/70"
-                        : active
-                        ? "text-primary"
-                        : "text-muted-foreground"
-                    }`}
+                    className={`transition-colors duration-200 ${thrift && !active ? "text-primary/70" : active ? "text-primary" : "text-muted-foreground"}`}
                     style={{ width: 22, height: 22 }}
                     strokeWidth={active ? 2.4 : 1.9}
                   />
@@ -79,15 +78,7 @@ export default function BottomNav() {
                     </motion.span>
                   )}
                 </motion.div>
-                <span
-                  className={`text-[10px] leading-none font-semibold tracking-tight transition-colors duration-200 ${
-                    thrift && !active
-                      ? "text-primary/80"
-                      : active
-                      ? "text-primary"
-                      : "text-muted-foreground"
-                  }`}
-                >
+                <span className={`text-[10px] leading-none font-semibold tracking-tight transition-colors duration-200 ${thrift && !active ? "text-primary/80" : active ? "text-primary" : "text-muted-foreground"}`}>
                   {label}
                 </span>
               </Link>
@@ -96,111 +87,96 @@ export default function BottomNav() {
         </div>
       </nav>
 
-      {/* ── Desktop left sidebar ── */}
-      <aside className="hidden sm:flex fixed left-0 top-0 h-full w-56 z-40 bg-background/98 backdrop-blur-xl border-r border-border flex-col py-6 px-3">
+      {/* ── Desktop left icon rail ── */}
+      <nav className="hidden sm:flex fixed left-0 top-0 h-full z-40 flex-col items-center py-6 gap-1 bg-background/98 backdrop-blur-xl border-r border-border w-16">
         {/* Logo */}
         <Link href="/">
-          <span className="text-2xl font-black text-primary px-3 mb-8 block cursor-pointer">
+          <span className="text-lg font-black text-primary mb-4 block cursor-pointer">
             KAT
           </span>
         </Link>
 
-        {/* Main nav links */}
-        <div className="flex flex-col gap-1 flex-1">
-          {TABS.map(({ href, icon: Icon, label, thrift }) => {
-            const active =
-              location === href ||
-              (href !== "/" && location.startsWith(href));
-            const isCart = href === "/cart";
-            return (
-              <Link key={href} href={href}>
-                <div
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer ${
-                    active
-                      ? "bg-primary/10 text-primary font-semibold"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  }`}
-                >
-                  <div className="relative">
-                    <Icon
-                      style={{ width: 20, height: 20 }}
-                      strokeWidth={active ? 2.4 : 1.9}
-                      className={thrift && !active ? "text-primary/70" : ""}
-                    />
-                    {isCart && totalItems > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] bg-primary text-primary-foreground text-[9px] font-bold rounded-full flex items-center justify-center px-[3px]">
-                        {totalItems > 9 ? "9+" : totalItems}
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-sm font-medium">{label}</span>
-                  {thrift && (
-                    <span className="ml-auto text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
-                      NEW
+        {/* Nav items */}
+        {allTabs.map(({ href, icon: Icon, label, thrift }) => {
+          const active =
+            location === href ||
+            (href !== "/" && location.startsWith(href));
+          const isCart = href === "/cart";
+
+          return (
+            <Link key={href} href={href} className="w-full px-2">
+              <motion.div
+                className={`group relative flex items-center rounded-xl px-2.5 py-2.5 cursor-pointer transition-colors ${
+                  active
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+                whileHover="hovered"
+              >
+                {/* Icon */}
+                <div className="relative shrink-0">
+                  <Icon
+                    style={{ width: 22, height: 22 }}
+                    strokeWidth={active ? 2.4 : 1.9}
+                    className={thrift && !active ? "text-primary/70" : ""}
+                  />
+                  {isCart && totalItems > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] bg-primary text-primary-foreground text-[9px] font-bold rounded-full flex items-center justify-center px-[3px]">
+                      {totalItems > 9 ? "9+" : totalItems}
                     </span>
                   )}
                 </div>
-              </Link>
-            );
-          })}
 
-          {/* Admin link */}
-          {user?.isAdmin && (
-            <Link href="/admin/sellers">
-              <div
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer mt-1 ${
-                  location.startsWith("/admin")
-                    ? "bg-primary/10 text-primary font-semibold"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                <ShieldCheck style={{ width: 20, height: 20 }} strokeWidth={1.9} />
-                <span className="text-sm font-medium">Admin</span>
-              </div>
+                {/* Label tooltip that slides out on hover */}
+                <motion.div
+                  variants={{
+                    hovered: { opacity: 1, x: 0, display: "flex" },
+                  }}
+                  initial={{ opacity: 0, x: -5, display: "none" }}
+                  className="absolute left-14 bg-background border border-border shadow-lg rounded-xl px-3 py-1.5 whitespace-nowrap z-50"
+                >
+                  <span className="text-sm font-semibold text-foreground">
+                    {label}
+                  </span>
+                </motion.div>
+              </motion.div>
             </Link>
-          )}
+          );
+        })}
 
-          {/* Seller link */}
-          {user?.sellerVerified && (
-            <Link href="/seller">
-              <div
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer ${
-                  location === "/seller"
-                    ? "bg-primary/10 text-primary font-semibold"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                <Store style={{ width: 20, height: 20 }} strokeWidth={1.9} />
-                <span className="text-sm font-medium">My Store</span>
-              </div>
-            </Link>
-          )}
-        </div>
-
-        {/* User info at bottom */}
+        {/* User avatar at bottom */}
         {user && (
-          <div className="mt-auto px-3 py-3 bg-muted rounded-xl">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0">
-                <span className="text-[11px] font-black text-primary-foreground">
-                  {(user.name || user.email || "KA").slice(0, 2).toUpperCase()}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold truncate">
-                  {user.name || user.email}
-                </p>
-                <p className="text-[10px] text-muted-foreground truncate">
-                  {user.email}
-                </p>
-              </div>
-            </div>
+          <div className="mt-auto w-full px-2">
+            <Link href="/me">
+              <motion.div
+                className="group relative flex items-center justify-center rounded-xl py-2 cursor-pointer hover:bg-muted transition-colors"
+                whileHover="hovered"
+              >
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0">
+                  <span className="text-[11px] font-black text-primary-foreground">
+                    {(user.name || user.email || "KA").slice(0, 2).toUpperCase()}
+                  </span>
+                </div>
+                {/* Name tooltip */}
+                <motion.div
+                  variants={{
+                    hovered: { opacity: 1, x: 0, display: "flex" },
+                  }}
+                  initial={{ opacity: 0, x: -5, display: "none" }}
+                  className="absolute left-14 bg-background border border-border shadow-lg rounded-xl px-3 py-2 whitespace-nowrap z-50 flex-col"
+                >
+                  <span className="text-xs font-semibold text-foreground">
+                    {user.name || "User"}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {user.email}
+                  </span>
+                </motion.div>
+              </motion.div>
+            </Link>
           </div>
         )}
-      </aside>
-
-      {/* ── Desktop content offset ── */}
-      <div className="hidden sm:block w-56 shrink-0" />
+      </nav>
     </>
   );
 }
