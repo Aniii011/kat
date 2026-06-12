@@ -51,8 +51,12 @@ function App() {
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <WouterRouter>
-              <Router />
-              <BottomNav />
+              <div className="flex min-h-screen">
+                <BottomNav />
+                <main className="flex-1 sm:ml-56 min-w-0">
+                  <Router />
+                </main>
+              </div>
               <AiAssistant />
               <Toaster />
             </WouterRouter>
@@ -64,4 +68,3 @@ function App() {
 }
 
 export default App;
-
