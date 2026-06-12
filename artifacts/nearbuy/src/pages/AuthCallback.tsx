@@ -1,18 +1,27 @@
 import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { useNavigate } from "react-router-dom";
+import { useLocation } from "wouter";
 
 export default function AuthCallback() {
-  const navigate = useNavigate();
+  const [, navigate] = useLocation();
 
   useEffect(() => {
     const finishLogin = async () => {
-      await supabase.auth.exchangeCodeForSession(window.location.href);
+      try {
+        await supabase.auth.exchangeCodeForSession(window.location.href);
+      } catch (err) {
+        console.error(err);
+      }
+
       navigate("/");
     };
 
     finishLogin();
-  }, []);
+  }, [navigate]);
 
-  return <div>Signing you in...</div>;
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      Signing you in...
+    </div>
+  );
 }
