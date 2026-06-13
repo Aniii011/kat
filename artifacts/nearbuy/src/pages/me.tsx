@@ -182,3 +182,4 @@ export default function Me() {
             exit={{ opacity: 0 }}
        ></motion.div>
 )
+        }
