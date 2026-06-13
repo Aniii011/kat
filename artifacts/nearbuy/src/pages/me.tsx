@@ -181,5 +181,5 @@ export default function Me() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
        ></motion.div>
-)
-        }
+)}
+      </AnimatePresence>
