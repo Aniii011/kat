@@ -199,7 +199,7 @@ export default function ThriftDrops() {
   const [saveTarget, setSaveTarget] = useState<number | null>(null);
 
   const { listings: remoteListings, loading } = useListings();
-  const allListings = remoteListings.length > 0 ? remoteListings : staticListings;
+  const allListings = remoteListings;
   const thriftListings = allListings.filter((l) => l.isThrift);
 
   const { holdItem, releaseHold, getStatus, getTimeRemaining } = useThriftHolds();
