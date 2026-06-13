@@ -5,28 +5,28 @@ import type { Listing, Review, Aesthetic } from "@/data/listings";
 function rowToListing(row: Record<string, unknown>): Listing {
   return {
     id: row.id as number,
-    title: row.title as string,
-    price: Number(row.price),
+    title: (row.title as string) ?? "",
+    price: Number(row.price) || 0,
     originalPrice: row.original_price ? Number(row.original_price) : undefined,
     discount: row.discount as number | undefined,
-    category: row.category as string,
-    description: row.description as string,
+    category: (row.category as string) ?? "",
+    description: (row.description as string) ?? "",
     brand: row.brand as string | undefined,
-    imageUrl: row.image_url as string,
+    imageUrl: (row.image_url as string) ?? "",
     images: (row.images as string[]) ?? [],
-    rating: Number(row.rating),
-    reviewCount: row.review_count as number,
+    rating: Number(row.rating) || 0,
+    reviewCount: (row.review_count as number) ?? 0,
     reviews: [],
-    sold: row.sold as number,
-    inStock: row.in_stock as boolean,
-    stockCount: row.stock_count as number,
-    freeShipping: row.free_shipping as boolean,
-    shippingDays: row.shipping_days as number,
-    sellerName: row.seller_name as string,
+    sold: (row.sold as number) ?? 0,
+    inStock: (row.in_stock as boolean) ?? true,
+    stockCount: (row.stock_count as number) ?? 0,
+    freeShipping: (row.free_shipping as boolean) ?? false,
+    shippingDays: (row.shipping_days as number) ?? 3,
+    sellerName: (row.seller_name as string) ?? "",
     sellerAvatar: row.seller_avatar as string | undefined,
-    sellerRating: Number(row.seller_rating),
+    sellerRating: Number(row.seller_rating) || 0,
     sellerFollowers: row.seller_followers as number | undefined,
-    isVerifiedSeller: row.is_verified_seller as boolean,
+    isVerifiedSeller: (row.is_verified_seller as boolean) ?? false,
     badge: row.badge as Listing["badge"] | undefined,
     colors: (row.colors as string[]) ?? undefined,
     clothingSizes: (row.clothing_sizes as string[]) ?? undefined,
@@ -52,7 +52,12 @@ function rowToReview(row: Record<string, unknown>): Review {
   };
 }
 
-export function useListings(filters?: { category?: string; aesthetic?: string; isThrift?: boolean; search?: string }) {
+export function useListings(filters?: {
+  category?: string;
+  aesthetic?: string;
+  isThrift?: boolean;
+  search?: string;
+}) {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,14 +66,22 @@ export function useListings(filters?: { category?: string; aesthetic?: string; i
     async function fetchListings() {
       setLoading(true);
       setError(null);
-      let query = supabase.from("listings").select("*").order("id");
+
+      let query = supabase
+        .from("products")
+        .select("*")
+        .order("created_at", { ascending: false });
+
       if (filters?.isThrift !== undefined) {
         query = query.eq("is_thrift", filters.isThrift);
       }
+
       if (filters?.category && filters.category !== "All") {
         query = query.eq("category", filters.category);
       }
+
       const { data, error } = await query;
+
       if (error) {
         setError(error.message);
       } else {
@@ -76,6 +89,7 @@ export function useListings(filters?: { category?: string; aesthetic?: string; i
       }
       setLoading(false);
     }
+
     fetchListings();
   }, [filters?.category, filters?.isThrift, filters?.aesthetic, filters?.search]);
 
@@ -89,23 +103,28 @@ export function useListing(id: number | null) {
 
   useEffect(() => {
     if (!id) return;
+
     async function fetchListing() {
       setLoading(true);
       setError(null);
+
       const [listingRes, reviewsRes] = await Promise.all([
-        supabase.from("listings").select("*").eq("id", id).single(),
-        supabase.from("reviews").select("*").eq("listing_id", id).order("id"),
+        supabase.from("products").select("*").eq("id", id).single(),
+        supabase.from("reviews").select("*").eq("product_id", id).order("id"),
       ]);
+
       if (listingRes.error) {
         setError(listingRes.error.message);
         setLoading(false);
         return;
       }
+
       const parsed = rowToListing(listingRes.data as Record<string, unknown>);
       parsed.reviews = (reviewsRes.data ?? []).map((r) => rowToReview(r as Record<string, unknown>));
       setListing(parsed);
       setLoading(false);
     }
+
     fetchListing();
   }, [id]);
 
