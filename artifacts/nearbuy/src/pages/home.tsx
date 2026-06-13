@@ -167,7 +167,7 @@ export default function Home() {
 
   const { user } = useAuth();
   const { listings: remoteListings, loading } = useListings();
-  const allListings = remoteListings.length > 0 ? remoteListings : staticListings;
+  const allListings = remoteListings;
   const { isSaved } = useBoards();
 
   const openLogin = () => { setAuthMode("login"); setShowAuth(true); };
