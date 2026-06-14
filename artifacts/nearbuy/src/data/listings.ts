@@ -52,6 +52,8 @@ export interface Listing {
   depositAmount?: number;
   isFeatured?: boolean;
   tags?: string[];
+  colorImages?: Record<string, string>;
+customSizeNote?: string;
 }
 
 export const TOP_CATEGORIES = [
