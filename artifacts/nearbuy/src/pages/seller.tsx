@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Link } from "wouter";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 import {
   ArrowLeft, Plus, Package, ShoppingCart, TrendingUp, Eye,
   Trash2, Lock, LogIn, AlertCircle, X, ImagePlus, Video,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,14 +40,17 @@ export default function Seller() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [showUpload, setShowUpload] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
   const [basePrice, setBasePrice] = useState("");
   const [description, setDescription] = useState("");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState("");
+  const [existingVideoUrl, setExistingVideoUrl] = useState<string>("");
   const [variants, setVariants] = useState<Variant[]>([]);
   const [useVariantPricing, setUseVariantPricing] = useState(false);
   const [showVariants, setShowVariants] = useState(false);
@@ -55,52 +58,58 @@ export default function Seller() {
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedShoeSizes, setSelectedShoeSizes] = useState<string[]>([]);
 
+  const productsListRef = useRef<HTMLDivElement>(null);
+
+  const fetchProducts = async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data: productsData, error: productsError } = await supabase
+      .from("products")
+      .select("*")
+      .eq("seller_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (!productsError) setProducts(productsData || []);
+
+    const { data: ordersData, error: ordersError } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("seller_id", user.id);
+
+    if (!ordersError && ordersData) {
+      setOrdersCount(ordersData.length);
+      setRevenue(ordersData.reduce((sum, o) => sum + (o.total || 0), 0));
+    }
+
+    const { data: viewsData } = await supabase
+      .from("product_views")
+      .select("*")
+      .in("product_id", (productsData || []).map((p) => p.id));
+
+    if (viewsData) setViews(viewsData.length);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const fetchProducts = async () => {
-      if (!user) return;
-      setLoading(true);
-
-      const { data: productsData, error: productsError } = await supabase
-        .from("products")
-        .select("*")
-        .eq("seller_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (!productsError) setProducts(productsData || []);
-
-      const { data: ordersData, error: ordersError } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("seller_id", user.id);
-
-      if (!ordersError && ordersData) {
-        setOrdersCount(ordersData.length);
-        setRevenue(ordersData.reduce((sum, o) => sum + (o.total || 0), 0));
-      }
-
-      const { data: viewsData } = await supabase
-        .from("product_views")
-        .select("*")
-        .in("product_id", (productsData || []).map((p) => p.id));
-
-      if (viewsData) setViews(viewsData.length);
-      setLoading(false);
-    };
-
     fetchProducts();
   }, [user]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const remaining = 8 - imageFiles.length;
+    const totalCurrent = imageFiles.length + existingImages.length;
+    const remaining = 8 - totalCurrent;
     const newFiles = files.slice(0, remaining);
     setImageFiles((prev) => [...prev, ...newFiles]);
     setImagePreviews((prev) => [...prev, ...newFiles.map((f) => URL.createObjectURL(f))]);
   };
 
-  const removeImage = (index: number) => {
+  const removeNewImage = (index: number) => {
     setImageFiles((prev) => prev.filter((_, i) => i !== index));
     setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const removeExistingImage = (index: number) => {
+    setExistingImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,6 +117,7 @@ export default function Seller() {
     if (!file) return;
     setVideoFile(file);
     setVideoPreview(URL.createObjectURL(file));
+    setExistingVideoUrl("");
   };
 
   const uploadImages = async (): Promise<string[]> => {
@@ -142,14 +152,19 @@ export default function Seller() {
       for (const size of sizes) {
         for (const shoeSize of shoeSizes) {
           if (color || size || shoeSize) {
-            newVariants.push({
-              id: Math.random().toString(36).slice(2),
-              color,
-              size,
-              shoeSize,
-              price: basePrice,
-              stock: "10",
-            });
+            const existing = variants.find(
+              (v) => v.color === color && v.size === size && v.shoeSize === shoeSize
+            );
+            newVariants.push(
+              existing || {
+                id: Math.random().toString(36).slice(2),
+                color,
+                size,
+                shoeSize,
+                price: basePrice,
+                stock: "10",
+              }
+            );
           }
         }
       }
@@ -181,20 +196,48 @@ export default function Seller() {
 
   const resetForm = () => {
     setTitle(""); setBasePrice(""); setDescription("");
-    setImageFiles([]); setImagePreviews([]);
-    setVideoFile(null); setVideoPreview("");
+    setImageFiles([]); setImagePreviews([]); setExistingImages([]);
+    setVideoFile(null); setVideoPreview(""); setExistingVideoUrl("");
     setVariants([]); setSelectedColors([]);
     setSelectedSizes([]); setSelectedShoeSizes([]);
     setUseVariantPricing(false); setShowVariants(false);
-    setUploadError(null);
+    setUploadError(null); setEditingProductId(null);
   };
 
-  const addProduct = async () => {
+  const openEdit = (p: any) => {
+    setEditingProductId(p.id);
+    setTitle(p.title || "");
+    setBasePrice(String(p.price ?? ""));
+    setDescription(p.description || "");
+    setExistingImages(Array.isArray(p.images) && p.images.length > 0 ? p.images : (p.image_url ? [p.image_url] : []));
+    setImageFiles([]);
+    setImagePreviews([]);
+    setExistingVideoUrl(p.video_url || "");
+    setVideoFile(null);
+    setVideoPreview("");
+    const v: Variant[] = Array.isArray(p.variants) ? p.variants : [];
+    setVariants(v);
+    setUseVariantPricing(Boolean(p.use_variant_pricing));
+    setShowVariants(v.length > 0);
+    setSelectedColors(Array.from(new Set(v.map((x) => x.color).filter(Boolean))) as string[]);
+    setSelectedSizes(Array.from(new Set(v.map((x) => x.size).filter(Boolean))) as string[]);
+    setSelectedShoeSizes(Array.from(new Set(v.map((x) => x.shoeSize).filter(Boolean))) as string[]);
+    setUploadError(null);
+    setShowUpload(true);
+  };
+
+  const openAdd = () => {
+    resetForm();
+    setShowUpload(true);
+  };
+
+  const saveProduct = async () => {
     if (!title.trim() || !basePrice) {
       setUploadError("Please fill in title and price.");
       return;
     }
-    if (imageFiles.length === 0) {
+    const totalImages = existingImages.length + imageFiles.length;
+    if (totalImages === 0) {
       setUploadError("Please add at least one image.");
       return;
     }
@@ -202,33 +245,58 @@ export default function Seller() {
     setUploading(true);
     setUploadError(null);
 
-    const imageUrls = await uploadImages();
-    const videoUrl = await uploadVideo();
+    const newImageUrls = await uploadImages();
+    const allImages = [...existingImages, ...newImageUrls];
 
-    const { data, error } = await supabase
-      .from("products")
-      .insert({
-        title,
-        description,
-        price: Number(basePrice),
-        seller_id: user?.id,
-        image_url: imageUrls[0] || "",
-        images: imageUrls,
-        video_url: videoUrl || null,
-        variants: variants.length > 0 ? variants : null,
-        use_variant_pricing: useVariantPricing,
-      })
-      .select()
-      .single();
+    let videoUrl = existingVideoUrl;
+    if (videoFile) {
+      videoUrl = await uploadVideo();
+    }
 
-    setUploading(false);
+    const payload = {
+      title,
+      description,
+      price: Number(basePrice),
+      image_url: allImages[0] || "",
+      images: allImages,
+      video_url: videoUrl || null,
+      variants: variants.length > 0 ? variants : null,
+      use_variant_pricing: useVariantPricing,
+    };
 
-    if (!error && data) {
-      setProducts((prev) => [data, ...prev]);
-      setShowUpload(false);
-      resetForm();
+    if (editingProductId) {
+      const { data, error } = await supabase
+        .from("products")
+        .update(payload)
+        .eq("id", editingProductId)
+        .select()
+        .single();
+
+      setUploading(false);
+
+      if (!error && data) {
+        setProducts((prev) => prev.map((p) => (p.id === editingProductId ? data : p)));
+        setShowUpload(false);
+        resetForm();
+      } else {
+        setUploadError(error?.message || "Failed to update product.");
+      }
     } else {
-      setUploadError(error?.message || "Failed to add product.");
+      const { data, error } = await supabase
+        .from("products")
+        .insert({ ...payload, seller_id: user?.id })
+        .select()
+        .single();
+
+      setUploading(false);
+
+      if (!error && data) {
+        setProducts((prev) => [data, ...prev]);
+        setShowUpload(false);
+        resetForm();
+      } else {
+        setUploadError(error?.message || "Failed to add product.");
+      }
     }
   };
 
@@ -236,6 +304,10 @@ export default function Seller() {
     if (!window.confirm("Are you sure you want to delete this product?")) return;
     await supabase.from("products").delete().eq("id", id);
     setProducts((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const scrollToProducts = () => {
+    productsListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   if (!user) {
@@ -262,6 +334,8 @@ export default function Seller() {
     );
   }
 
+  const totalImages = existingImages.length + imageFiles.length;
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="max-w-2xl mx-auto px-4 py-4">
@@ -273,27 +347,43 @@ export default function Seller() {
             </button>
           </Link>
           <h1 className="font-black text-base">Seller Dashboard</h1>
-          <Button onClick={() => setShowUpload(true)} className="rounded-full h-9 gap-1 text-xs font-semibold">
+          <Button onClick={openAdd} className="rounded-full h-9 gap-1 text-xs font-semibold">
             <Plus className="w-3.5 h-3.5" /> Add Product
           </Button>
         </div>
 
         <div className="grid grid-cols-2 gap-3 mb-6">
-          {[
-            { icon: <Package className="w-5 h-5 text-primary" />, label: "Products", value: products.length },
-            { icon: <ShoppingCart className="w-5 h-5 text-primary" />, label: "Orders", value: ordersCount },
-            { icon: <TrendingUp className="w-5 h-5 text-primary" />, label: "Revenue", value: formatNaira(revenue) },
-            { icon: <Eye className="w-5 h-5 text-primary" />, label: "Views", value: views },
-          ].map((stat) => (
-            <div key={stat.label} className="bg-card border border-card-border rounded-2xl p-4 flex flex-col gap-2">
-              {stat.icon}
-              <p className="text-lg font-black text-primary">{stat.value}</p>
-              <p className="text-xs text-muted-foreground">{stat.label}</p>
+          <button
+            onClick={scrollToProducts}
+            className="bg-card border border-card-border rounded-2xl p-4 flex flex-col gap-2 text-left hover:border-primary/40 transition-colors"
+          >
+            <Package className="w-5 h-5 text-primary" />
+            <p className="text-lg font-black text-primary">{products.length}</p>
+            <p className="text-xs text-muted-foreground">Products</p>
+          </button>
+
+          <Link href="/seller/orders">
+            <div className="bg-card border border-card-border rounded-2xl p-4 flex flex-col gap-2 hover:border-primary/40 transition-colors cursor-pointer">
+              <ShoppingCart className="w-5 h-5 text-primary" />
+              <p className="text-lg font-black text-primary">{ordersCount}</p>
+              <p className="text-xs text-muted-foreground">Orders</p>
             </div>
-          ))}
+          </Link>
+
+          <div className="bg-card border border-card-border rounded-2xl p-4 flex flex-col gap-2">
+            <TrendingUp className="w-5 h-5 text-primary" />
+            <p className="text-lg font-black text-primary">{formatNaira(revenue)}</p>
+            <p className="text-xs text-muted-foreground">Revenue</p>
+          </div>
+
+          <div className="bg-card border border-card-border rounded-2xl p-4 flex flex-col gap-2">
+            <Eye className="w-5 h-5 text-primary" />
+            <p className="text-lg font-black text-primary">{views}</p>
+            <p className="text-xs text-muted-foreground">Views</p>
+          </div>
         </div>
 
-        <h2 className="font-bold text-sm mb-3">My Products</h2>
+        <h2 ref={productsListRef} className="font-bold text-sm mb-3">My Products</h2>
         <div className="space-y-3">
           {loading ? (
             <p className="text-sm text-muted-foreground text-center py-8">Loading...</p>
@@ -302,7 +392,7 @@ export default function Seller() {
               <Package className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
               <p className="font-semibold text-sm">No products yet</p>
               <p className="text-xs text-muted-foreground mt-1">Add your first product to get started</p>
-              <Button onClick={() => setShowUpload(true)} className="rounded-full mt-4 text-xs" size="sm">
+              <Button onClick={openAdd} className="rounded-full mt-4 text-xs" size="sm">
                 <Plus className="w-3.5 h-3.5 mr-1" /> Add Product
               </Button>
             </div>
@@ -326,6 +416,12 @@ export default function Seller() {
                   )}
                 </div>
                 <button
+                  onClick={() => openEdit(p)}
+                  className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors shrink-0"
+                >
+                  <Pencil className="w-3.5 h-3.5 text-primary" />
+                </button>
+                <button
                   onClick={() => deleteProduct(p.id)}
                   className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center hover:bg-destructive/20 transition-colors shrink-0"
                 >
@@ -340,17 +436,17 @@ export default function Seller() {
       <Dialog open={showUpload} onOpenChange={(open) => { if (!open) resetForm(); setShowUpload(open); }}>
         <DialogContent className="rounded-3xl max-w-sm mx-auto max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-black">Add New Product</DialogTitle>
+            <DialogTitle className="font-black">
+              {editingProductId ? "Edit Product" : "Add New Product"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-
             <Input
               placeholder="Product title *"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="rounded-xl h-11"
             />
-
             <Input
               placeholder="Base price (₦) *"
               type="number"
@@ -358,7 +454,6 @@ export default function Seller() {
               onChange={(e) => setBasePrice(e.target.value)}
               className="rounded-xl h-11"
             />
-
             <Textarea
               placeholder="Description (optional)"
               value={description}
@@ -371,9 +466,9 @@ export default function Seller() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold text-muted-foreground">
-                  Images ({imageFiles.length}/8) *
+                  Images ({totalImages}/8) *
                 </p>
-                {imageFiles.length < 8 && (
+                {totalImages < 8 && (
                   <label className="flex items-center gap-1 text-xs text-primary font-semibold cursor-pointer">
                     <ImagePlus className="w-3.5 h-3.5" /> Add Images
                     <input
@@ -386,14 +481,14 @@ export default function Seller() {
                   </label>
                 )}
               </div>
-              {imagePreviews.length > 0 && (
+              {totalImages > 0 && (
                 <div className="grid grid-cols-4 gap-2">
-                  {imagePreviews.map((preview, i) => (
-                    <div key={i} className="relative aspect-square">
-                      <img src={preview} alt="" className="w-full h-full object-cover rounded-xl" />
+                  {existingImages.map((url, i) => (
+                    <div key={`existing-${i}`} className="relative aspect-square">
+                      <img src={url} alt="" className="w-full h-full object-cover rounded-xl" />
                       <button
                         type="button"
-                        onClick={() => removeImage(i)}
+                        onClick={() => removeExistingImage(i)}
                         className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive flex items-center justify-center"
                       >
                         <X className="w-3 h-3 text-white" />
@@ -405,9 +500,26 @@ export default function Seller() {
                       )}
                     </div>
                   ))}
+                  {imagePreviews.map((preview, i) => (
+                    <div key={`new-${i}`} className="relative aspect-square">
+                      <img src={preview} alt="" className="w-full h-full object-cover rounded-xl" />
+                      <button
+                        type="button"
+                        onClick={() => removeNewImage(i)}
+                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive flex items-center justify-center"
+                      >
+                        <X className="w-3 h-3 text-white" />
+                      </button>
+                      {existingImages.length === 0 && i === 0 && (
+                        <span className="absolute bottom-1 left-1 text-[8px] bg-black/60 text-white px-1 rounded">
+                          Main
+                        </span>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
-              {imagePreviews.length === 0 && (
+              {totalImages === 0 && (
                 <label className="flex flex-col items-center justify-center h-24 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary/50 transition-colors">
                   <ImagePlus className="w-6 h-6 text-muted-foreground mb-1" />
                   <span className="text-xs text-muted-foreground">Tap to add images</span>
@@ -425,12 +537,12 @@ export default function Seller() {
             {/* Video */}
             <div className="space-y-2">
               <p className="text-xs font-semibold text-muted-foreground">Product Video (optional)</p>
-              {videoPreview ? (
+              {videoPreview || existingVideoUrl ? (
                 <div className="relative">
-                  <video src={videoPreview} className="w-full rounded-xl" controls />
+                  <video src={videoPreview || existingVideoUrl} className="w-full rounded-xl" controls />
                   <button
                     type="button"
-                    onClick={() => { setVideoFile(null); setVideoPreview(""); }}
+                    onClick={() => { setVideoFile(null); setVideoPreview(""); setExistingVideoUrl(""); }}
                     className="absolute top-2 right-2 w-6 h-6 rounded-full bg-destructive flex items-center justify-center"
                   >
                     <X className="w-3 h-3 text-white" />
@@ -457,8 +569,6 @@ export default function Seller() {
 
               {showVariants && (
                 <div className="space-y-4">
-
-                  {/* Colors */}
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground mb-2">Colors</p>
                     <div className="flex flex-wrap gap-1.5">
@@ -479,7 +589,6 @@ export default function Seller() {
                     </div>
                   </div>
 
-                  {/* Clothing Sizes */}
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground mb-2">Clothing Sizes</p>
                     <div className="flex flex-wrap gap-1.5">
@@ -500,7 +609,6 @@ export default function Seller() {
                     </div>
                   </div>
 
-                  {/* Shoe Sizes */}
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground mb-2">Shoe Sizes</p>
                     <div className="flex flex-wrap gap-1.5">
@@ -521,7 +629,6 @@ export default function Seller() {
                     </div>
                   </div>
 
-                  {/* Variant pricing toggle */}
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold">Different price per variant?</p>
                     <button
@@ -537,7 +644,6 @@ export default function Seller() {
                     </button>
                   </div>
 
-                  {/* Generate variants button */}
                   {(selectedColors.length > 0 || selectedSizes.length > 0 || selectedShoeSizes.length > 0) && (
                     <Button
                       type="button"
@@ -550,7 +656,6 @@ export default function Seller() {
                     </Button>
                   )}
 
-                  {/* Variant list */}
                   {variants.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-xs font-semibold text-muted-foreground">
@@ -606,10 +711,10 @@ export default function Seller() {
               </Button>
               <Button
                 className="flex-1 rounded-full"
-                onClick={addProduct}
+                onClick={saveProduct}
                 disabled={uploading}
               >
-                {uploading ? "Uploading..." : "Add Product"}
+                {uploading ? "Saving..." : editingProductId ? "Save Changes" : "Add Product"}
               </Button>
             </div>
           </div>
