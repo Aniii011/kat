@@ -36,6 +36,8 @@ function rowToListing(row: Record<string, unknown>): Listing {
     depositAmount: row.deposit_amount ? Number(row.deposit_amount) : undefined,
     isFeatured: (row.is_featured as boolean) ?? false,
     tags: (row.tags as string[]) ?? undefined,
+    colorImages: (row.color_images as Record<string, string>) ?? undefined,
+customSizeNote: (row.custom_size_note as string) ?? undefined,
   };
 }
 
