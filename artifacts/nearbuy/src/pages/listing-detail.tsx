@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRoute, Link } from "wouter";
 import { useListing, useListings } from "@/hooks/use-listings";
 import { listings as staticListings } from "@/data/listings";
@@ -6,7 +6,7 @@ import ThemeSwitcher from "@/components/theme-switcher";
 import {
   ArrowLeft, Star, ShoppingBag, Zap, Shield, RotateCcw,
   Truck, BadgeCheck, ChevronLeft, ChevronRight, Minus, Plus,
-  Heart, Share2, Users, Clock
+  Heart, Share2, Users, Clock, Ruler, X, Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +41,113 @@ function StarRow({ rating, count }: { rating: number; count: number }) {
   );
 }
 
+// ── Size guide data ──────────────────────────────
+const TOPS_SIZE_GUIDE = [
+  { size: "XXS", bust: "76-79", waist: "58-61", hip: "82-85" },
+  { size: "XS", bust: "80-83", waist: "62-65", hip: "86-89" },
+  { size: "S", bust: "84-87", waist: "66-69", hip: "90-93" },
+  { size: "M", bust: "88-93", waist: "70-75", hip: "94-99" },
+  { size: "L", bust: "94-99", waist: "76-81", hip: "100-105" },
+  { size: "XL", bust: "100-107", waist: "82-89", hip: "106-113" },
+  { size: "XXL", bust: "108-115", waist: "90-97", hip: "114-121" },
+  { size: "3XL", bust: "116-124", waist: "98-106", hip: "122-130" },
+];
+
+const BOTTOMS_SIZE_GUIDE = [
+  { size: "XXS", waist: "58-61", hip: "82-85", inseam: "74-76" },
+  { size: "XS", waist: "62-65", hip: "86-89", inseam: "75-77" },
+  { size: "S", waist: "66-69", hip: "90-93", inseam: "76-78" },
+  { size: "M", waist: "70-75", hip: "94-99", inseam: "77-79" },
+  { size: "L", waist: "76-81", hip: "100-105", inseam: "78-80" },
+  { size: "XL", waist: "82-89", hip: "106-113", inseam: "79-81" },
+  { size: "XXL", waist: "90-97", hip: "114-121", inseam: "80-82" },
+  { size: "3XL", waist: "98-106", hip: "122-130", inseam: "81-83" },
+];
+
+const SHOE_SIZE_GUIDE = [
+  { eu: "36", uk: "3", us: "5.5", cm: "23" },
+  { eu: "37", uk: "4", us: "6.5", cm: "23.5" },
+  { eu: "38", uk: "5", us: "7.5", cm: "24" },
+  { eu: "39", uk: "6", us: "8.5", cm: "25" },
+  { eu: "40", uk: "6.5", us: "9", cm: "25.5" },
+  { eu: "41", uk: "7", us: "9.5", cm: "26" },
+  { eu: "42", uk: "8", us: "10.5", cm: "27" },
+  { eu: "43", uk: "9", us: "11.5", cm: "27.5" },
+  { eu: "44", uk: "10", us: "12", cm: "28" },
+  { eu: "45", uk: "11", us: "13", cm: "29" },
+  { eu: "46", uk: "12", us: "14", cm: "30" },
+];
+
+function SizeGuideModal({ open, onClose, isShoe }: { open: boolean; onClose: () => void; isShoe: boolean }) {
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="rounded-3xl max-w-sm mx-auto max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="font-black flex items-center gap-2">
+            <Ruler className="w-4 h-4 text-primary" /> Size Guide
+          </DialogTitle>
+          <DialogDescription className="text-xs">
+            All measurements in centimetres (cm) unless noted.
+          </DialogDescription>
+        </DialogHeader>
+
+        {isShoe ? (
+          <div className="space-y-2">
+            <div className="grid grid-cols-4 gap-2 text-[11px] font-bold text-muted-foreground px-2">
+              <span>EU</span><span>UK</span><span>US</span><span>Foot (cm)</span>
+            </div>
+            {SHOE_SIZE_GUIDE.map((row) => (
+              <div key={row.eu} className="grid grid-cols-4 gap-2 text-sm bg-muted rounded-xl px-2 py-2">
+                <span className="font-bold">{row.eu}</span>
+                <span>{row.uk}</span>
+                <span>{row.us}</span>
+                <span>{row.cm}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <Tabs defaultValue="tops">
+            <TabsList className="rounded-full bg-muted p-1 h-auto w-full">
+              <TabsTrigger value="tops" className="rounded-full text-xs px-4 py-1.5 flex-1">Tops & Dresses</TabsTrigger>
+              <TabsTrigger value="bottoms" className="rounded-full text-xs px-4 py-1.5 flex-1">Bottoms</TabsTrigger>
+            </TabsList>
+            <TabsContent value="tops" className="mt-3 space-y-2">
+              <div className="grid grid-cols-4 gap-2 text-[11px] font-bold text-muted-foreground px-2">
+                <span>Size</span><span>Bust</span><span>Waist</span><span>Hip</span>
+              </div>
+              {TOPS_SIZE_GUIDE.map((row) => (
+                <div key={row.size} className="grid grid-cols-4 gap-2 text-sm bg-muted rounded-xl px-2 py-2">
+                  <span className="font-bold">{row.size}</span>
+                  <span>{row.bust}</span>
+                  <span>{row.waist}</span>
+                  <span>{row.hip}</span>
+                </div>
+              ))}
+            </TabsContent>
+            <TabsContent value="bottoms" className="mt-3 space-y-2">
+              <div className="grid grid-cols-4 gap-2 text-[11px] font-bold text-muted-foreground px-2">
+                <span>Size</span><span>Waist</span><span>Hip</span><span>Inseam</span>
+              </div>
+              {BOTTOMS_SIZE_GUIDE.map((row) => (
+                <div key={row.size} className="grid grid-cols-4 gap-2 text-sm bg-muted rounded-xl px-2 py-2">
+                  <span className="font-bold">{row.size}</span>
+                  <span>{row.waist}</span>
+                  <span>{row.hip}</span>
+                  <span>{row.inseam}</span>
+                </div>
+              ))}
+            </TabsContent>
+          </Tabs>
+        )}
+
+        <p className="text-[11px] text-muted-foreground pt-2">
+          This is a general guide. Always check the seller's fit notes for the specific item, as sizing can vary between brands.
+        </p>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function ListingDetail() {
   const [, params] = useRoute("/listing/:id");
   const id = params?.id ? parseInt(params.id) : null;
@@ -58,10 +165,22 @@ export default function ListingDetail() {
   const [quantity, setQuantity] = useState(1);
   const [wishlisted, setWishlisted] = useState(false);
   const [showDeposit, setShowDeposit] = useState(false);
+  const [showSizeGuide, setShowSizeGuide] = useState(false);
 
   const related = listing
     ? allListings.filter((l) => l.id !== listing.id && (l.category === listing.category || l.aesthetics?.some((a) => listing.aesthetics?.includes(a)))).slice(0, 4)
     : [];
+
+  // Reset selected image when a color with its own image is picked
+  useEffect(() => {
+    if (!listing) return;
+    if (selectedColor && listing.colorImages && listing.colorImages[selectedColor]) {
+      const images = listing.images.length > 0 ? listing.images : [listing.imageUrl];
+      const colorImgUrl = listing.colorImages[selectedColor];
+      const idx = images.indexOf(colorImgUrl);
+      setSelectedImage(idx >= 0 ? idx : 0);
+    }
+  }, [selectedColor, listing]);
 
   if (loading) {
     return (
@@ -94,9 +213,25 @@ export default function ListingDetail() {
     );
   }
 
-  const images = listing.images.length > 0 ? listing.images : [listing.imageUrl];
+  // Build image list — include color-specific images that aren't already in `images`
+  const baseImages = listing.images.length > 0 ? listing.images : [listing.imageUrl];
+  const colorOnlyImages = listing.colorImages
+    ? Object.values(listing.colorImages).filter((url) => !baseImages.includes(url))
+    : [];
+  const images = [...baseImages, ...colorOnlyImages];
+
   const allSizes = listing.clothingSizes ?? listing.shoeSizes ?? [];
   const sizeLabel = listing.shoeSizes ? "Shoe Size" : "Size";
+  const isShoeSize = Boolean(listing.shoeSizes && listing.shoeSizes.length > 0);
+
+  const handleColorSelect = (c: string) => {
+    const newColor = selectedColor === c ? null : c;
+    setSelectedColor(newColor);
+    if (newColor && listing.colorImages && listing.colorImages[newColor]) {
+      const idx = images.indexOf(listing.colorImages[newColor]);
+      if (idx >= 0) setSelectedImage(idx);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -246,9 +381,12 @@ export default function ListingDetail() {
                   {listing.colors.map((c) => (
                     <button
                       key={c}
-                      onClick={() => setSelectedColor(selectedColor === c ? null : c)}
-                      className={`text-xs px-3 py-1.5 rounded-full border-2 font-medium transition-all ${selectedColor === c ? "border-primary text-primary bg-primary/10" : "border-border text-muted-foreground hover:border-muted-foreground"}`}
+                      onClick={() => handleColorSelect(c)}
+                      className={`text-xs px-3 py-1.5 rounded-full border-2 font-medium transition-all flex items-center gap-1.5 ${selectedColor === c ? "border-primary text-primary bg-primary/10" : "border-border text-muted-foreground hover:border-muted-foreground"}`}
                     >
+                      {listing.colorImages && listing.colorImages[c] && (
+                        <img src={listing.colorImages[c]} alt={c} className="w-4 h-4 rounded-full object-cover" />
+                      )}
                       {c}
                     </button>
                   ))}
@@ -259,7 +397,15 @@ export default function ListingDetail() {
             {/* Size selector */}
             {allSizes.length > 0 && (
               <div>
-                <p className="text-sm font-semibold mb-2">{sizeLabel} {selectedSize && <span className="text-muted-foreground font-normal">— {selectedSize}</span>}</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-semibold">{sizeLabel} {selectedSize && <span className="text-muted-foreground font-normal">— {selectedSize}</span>}</p>
+                  <button
+                    onClick={() => setShowSizeGuide(true)}
+                    className="flex items-center gap-1 text-xs text-primary font-semibold"
+                  >
+                    <Ruler className="w-3 h-3" /> Size Guide
+                  </button>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {allSizes.map((s) => (
                     <button
@@ -270,6 +416,29 @@ export default function ListingDetail() {
                       {s}
                     </button>
                   ))}
+                </div>
+                {/* Fit note */}
+                {listing.customSizeNote && (
+                  <div className="flex items-start gap-2 mt-2 text-xs text-muted-foreground bg-muted rounded-xl p-2.5">
+                    <Info className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                    <span>{listing.customSizeNote}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* If no preset sizes but seller left a fit note, still show it + size guide link */}
+            {allSizes.length === 0 && listing.customSizeNote && (
+              <div className="space-y-2">
+                <button
+                  onClick={() => setShowSizeGuide(true)}
+                  className="flex items-center gap-1 text-xs text-primary font-semibold"
+                >
+                  <Ruler className="w-3 h-3" /> Size Guide
+                </button>
+                <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted rounded-xl p-2.5">
+                  <Info className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                  <span>{listing.customSizeNote}</span>
                 </div>
               </div>
             )}
@@ -502,6 +671,9 @@ export default function ListingDetail() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Size guide dialog */}
+      <SizeGuideModal open={showSizeGuide} onClose={() => setShowSizeGuide(false)} isShoe={isShoeSize} />
     </div>
   );
 }
