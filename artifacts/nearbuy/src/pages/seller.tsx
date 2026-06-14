@@ -57,6 +57,12 @@ export default function Seller() {
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedShoeSizes, setSelectedShoeSizes] = useState<string[]>([]);
+  const [customSizeNote, setCustomSizeNote] = useState("");
+
+  // Per-color images
+  const [colorImageFiles, setColorImageFiles] = useState<Record<string, File>>({});
+  const [colorImagePreviews, setColorImagePreviews] = useState<Record<string, string>>({});
+  const [existingColorImages, setExistingColorImages] = useState<Record<string, string>>({});
 
   const productsListRef = useRef<HTMLDivElement>(null);
 
@@ -120,6 +126,19 @@ export default function Seller() {
     setExistingVideoUrl("");
   };
 
+  const handleColorImageSelect = (color: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setColorImageFiles((prev) => ({ ...prev, [color]: file }));
+    setColorImagePreviews((prev) => ({ ...prev, [color]: URL.createObjectURL(file) }));
+  };
+
+  const removeColorImage = (color: string) => {
+    setColorImageFiles((prev) => { const next = { ...prev }; delete next[color]; return next; });
+    setColorImagePreviews((prev) => { const next = { ...prev }; delete next[color]; return next; });
+    setExistingColorImages((prev) => { const next = { ...prev }; delete next[color]; return next; });
+  };
+
   const uploadImages = async (): Promise<string[]> => {
     const urls: string[] = [];
     for (const file of imageFiles) {
@@ -140,6 +159,19 @@ export default function Seller() {
     if (error) return "";
     const { data } = supabase.storage.from("product-images").getPublicUrl(fileName);
     return data.publicUrl;
+  };
+
+  const uploadColorImages = async (): Promise<Record<string, string>> => {
+    const result: Record<string, string> = { ...existingColorImages };
+    for (const [color, file] of Object.entries(colorImageFiles)) {
+      const fileName = `colors/${Date.now()}-${Math.random()}-${file.name}`;
+      const { error } = await supabase.storage.from("product-images").upload(fileName, file);
+      if (!error) {
+        const { data } = supabase.storage.from("product-images").getPublicUrl(fileName);
+        result[color] = data.publicUrl;
+      }
+    }
+    return result;
   };
 
   const generateVariants = () => {
@@ -202,6 +234,8 @@ export default function Seller() {
     setSelectedSizes([]); setSelectedShoeSizes([]);
     setUseVariantPricing(false); setShowVariants(false);
     setUploadError(null); setEditingProductId(null);
+    setCustomSizeNote("");
+    setColorImageFiles({}); setColorImagePreviews({}); setExistingColorImages({});
   };
 
   const openEdit = (p: any) => {
@@ -222,6 +256,10 @@ export default function Seller() {
     setSelectedColors(Array.from(new Set(v.map((x) => x.color).filter(Boolean))) as string[]);
     setSelectedSizes(Array.from(new Set(v.map((x) => x.size).filter(Boolean))) as string[]);
     setSelectedShoeSizes(Array.from(new Set(v.map((x) => x.shoeSize).filter(Boolean))) as string[]);
+    setCustomSizeNote(p.custom_size_note || "");
+    setExistingColorImages(p.color_images || {});
+    setColorImageFiles({});
+    setColorImagePreviews({});
     setUploadError(null);
     setShowUpload(true);
   };
@@ -253,6 +291,8 @@ export default function Seller() {
       videoUrl = await uploadVideo();
     }
 
+    const colorImages = await uploadColorImages();
+
     const payload = {
       title,
       description,
@@ -262,6 +302,8 @@ export default function Seller() {
       video_url: videoUrl || null,
       variants: variants.length > 0 ? variants : null,
       use_variant_pricing: useVariantPricing,
+      custom_size_note: customSizeNote.trim() || null,
+      color_images: Object.keys(colorImages).length > 0 ? colorImages : null,
     };
 
     if (editingProductId) {
@@ -569,6 +611,7 @@ export default function Seller() {
 
               {showVariants && (
                 <div className="space-y-4">
+                  {/* Colors */}
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground mb-2">Colors</p>
                     <div className="flex flex-wrap gap-1.5">
@@ -587,8 +630,48 @@ export default function Seller() {
                         </button>
                       ))}
                     </div>
+
+                    {/* Per-color images */}
+                    {selectedColors.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        <p className="text-xs font-semibold text-muted-foreground">Color Images (optional)</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {selectedColors.map((color) => {
+                            const preview = colorImagePreviews[color] || existingColorImages[color];
+                            return (
+                              <div key={color} className="space-y-1">
+                                <p className="text-[10px] text-muted-foreground">{color}</p>
+                                {preview ? (
+                                  <div className="relative aspect-square">
+                                    <img src={preview} alt={color} className="w-full h-full object-cover rounded-xl" />
+                                    <button
+                                      type="button"
+                                      onClick={() => removeColorImage(color)}
+                                      className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive flex items-center justify-center"
+                                    >
+                                      <X className="w-3 h-3 text-white" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary/50 transition-colors">
+                                    <ImagePlus className="w-4 h-4 text-muted-foreground" />
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={(e) => handleColorImageSelect(color, e)}
+                                    />
+                                  </label>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
+                  {/* Clothing Sizes */}
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground mb-2">Clothing Sizes</p>
                     <div className="flex flex-wrap gap-1.5">
@@ -609,6 +692,23 @@ export default function Seller() {
                     </div>
                   </div>
 
+                  {/* Fit notes / custom size note */}
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">
+                      Fit Notes (optional)
+                    </p>
+                    <Input
+                      placeholder='e.g. "Fits XXL, very stretchy" or "Runs small, order one size up"'
+                      value={customSizeNote}
+                      onChange={(e) => setCustomSizeNote(e.target.value)}
+                      className="rounded-xl h-10 text-xs"
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      This note will show next to the size options on the product page.
+                    </p>
+                  </div>
+
+                  {/* Shoe Sizes */}
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground mb-2">Shoe Sizes</p>
                     <div className="flex flex-wrap gap-1.5">
@@ -629,6 +729,7 @@ export default function Seller() {
                     </div>
                   </div>
 
+                  {/* Variant pricing toggle */}
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold">Different price per variant?</p>
                     <button
@@ -644,6 +745,7 @@ export default function Seller() {
                     </button>
                   </div>
 
+                  {/* Generate variants button */}
                   {(selectedColors.length > 0 || selectedSizes.length > 0 || selectedShoeSizes.length > 0) && (
                     <Button
                       type="button"
@@ -656,6 +758,7 @@ export default function Seller() {
                     </Button>
                   )}
 
+                  {/* Variant list */}
                   {variants.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-xs font-semibold text-muted-foreground">
