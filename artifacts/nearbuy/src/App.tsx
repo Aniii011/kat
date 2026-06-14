@@ -20,6 +20,7 @@ import ResetPassword from "@/pages/reset-password";
 import BottomNav from "@/components/bottom-nav";
 import AiAssistant from "@/components/ai-assistant";
 import AuthCallback from "@/pages/AuthCallback";
+import SellerOrders from "@/pages/seller-orders";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,7 @@ function Router() {
       <Route path="/search" component={Search} />
       <Route path="/me" component={Me} />
       <Route path="/seller" component={Seller} />
+      <Route path="/seller/orders" component={SellerOrders} />
       <Route path="/admin/sellers" component={AdminSellers} />
       <Route path="/admin/orders" component={AdminOrders} />
       <Route path="/reset-password" component={ResetPassword} />
