@@ -150,7 +150,7 @@ function SizeGuideModal({ open, onClose, isShoe }: { open: boolean; onClose: () 
 
 export default function ListingDetail() {
   const [, params] = useRoute("/listing/:id");
-  const id = params?.id ? parseInt(params.id) : null;
+  const id = params?.id ?? null;
 
   const { listing: remoteListing, loading, error } = useListing(id);
   const fallback = staticListings.find((l) => l.id === id) ?? null;
