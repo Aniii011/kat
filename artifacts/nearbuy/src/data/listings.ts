@@ -9,7 +9,7 @@ export type Aesthetic =
   | "Soft Girl";
 
 export interface Review {
-  id: number;
+  id: string;
   author: string;
   avatar: string;
   rating: number;
@@ -20,7 +20,7 @@ export interface Review {
 }
 
 export interface Listing {
-  id: number;
+  id: string;
   title: string;
   price: number;
   originalPrice?: number;
