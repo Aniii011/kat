@@ -4,7 +4,7 @@ import type { Listing, Review, Aesthetic } from "@/data/listings";
 
 function rowToListing(row: Record<string, unknown>): Listing {
   return {
-    id: row.id as number,
+    id: row.id as string,
     title: (row.title as string) ?? "",
     price: Number(row.price) || 0,
     originalPrice: row.original_price ? Number(row.original_price) : undefined,
@@ -37,13 +37,13 @@ function rowToListing(row: Record<string, unknown>): Listing {
     isFeatured: (row.is_featured as boolean) ?? false,
     tags: (row.tags as string[]) ?? undefined,
     colorImages: (row.color_images as Record<string, string>) ?? undefined,
-customSizeNote: (row.custom_size_note as string) ?? undefined,
+    customSizeNote: (row.custom_size_note as string) ?? undefined,
   };
 }
 
 function rowToReview(row: Record<string, unknown>): Review {
   return {
-    id: row.id as number,
+    id: row.id as string,
     author: row.author as string,
     avatar: row.avatar as string,
     rating: row.rating as number,
@@ -98,7 +98,7 @@ export function useListings(filters?: {
   return { listings, loading, error };
 }
 
-export function useListing(id: number | null) {
+export function useListing(id: string | null) {
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -122,7 +122,9 @@ export function useListing(id: number | null) {
       }
 
       const parsed = rowToListing(listingRes.data as Record<string, unknown>);
-      parsed.reviews = (reviewsRes.data ?? []).map((r) => rowToReview(r as Record<string, unknown>));
+      parsed.reviews = (reviewsRes.data ?? []).map((r) =>
+        rowToReview(r as Record<string, unknown>)
+      );
       setListing(parsed);
       setLoading(false);
     }
