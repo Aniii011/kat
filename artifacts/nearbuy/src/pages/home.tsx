@@ -8,13 +8,13 @@ import {
 } from "@/data/listings";
 import { useBoards } from "@/hooks/use-boards";
 import { useAuth } from "@/context/auth-context";
+import { useCart } from "@/hooks/use-cart";
 import ThemeSwitcher from "@/components/theme-switcher";
-import QuickViewModal from "@/components/quick-view-modal";
 import SaveToBoardModal from "@/components/save-to-board-modal";
 import AuthModal from "@/components/auth-modal";
 import {
   Search, ShoppingBag, Star, BadgeCheck, Flame, Sparkles,
-  ChevronRight, Bookmark, Heart, LogIn,
+  ChevronRight, Bookmark, Heart, LogIn, CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -39,104 +39,135 @@ const ANNOUNCEMENT_ITEMS = [
 ];
 
 function ProductCard({
-  listing, index, onQuickView, onSave, saved,
+  listing, index, onSave, saved,
 }: {
   listing: Listing; index: number;
-  onQuickView: (l: Listing) => void;
   onSave: (e: React.MouseEvent, l: Listing) => void;
   saved: boolean;
 }) {
+  const { addItem } = useCart();
+  const [addedToCart, setAddedToCart] = useState(false);
+
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addItem({
+      listingId: listing.id,
+      title: listing.title,
+      price: listing.price,
+      imageUrl: listing.imageUrl,
+      sellerName: listing.sellerName,
+      quantity: 1,
+    });
+    setAddedToCart(true);
+    setTimeout(() => setAddedToCart(false), 1500);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(index * 0.04, 0.35), duration: 0.28 }}
     >
-      <div
-        className="group bg-card rounded-2xl overflow-hidden cursor-pointer border border-border hover:shadow-md transition-all duration-300"
-        onClick={() => onQuickView(listing)}
-      >
-        <div className="relative aspect-[3/4] overflow-hidden bg-muted">
-          <img
-            src={listing.imageUrl}
-            alt={listing.title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
-          />
-          <div className="absolute top-2 left-2 flex flex-col gap-1">
-            {listing.isThrift && (
-              <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-purple-500 text-white leading-tight">
-                Thrift 💜
-              </span>
-            )}
-            {listing.badge && !listing.isThrift && (
-              <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold leading-tight ${BADGE_STYLES[listing.badge] ?? "bg-gray-500 text-white"}`}>
-                {listing.badge}
-              </span>
-            )}
-          </div>
-          {listing.discount && (
-            <span className="absolute bottom-2 left-2 text-[9px] px-1.5 py-0.5 rounded-md bg-primary text-primary-foreground font-bold">
-              -{listing.discount}%
-            </span>
-          )}
-          <motion.button
-            onClick={(e) => onSave(e, listing)}
-            whileTap={{ scale: 0.8 }}
-            className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center shadow transition-all ${
-              saved ? "bg-primary shadow-primary/30" : "bg-white/90 hover:bg-white"
-            }`}
-          >
-            <Heart className={`w-3.5 h-3.5 ${saved ? "fill-white text-white" : "text-gray-700"}`} />
-          </motion.button>
-          <div className="absolute inset-x-0 bottom-0 hidden sm:flex justify-center pb-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            <span className="bg-background/90 backdrop-blur-sm text-foreground text-[11px] font-semibold px-3 py-1.5 rounded-full shadow">
-              Quick View
-            </span>
-          </div>
-        </div>
-        <div className="p-2.5 space-y-1">
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] text-muted-foreground truncate flex-1 leading-tight">
-              {listing.sellerName}
-            </span>
-            {listing.isVerifiedSeller && (
-              <BadgeCheck className="w-3 h-3 text-primary shrink-0" />
-            )}
-          </div>
-          <p className="text-[12px] font-semibold leading-snug line-clamp-2 text-foreground">
-            {listing.title}
-          </p>
-          {listing.aesthetics && listing.aesthetics.length > 0 && (
-            <span className="inline-block text-[9px] bg-accent text-accent-foreground px-1.5 py-0.5 rounded-md font-medium">
-              {listing.aesthetics[0]}
-            </span>
-          )}
-          <div className="flex items-center justify-between pt-0.5">
-            <div className="flex items-baseline gap-1 flex-wrap">
-              <span className="text-[13px] font-extrabold text-primary leading-none">
-                {formatNaira(listing.price)}
-              </span>
-              {listing.originalPrice && (
-                <span className="text-[10px] text-muted-foreground line-through leading-none">
-                  {formatNaira(listing.originalPrice)}
+      <Link href={`/listing/${listing.id}`}>
+        <div className="group bg-card rounded-2xl overflow-hidden cursor-pointer border border-border hover:shadow-md transition-all duration-300">
+          <div className="relative aspect-[3/4] overflow-hidden bg-muted">
+            <img
+              src={listing.imageUrl}
+              alt={listing.title}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              loading="lazy"
+            />
+            <div className="absolute top-2 left-2 flex flex-col gap-1">
+              {listing.isThrift && (
+                <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-purple-500 text-white leading-tight">
+                  Thrift 💜
+                </span>
+              )}
+              {listing.badge && !listing.isThrift && (
+                <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold leading-tight ${BADGE_STYLES[listing.badge] ?? "bg-gray-500 text-white"}`}>
+                  {listing.badge}
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-0.5 shrink-0">
-              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-              <span className="text-[10px] font-medium text-muted-foreground">
-                {listing.rating}
+            {listing.discount && (
+              <span className="absolute bottom-2 left-2 text-[9px] px-1.5 py-0.5 rounded-md bg-primary text-primary-foreground font-bold">
+                -{listing.discount}%
               </span>
-            </div>
+            )}
+
+            {/* Heart / save button */}
+            <motion.button
+              onClick={(e) => onSave(e, listing)}
+              whileTap={{ scale: 0.8 }}
+              className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center shadow transition-all ${
+                saved ? "bg-primary shadow-primary/30" : "bg-white/90 hover:bg-white"
+              }`}
+            >
+              <Heart className={`w-3.5 h-3.5 ${saved ? "fill-white text-white" : "text-gray-700"}`} />
+            </motion.button>
+
+            {/* Quick Add to Cart */}
+            <motion.button
+              onClick={handleAddToCart}
+              whileTap={{ scale: 0.85 }}
+              className={`absolute bottom-2 right-2 w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all ${
+                addedToCart
+                  ? "bg-emerald-500 opacity-100"
+                  : "bg-primary opacity-0 group-hover:opacity-100 sm:opacity-100"
+              }`}
+            >
+              {addedToCart ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+              ) : (
+                <ShoppingBag className="w-3.5 h-3.5 text-primary-foreground" />
+              )}
+            </motion.button>
           </div>
-          {listing.isThrift && listing.depositAmount && (
-            <p className="text-[9px] text-purple-500 font-semibold leading-tight">
-              Deposit {formatNaira(listing.depositAmount)} to hold
+
+          <div className="p-2.5 space-y-1">
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-muted-foreground truncate flex-1 leading-tight">
+                {listing.sellerName}
+              </span>
+              {listing.isVerifiedSeller && (
+                <BadgeCheck className="w-3 h-3 text-primary shrink-0" />
+              )}
+            </div>
+            <p className="text-[12px] font-semibold leading-snug line-clamp-2 text-foreground">
+              {listing.title}
             </p>
-          )}
+            {listing.aesthetics && listing.aesthetics.length > 0 && (
+              <span className="inline-block text-[9px] bg-accent text-accent-foreground px-1.5 py-0.5 rounded-md font-medium">
+                {listing.aesthetics[0]}
+              </span>
+            )}
+            <div className="flex items-center justify-between pt-0.5">
+              <div className="flex items-baseline gap-1 flex-wrap">
+                <span className="text-[13px] font-extrabold text-primary leading-none">
+                  {formatNaira(listing.price)}
+                </span>
+                {listing.originalPrice && (
+                  <span className="text-[10px] text-muted-foreground line-through leading-none">
+                    {formatNaira(listing.originalPrice)}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-0.5 shrink-0">
+                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                <span className="text-[10px] font-medium text-muted-foreground">
+                  {listing.rating || "New"}
+                </span>
+              </div>
+            </div>
+            {listing.isThrift && listing.depositAmount && (
+              <p className="text-[9px] text-purple-500 font-semibold leading-tight">
+                Deposit {formatNaira(listing.depositAmount)} to hold
+              </p>
+            )}
+          </div>
         </div>
-      </div>
+      </Link>
     </motion.div>
   );
 }
@@ -159,7 +190,6 @@ export default function Home() {
   const [subCategory, setSubCategory] = useState<string | null>(null);
   const [selectedAesthetic, setSelectedAesthetic] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState("featured");
-  const [quickViewListing, setQuickViewListing] = useState<Listing | null>(null);
   const [saveTarget, setSaveTarget] = useState<Listing | null>(null);
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
@@ -473,7 +503,6 @@ export default function Home() {
                 key={listing.id}
                 listing={listing}
                 index={i}
-                onQuickView={setQuickViewListing}
                 onSave={handleSave}
                 saved={isSaved(listing.id)}
               />
@@ -502,7 +531,6 @@ export default function Home() {
                   key={listing.id}
                   listing={listing}
                   index={i}
-                  onQuickView={setQuickViewListing}
                   onSave={handleSave}
                   saved={isSaved(listing.id)}
                 />
@@ -512,7 +540,6 @@ export default function Home() {
         )}
       </main>
 
-      <QuickViewModal listing={quickViewListing} onClose={() => setQuickViewListing(null)} />
       {saveTarget && (
         <SaveToBoardModal
           open={!!saveTarget}
@@ -524,4 +551,4 @@ export default function Home() {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
     </div>
   );
-}
+    }
