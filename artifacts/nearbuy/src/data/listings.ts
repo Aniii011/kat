@@ -39,6 +39,7 @@ export interface Listing {
   freeShipping: boolean;
   shippingDays: number;
   sellerName: string;
+  sellerId?: string;
   sellerAvatar?: string;
   sellerRating: number;
   sellerFollowers?: number;
