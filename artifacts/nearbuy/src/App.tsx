@@ -22,6 +22,7 @@ import AiAssistant from "@/components/ai-assistant";
 import AuthCallback from "@/pages/AuthCallback";
 import SellerOrders from "@/pages/seller-orders";
 import Store from "@/pages/store";
+import Checkout from "@/pages/checkout";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ function Router() {
       <Route path="/me" component={Me} />
       <Route path="/seller" component={Seller} />
       <Route path="/store/:sellerId" component={Store} />
+      <Route path="/checkout" component={Checkout} />
       <Route path="/seller/orders" component={SellerOrders} />
       <Route path="/admin/sellers" component={AdminSellers} />
       <Route path="/admin/orders" component={AdminOrders} />
