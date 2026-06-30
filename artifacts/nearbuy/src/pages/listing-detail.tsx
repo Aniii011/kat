@@ -284,19 +284,19 @@ export default function ListingDetail() {
 
         {/* Image Gallery */}
         <div className="relative bg-muted">
-          <div className="aspect-square sm:aspect-[4/3] md:aspect-[16/9] overflow-hidden relative">
-            <AnimatePresence mode="wait">
-              <motion.img
-                key={selectedImage}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                src={images[selectedImage]}
-                alt={listing.title}
-                className="w-full h-full object-cover"
-              />
-            </AnimatePresence>
+          <div className="aspect-square overflow-hidden relative bg-muted">
+  <AnimatePresence mode="wait">
+    <motion.img
+      key={selectedImage}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      src={images[selectedImage]}
+      alt={listing.title}
+      className="w-full h-full object-contain"
+    />
+  </AnimatePresence>
 
             {/* Image counter */}
             <div className="absolute bottom-3 right-3 bg-black/60 text-white text-[10px] font-bold px-2 py-1 rounded-full">
@@ -339,14 +339,14 @@ export default function ListingDetail() {
             <div className="flex gap-1.5 overflow-x-auto scrollbar-hide px-3 py-2">
               {images.map((img, i) => (
                 <button
-                  key={i}
-                  onClick={() => setSelectedImage(i)}
-                  className={`shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 transition-all ${
-                    selectedImage === i ? "border-primary" : "border-transparent opacity-50 hover:opacity-80"
-                  }`}
-                >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
-                </button>
+  key={i}
+  onClick={() => setSelectedImage(i)}
+  className={`shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 bg-muted transition-all ${
+    selectedImage === i ? "border-primary" : "border-transparent opacity-50 hover:opacity-80"
+  }`}
+>
+  <img src={img} alt="" className="w-full h-full object-contain" />
+</button>
               ))}
             </div>
           )}
