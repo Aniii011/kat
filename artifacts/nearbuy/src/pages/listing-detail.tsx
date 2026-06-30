@@ -602,7 +602,7 @@ export default function ListingDetail() {
                   )}
                 </div>
               </div>
-              <Link href={`/store/${listing.sellerName}`}>
+              <Link href={`/store/${listing.sellerId}`}>
                 <Button variant="outline" size="sm" className="rounded-full text-xs border-primary text-primary hover:bg-primary/10 shrink-0">
                   Visit Store
                 </Button>
