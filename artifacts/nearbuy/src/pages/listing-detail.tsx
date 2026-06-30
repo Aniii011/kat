@@ -805,7 +805,7 @@ export default function ListingDetail() {
       </div>
 
       {/* Sticky bottom CTA */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-background/98 backdrop-blur-md border-t border-border px-4 py-3 sm:hidden">
+      <div className="fixed bottom-[62px] left-0 right-0 z-30 bg-background/98 backdrop-blur-md border-t border-border px-4 py-3 sm:hidden">
         <div className="max-w-lg mx-auto">
           {listing.isThrift ? (
             <Button
