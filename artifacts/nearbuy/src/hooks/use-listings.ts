@@ -23,6 +23,7 @@ function rowToListing(row: Record<string, unknown>): Listing {
     freeShipping: (row.free_shipping as boolean) ?? false,
     shippingDays: (row.shipping_days as number) ?? 3,
     sellerName: (row.seller_name as string) ?? "",
+    sellerId: (row.seller_id as string) ?? undefined,
     sellerAvatar: row.seller_avatar as string | undefined,
     sellerRating: Number(row.seller_rating) || 0,
     sellerFollowers: row.seller_followers as number | undefined,
