@@ -170,7 +170,7 @@ export default function Checkout() {
       </main>
 
       {/* Sticky place order */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-md border-t border-border z-30">
+      <div className="fixed bottom-[62px] left-0 right-0 p-4 bg-background/95 backdrop-blur-md border-t border-border z-30">
         <div className="max-w-2xl mx-auto">
           <Button
             className="w-full rounded-full font-bold h-12 text-sm"
