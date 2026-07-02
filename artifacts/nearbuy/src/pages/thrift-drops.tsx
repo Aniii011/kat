@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useListings } from "@/hooks/use-listings";
-import { listings as staticListings, type Listing } from "@/data/listings";
+import { type Listing } from "@/data/listings";
 import { useThriftHolds, type HoldStatus } from "@/hooks/use-thrift-holds";
 import { useBoards } from "@/hooks/use-boards";
 import ThemeSwitcher from "@/components/theme-switcher";
@@ -74,12 +74,11 @@ function ThriftCard({
           <img
             src={listing.imageUrl}
             alt={listing.title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer"
+            className="w-full h-full object-contain cursor-pointer"
             loading="lazy"
           />
         </Link>
 
-        {/* Overlay when held */}
         <AnimatePresence>
           {status === "held_by_me" && (
             <motion.div
@@ -98,13 +97,11 @@ function ThriftCard({
           )}
         </AnimatePresence>
 
-        {/* Badges */}
         <div className="absolute top-2 left-2 flex flex-col gap-1">
           <span className="text-[10px] px-2.5 py-1 rounded-full font-bold bg-purple-500 text-white">1 of 1 💜</span>
           <StatusBadge status={status} />
         </div>
 
-        {/* Save button */}
         <button
           onClick={onSave}
           className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all ${
@@ -123,7 +120,9 @@ function ThriftCard({
         </div>
 
         <Link href={`/listing/${listing.id}`}>
-          <p className="text-sm font-bold leading-tight line-clamp-2 cursor-pointer hover:text-primary transition-colors">{listing.title}</p>
+          <p className="text-sm font-bold leading-tight line-clamp-2 cursor-pointer hover:text-primary transition-colors">
+            {listing.title}
+          </p>
         </Link>
 
         <div className="flex items-center gap-1">
@@ -145,7 +144,6 @@ function ThriftCard({
           <span className="font-black text-primary">{formatNaira(listing.price)}</span>
         </div>
 
-        {/* Deposit info */}
         <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-xl p-2.5">
           <div className="flex items-center gap-1.5 mb-1">
             <Clock className="w-3 h-3 text-purple-500" />
@@ -158,7 +156,6 @@ function ThriftCard({
           </p>
         </div>
 
-        {/* CTA */}
         {status === "available" && (
           <Button
             size="sm"
@@ -196,11 +193,10 @@ function ThriftCard({
 export default function ThriftDrops() {
   const [depositListing, setDepositListing] = useState<Listing | null>(null);
   const [completeListing, setCompleteListing] = useState<Listing | null>(null);
-  const [saveTarget, setSaveTarget] = useState<number | null>(null);
+  const [saveTarget, setSaveTarget] = useState<string | null>(null);
 
   const { listings: remoteListings, loading } = useListings();
-  const allListings = remoteListings;
-  const thriftListings = allListings.filter((l) => l.isThrift);
+  const thriftListings = remoteListings.filter((l) => l.isThrift);
 
   const { holdItem, releaseHold, getStatus, getTimeRemaining } = useThriftHolds();
   const { isSaved } = useBoards();
@@ -213,7 +209,6 @@ export default function ThriftDrops() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
         <div className="max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
           <Link href="/">
@@ -225,14 +220,15 @@ export default function ThriftDrops() {
             <h1 className="text-base font-black">💜 Thrift Drops</h1>
           </div>
           <ThemeSwitcher />
-          <Button variant="ghost" size="icon" className="w-9 h-9 rounded-full">
-            <ShoppingBag className="w-4 h-4" />
-          </Button>
+          <Link href="/cart">
+            <Button variant="ghost" size="icon" className="w-9 h-9 rounded-full">
+              <ShoppingBag className="w-4 h-4" />
+            </Button>
+          </Link>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6 pb-24">
-        {/* Hero */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -252,7 +248,6 @@ export default function ThriftDrops() {
           </div>
         </motion.div>
 
-        {/* How it works */}
         <div className="mb-8">
           <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
             <Info className="w-4 h-4 text-purple-500" /> How Thrift Drops Work
@@ -278,7 +273,6 @@ export default function ThriftDrops() {
           </div>
         </div>
 
-        {/* Hold states legend */}
         <div className="flex flex-wrap gap-2 mb-4">
           {[
             { status: "available" as HoldStatus, label: "Available to hold" },
@@ -341,13 +335,12 @@ export default function ThriftDrops() {
         )}
       </main>
 
-      {/* Hold confirmation dialog */}
       <Dialog open={!!depositListing} onOpenChange={() => setDepositListing(null)}>
         <DialogContent className="rounded-3xl max-w-sm mx-auto">
           <DialogHeader>
             <DialogTitle className="text-center text-lg font-black">💜 Hold this piece</DialogTitle>
             <DialogDescription className="text-center text-sm">
-              Pay a deposit to secure <strong>{depositListing?.title}</strong> for <strong>24 hours</strong> while you arrange full payment.
+              Pay a deposit to secure <strong>{depositListing?.title}</strong> for <strong>24 hours</strong>.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
@@ -384,7 +377,6 @@ export default function ThriftDrops() {
         </DialogContent>
       </Dialog>
 
-      {/* Complete purchase dialog */}
       <Dialog open={!!completeListing} onOpenChange={() => setCompleteListing(null)}>
         <DialogContent className="rounded-3xl max-w-sm mx-auto">
           <DialogHeader>
@@ -401,7 +393,9 @@ export default function ThriftDrops() {
               </div>
               <div className="flex justify-between items-center text-sm mb-2">
                 <span className="text-muted-foreground">Deposit already paid</span>
-                <span className="font-semibold text-emerald-600">-{completeListing?.depositAmount ? formatNaira(completeListing.depositAmount) : ""}</span>
+                <span className="font-semibold text-emerald-600">
+                  -{completeListing?.depositAmount ? formatNaira(completeListing.depositAmount) : ""}
+                </span>
               </div>
               <div className="border-t border-emerald-200 dark:border-emerald-700 pt-2 flex justify-between items-center">
                 <span className="font-bold">Balance due</span>
@@ -422,11 +416,12 @@ export default function ThriftDrops() {
 
       {saveTarget !== null && (
         <SaveToBoardModal
-          open={saveTarget !== null}
+          open={true}
           onClose={() => setSaveTarget(null)}
           listingId={saveTarget}
+          listingTitle=""
         />
       )}
     </div>
   );
-}
+      }
