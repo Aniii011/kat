@@ -1,19 +1,19 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 
 export interface Board {
   id: string;
   name: string;
   emoji: string;
   createdAt: string;
-  itemIds: number[];
+  itemIds: string[];
 }
 
 const STORAGE_KEY = "kat_boards";
 
 const DEFAULT_BOARDS: Board[] = [
-  { id: "b-vacation", name: "Vacation Fits", emoji: "🌴", createdAt: new Date().toISOString(), itemIds: [7, 8] },
-  { id: "b-gym", name: "Gym Era", emoji: "💪", createdAt: new Date().toISOString(), itemIds: [12] },
-  { id: "b-baddie", name: "Baddie Looks", emoji: "💅", createdAt: new Date().toISOString(), itemIds: [2, 13, 15] },
+  { id: "b-vacation", name: "Vacation Fits", emoji: "🌴", createdAt: new Date().toISOString(), itemIds: [] },
+  { id: "b-gym", name: "Gym Era", emoji: "💪", createdAt: new Date().toISOString(), itemIds: [] },
+  { id: "b-baddie", name: "Baddie Looks", emoji: "💅", createdAt: new Date().toISOString(), itemIds: [] },
 ];
 
 function loadBoards(): Board[] {
@@ -52,7 +52,7 @@ export function useBoards() {
     persist(boards.filter((b) => b.id !== id));
   }, [boards, persist]);
 
-  const saveToBoard = useCallback((boardId: string, listingId: number) => {
+  const saveToBoard = useCallback((boardId: string, listingId: string) => {
     persist(boards.map((b) =>
       b.id === boardId
         ? { ...b, itemIds: b.itemIds.includes(listingId) ? b.itemIds : [...b.itemIds, listingId] }
@@ -60,17 +60,17 @@ export function useBoards() {
     ));
   }, [boards, persist]);
 
-  const removeFromBoard = useCallback((boardId: string, listingId: number) => {
+  const removeFromBoard = useCallback((boardId: string, listingId: string) => {
     persist(boards.map((b) =>
       b.id === boardId ? { ...b, itemIds: b.itemIds.filter((id) => id !== listingId) } : b
     ));
   }, [boards, persist]);
 
-  const isSaved = useCallback((listingId: number) =>
+  const isSaved = useCallback((listingId: string) =>
     boards.some((b) => b.itemIds.includes(listingId)), [boards]);
 
-  const getBoardsForItem = useCallback((listingId: number) =>
+  const getBoardsForItem = useCallback((listingId: string) =>
     boards.filter((b) => b.itemIds.includes(listingId)), [boards]);
 
   return { boards, createBoard, deleteBoard, saveToBoard, removeFromBoard, isSaved, getBoardsForItem };
-}
+    }
