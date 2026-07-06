@@ -1,13 +1,13 @@
 import React, { useState } from "react";
 import { Link } from "wouter";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useListings } from "@/hooks/use-listings";
 import { type Listing } from "@/data/listings";
 import { useThriftHolds, type HoldStatus } from "@/hooks/use-thrift-holds";
 import ThemeSwitcher from "@/components/theme-switcher";
 import {
   ArrowLeft, Star, BadgeCheck, Recycle, ShoppingBag,
-  Clock, Info, Timer, CheckCircle2,
+  Clock, Info, Timer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -30,7 +30,6 @@ function ThriftCard({ listing, status, timeRemaining }: {
         animate={{ opacity: 1, y: 0 }}
         className="group relative flex flex-col rounded-3xl overflow-hidden bg-card border border-card-border shadow-sm transition-all duration-300 hover:shadow-md cursor-pointer"
       >
-        {/* Image */}
         <div className="relative aspect-[3/4] overflow-hidden bg-muted">
           <img
             src={listing.imageUrl}
@@ -38,8 +37,6 @@ function ThriftCard({ listing, status, timeRemaining }: {
             className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
             loading="lazy"
           />
-
-          {/* Holding overlay with timer */}
           {status === "held_by_me" && (
             <div className="absolute inset-0 bg-amber-500/20 backdrop-blur-[1px] flex items-center justify-center">
               <div className="bg-background/90 rounded-2xl px-4 py-3 text-center shadow-lg">
@@ -50,8 +47,6 @@ function ThriftCard({ listing, status, timeRemaining }: {
               </div>
             </div>
           )}
-
-          {/* Badges */}
           <div className="absolute top-2 left-2 flex flex-col gap-1">
             <span className="text-[10px] px-2.5 py-1 rounded-full font-bold bg-purple-500 text-white">
               1 of 1 💜
@@ -69,22 +64,18 @@ function ThriftCard({ listing, status, timeRemaining }: {
           </div>
         </div>
 
-        {/* Body */}
         <div className="p-3 flex flex-col gap-2 flex-1">
           <div className="flex items-center gap-1">
             <p className="text-[11px] text-muted-foreground truncate flex-1">{listing.sellerName}</p>
             {listing.isVerifiedSeller && <BadgeCheck className="w-3 h-3 text-primary shrink-0" />}
           </div>
-
           <p className="text-sm font-bold leading-tight line-clamp-2">{listing.title}</p>
-
           <div className="flex items-center gap-1">
             {Array.from({ length: 5 }, (_, i) => (
               <Star key={i} className={`h-3 w-3 ${i < Math.floor(listing.rating) ? "fill-amber-400 text-amber-400" : "fill-muted text-muted"}`} />
             ))}
             <span className="text-[10px] text-muted-foreground">({listing.reviewCount})</span>
           </div>
-
           {listing.clothingSizes && listing.clothingSizes.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {listing.clothingSizes.map((s) => (
@@ -92,11 +83,7 @@ function ThriftCard({ listing, status, timeRemaining }: {
               ))}
             </div>
           )}
-
-          <div className="flex items-baseline gap-2">
-            <span className="font-black text-primary">{formatNaira(listing.price)}</span>
-          </div>
-
+          <span className="font-black text-primary">{formatNaira(listing.price)}</span>
           <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-xl p-2.5">
             <div className="flex items-center gap-1.5 mb-1">
               <Clock className="w-3 h-3 text-purple-500" />
@@ -124,21 +111,22 @@ export default function ThriftDrops() {
 
   const availableListings = thriftListings.filter((l) => getStatus(l.id) === "available");
   const holdingListings = thriftListings.filter((l) => getStatus(l.id) === "held_by_me");
-  const prevHeldListings = thriftListings.filter((l) => getStatus(l.id) === "available");
 
-  const TABS: { key: FilterTab; label: string; count?: number }[] = [
+  const TABS: { key: FilterTab; label: string; count: number }[] = [
     { key: "available", label: "Available to hold", count: availableListings.length },
-    { key: "held_by_me", label: "Held by you", count: prevHeldListings.length },
+    { key: "held_by_me", label: "Held by you", count: 0 },
     { key: "holding", label: "You're holding this", count: holdingListings.length },
   ];
 
   const displayedListings =
     activeTab === "available" ? availableListings :
     activeTab === "holding" ? holdingListings :
-    prevHeldListings;
+    [];
 
   return (
     <div className="min-h-screen bg-background">
+
+      {/* Header — just title and icons, no tabs */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
         <div className="max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
           <Link href="/">
@@ -158,30 +146,6 @@ export default function ThriftDrops() {
         </div>
       </header>
 
-              {/* Filter tabs */}
-        <div className="flex overflow-x-auto scrollbar-hide px-4 pb-3 gap-2">
-          {TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`shrink-0 flex items-center gap-1.5 text-xs px-4 py-2 rounded-full font-semibold transition-all whitespace-nowrap ${
-                activeTab === tab.key
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "bg-muted text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tab.label}
-              {tab.count !== undefined && tab.count > 0 && (
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                  activeTab === tab.key ? "bg-white/20 text-white" : "bg-background text-foreground"
-                }`}>
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      
       <main className="max-w-4xl mx-auto px-4 py-6 pb-24">
 
         {/* Hero */}
@@ -221,6 +185,30 @@ export default function ThriftDrops() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Filter tabs — NOW below hero and how it works */}
+        <div className="flex overflow-x-auto scrollbar-hide gap-2 mb-4">
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`shrink-0 flex items-center gap-1.5 text-xs px-4 py-2 rounded-full font-semibold transition-all whitespace-nowrap ${
+                activeTab === tab.key
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+              {tab.count > 0 && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                  activeTab === tab.key ? "bg-white/20 text-white" : "bg-background text-foreground"
+                }`}>
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
 
         <div className="flex items-center justify-between mb-4">
@@ -283,4 +271,4 @@ export default function ThriftDrops() {
       </main>
     </div>
   );
-                }
+            }
