@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import ThemeSwitcher from "@/components/theme-switcher";
@@ -10,7 +10,7 @@ import {
   Package, MapPin, RotateCcw, HelpCircle, LogOut,
   ChevronRight, Edit3, Check, Shield, BadgeCheck,
   Store, LogIn, UserCircle2, ShieldCheck, AlertTriangle,
-  Palette, X, MessageCircle,
+  Palette, X, MessageCircle, Camera, Phone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,10 +34,18 @@ export default function Me() {
   const { user, signOut } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+
   const [displayName, setDisplayName] = useState(() => user?.name || localStorage.getItem("kat_name") || "");
-  const [editingName, setEditingName] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState(() => localStorage.getItem("kat_phone") || "");
+  const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem("kat_avatar") || "");
+
+  const [editingProfile, setEditingProfile] = useState(false);
   const [nameInput, setNameInput] = useState(displayName);
-  const [savingName, setSavingName] = useState(false);
+  const [phoneInput, setPhoneInput] = useState(phoneNumber);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState(avatarUrl);
+  const [savingProfile, setSavingProfile] = useState(false);
+
   const [address, setAddress] = useState(() => localStorage.getItem("kat_address") ?? "");
   const [editingAddress, setEditingAddress] = useState(false);
   const [addressInput, setAddressInput] = useState(address);
@@ -47,19 +55,56 @@ export default function Me() {
   const [showHelp, setShowHelp] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const openLogin = () => { setAuthMode("login"); setShowAuth(true); };
   const openSignup = () => { setAuthMode("signup"); setShowAuth(true); };
 
-  const saveName = async () => {
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const saveProfile = async () => {
     if (!nameInput.trim()) return;
-    setSavingName(true);
-    localStorage.setItem("kat_name", nameInput);
-    if (user?.id) {
-      await supabase.from("profiles").update({ full_name: nameInput }).eq("id", user.id);
+    setSavingProfile(true);
+
+    let newAvatarUrl = avatarUrl;
+
+    // Upload avatar if changed
+    if (avatarFile && user?.id) {
+      const fileName = `avatars/${user.id}-${Date.now()}`;
+      const { error } = await supabase.storage
+        .from("product-images")
+        .upload(fileName, avatarFile, { upsert: true });
+      if (!error) {
+        const { data } = supabase.storage.from("product-images").getPublicUrl(fileName);
+        newAvatarUrl = data.publicUrl;
+      }
     }
-    setDisplayName(nameInput);
-    setSavingName(false);
-    setEditingName(false);
+
+    // Save to localStorage
+    localStorage.setItem("kat_name", nameInput.trim());
+    localStorage.setItem("kat_phone", phoneInput.trim());
+    if (newAvatarUrl) localStorage.setItem("kat_avatar", newAvatarUrl);
+
+    // Save to Supabase
+    if (user?.id) {
+      await supabase.from("profiles").update({
+        full_name: nameInput.trim(),
+        phone: phoneInput.trim(),
+        avatar_url: newAvatarUrl || null,
+      }).eq("id", user.id);
+    }
+
+    setDisplayName(nameInput.trim());
+    setPhoneNumber(phoneInput.trim());
+    setAvatarUrl(newAvatarUrl);
+    setSavingProfile(false);
+    setEditingProfile(false);
+    setAvatarFile(null);
   };
 
   const saveAddress = () => {
@@ -75,8 +120,8 @@ export default function Me() {
     setShowSignOutConfirm(false);
   };
 
-  const effectiveName = user?.name || displayName;
-  const initials = effectiveName ? effectiveName.slice(0, 2).toUpperCase() : "KAT";
+  const effectiveName = displayName || user?.email?.split("@")[0] || "KAT Member";
+  const initials = effectiveName.slice(0, 2).toUpperCase();
   const currentAccent = ACCENT_OPTIONS.find((a) => a.value === theme.accent);
 
   if (!user) {
@@ -103,7 +148,6 @@ export default function Me() {
                 Create Account
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground mt-6">Guest? You can still browse and shop.</p>
           </motion.div>
         </main>
         <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
@@ -120,6 +164,7 @@ export default function Me() {
   return (
     <div className="min-h-screen bg-background">
 
+      {/* Sign out confirm */}
       <AnimatePresence>
         {showSignOutConfirm && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center px-6">
@@ -140,6 +185,7 @@ export default function Me() {
         )}
       </AnimatePresence>
 
+      {/* Help */}
       <AnimatePresence>
         {showHelp && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center px-4 pb-4 sm:pb-0">
@@ -151,7 +197,7 @@ export default function Me() {
                 </button>
               </div>
               <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">Need help with your order, account, or anything else? We are here for you!</p>
+                <p className="text-sm text-muted-foreground">Need help? We're here for you!</p>
                 <a href="mailto:support@katmarketplace.com" className="flex items-center gap-3 p-3 rounded-xl bg-muted hover:bg-accent transition-colors">
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                     <MessageCircle className="w-4 h-4 text-primary" />
@@ -162,22 +208,13 @@ export default function Me() {
                   </div>
                   <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
                 </a>
-                <div className="p-3 rounded-xl bg-muted">
-                  <p className="text-xs font-semibold mb-1">Response Time</p>
-                  <p className="text-xs text-muted-foreground">We typically respond within 24 hours on business days.</p>
-                </div>
-                <div className="p-3 rounded-xl bg-muted space-y-1">
-                  <p className="text-xs font-semibold">Common Questions</p>
-                  {["How do I track my order?", "How do I return an item?", "How do I become a seller?", "How do I report a problem?"].map((q) => (
-                    <p key={q} className="text-xs text-muted-foreground">• {q}</p>
-                  ))}
-                </div>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
+      {/* Privacy */}
       <AnimatePresence>
         {showPrivacy && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center px-4 pb-4 sm:pb-0">
@@ -191,13 +228,10 @@ export default function Me() {
               <div className="space-y-4 text-sm text-muted-foreground">
                 <p className="text-xs">Last updated: June 2025</p>
                 {[
-                  { title: "Information We Collect", content: "We collect information you provide when creating an account, making purchases, or contacting support. This includes your name, email address, delivery address, and payment information." },
-                  { title: "How We Use Your Information", content: "We use your information to process orders, send order updates, improve our services, and communicate with you about your account and purchases." },
-                  { title: "Information Sharing", content: "We share your delivery information with sellers to fulfill your orders. We do not sell your personal information to third parties." },
-                  { title: "Data Security", content: "We use industry-standard security measures to protect your personal information. Your payment details are encrypted and never stored on our servers." },
-                  { title: "Your Rights", content: "You have the right to access, update, or delete your personal information at any time. Contact us at privacy@katmarketplace.com to exercise these rights." },
-                  { title: "Cookies", content: "We use cookies to improve your browsing experience and remember your preferences. You can disable cookies in your browser settings." },
-                  { title: "Contact Us", content: "For privacy-related questions, contact us at privacy@katmarketplace.com or through our Help & Support section." },
+                  { title: "Information We Collect", content: "We collect information you provide when creating an account, making purchases, or contacting support." },
+                  { title: "How We Use Your Information", content: "We use your information to process orders, send updates, and improve our services." },
+                  { title: "Data Security", content: "We use industry-standard security measures. Payment details are encrypted and never stored on our servers." },
+                  { title: "Your Rights", content: "You can access, update, or delete your personal information at any time by contacting privacy@katmarketplace.com." },
                 ].map(({ title, content }) => (
                   <div key={title}>
                     <p className="font-semibold text-foreground mb-1">{title}</p>
@@ -219,43 +253,109 @@ export default function Me() {
 
       <main className="max-w-2xl mx-auto px-4 py-4 pb-24 space-y-4">
 
+        {/* Profile card */}
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-card-border rounded-3xl p-5">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center shrink-0">
-              <span className="text-2xl font-black text-primary">{initials}</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              {editingName ? (
-                <div className="flex gap-2">
-                  <Input value={nameInput} onChange={(e) => setNameInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveName()} placeholder="Your name..." className="rounded-xl text-sm h-8" autoFocus />
-                  <Button size="sm" onClick={saveName} className="rounded-xl px-3 h-8" disabled={savingName}>{savingName ? "..." : "Save"}</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setEditingName(false)} className="rounded-xl px-2 h-8"><X className="w-3 h-3" /></Button>
+          {editingProfile ? (
+            <div className="space-y-4">
+              {/* Avatar upload */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="relative">
+                  <div className="w-20 h-20 rounded-full bg-primary/10 border-2 border-primary/20 overflow-hidden flex items-center justify-center">
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-2xl font-black text-primary">{initials}</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary flex items-center justify-center shadow-md"
+                  >
+                    <Camera className="w-3.5 h-3.5 text-primary-foreground" />
+                  </button>
+                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarSelect} />
                 </div>
-              ) : (
+                <p className="text-xs text-muted-foreground">Tap camera to change photo</p>
+              </div>
+
+              <Input
+                placeholder="Your name"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                className="rounded-xl h-11"
+              />
+              <Input
+                placeholder="Phone number (e.g. 08012345678)"
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+                className="rounded-xl h-11"
+                type="tel"
+              />
+              <div className="flex gap-2">
+                <Button className="flex-1 rounded-full" onClick={saveProfile} disabled={savingProfile}>
+                  {savingProfile ? "Saving..." : "Save Profile"}
+                </Button>
+                <Button variant="ghost" className="rounded-full" onClick={() => {
+                  setEditingProfile(false);
+                  setAvatarPreview(avatarUrl);
+                  setAvatarFile(null);
+                  setNameInput(displayName);
+                  setPhoneInput(phoneNumber);
+                }}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4">
+              <div className="relative shrink-0">
+                <div className="w-16 h-16 rounded-full bg-primary/10 border-2 border-primary/20 overflow-hidden flex items-center justify-center">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-2xl font-black text-primary">{initials}</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="font-bold text-base truncate">{effectiveName || "Set your name"}</p>
-                  <button onClick={() => { setNameInput(effectiveName); setEditingName(true); }} className="w-6 h-6 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0">
+                  <p className="font-bold text-base truncate">{effectiveName}</p>
+                  <button
+                    onClick={() => {
+                      setNameInput(displayName);
+                      setPhoneInput(phoneNumber);
+                      setAvatarPreview(avatarUrl);
+                      setEditingProfile(true);
+                    }}
+                    className="w-6 h-6 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0"
+                  >
                     <Edit3 className="w-3 h-3" />
                   </button>
                 </div>
-              )}
-              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                <p className="text-xs text-muted-foreground">{user?.email || "KAT Member"}</p>
-                {user?.sellerVerified && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full">
-                    <BadgeCheck className="w-3 h-3" /> Verified Seller
-                  </span>
+                <p className="text-xs text-muted-foreground mt-0.5">{user?.email}</p>
+                {phoneNumber && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <Phone className="w-3 h-3" /> {phoneNumber}
+                  </p>
                 )}
-                {user?.isAdmin && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                    <ShieldCheck className="w-3 h-3" /> Admin
-                  </span>
-                )}
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  {user?.sellerVerified && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full">
+                      <BadgeCheck className="w-3 h-3" /> Verified Seller
+                    </span>
+                  )}
+                  {user?.isAdmin && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                      <ShieldCheck className="w-3 h-3" /> Admin
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </motion.div>
 
+        {/* Tabs */}
         <div className="flex gap-1 bg-muted p-1 rounded-2xl">
           {menuItems.map(({ icon, label, tab }) => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl text-[10px] font-semibold transition-all ${activeTab === tab ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"}`}>
@@ -315,6 +415,7 @@ export default function Me() {
           </div>
         )}
 
+        {/* Theme */}
         <div className="bg-card border border-card-border rounded-2xl p-4 space-y-4">
           <p className="font-bold text-sm flex items-center gap-2"><Palette className="w-4 h-4 text-primary" /> App Theme</p>
           <div>
@@ -350,6 +451,7 @@ export default function Me() {
           </div>
         </div>
 
+        {/* Menu */}
         <div className="bg-card border border-card-border rounded-2xl overflow-hidden">
           {[
             { icon: <HelpCircle className="w-4 h-4" />, label: "Help & Support", onClick: () => setShowHelp(true) },
@@ -366,6 +468,7 @@ export default function Me() {
           ))}
         </div>
 
+        {/* Admin / Seller links */}
         {(user?.isAdmin || user?.sellerVerified) && (
           <div className="bg-card border border-card-border rounded-2xl overflow-hidden">
             {user?.isAdmin && (
@@ -396,4 +499,4 @@ export default function Me() {
       </main>
     </div>
   );
-}
+         }
