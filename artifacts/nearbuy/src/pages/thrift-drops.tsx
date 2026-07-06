@@ -156,30 +156,6 @@ export default function ThriftDrops() {
             </Button>
           </Link>
         </div>
-
-        {/* Filter tabs */}
-        <div className="flex overflow-x-auto scrollbar-hide px-4 pb-3 gap-2">
-          {TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`shrink-0 flex items-center gap-1.5 text-xs px-4 py-2 rounded-full font-semibold transition-all whitespace-nowrap ${
-                activeTab === tab.key
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "bg-muted text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tab.label}
-              {tab.count !== undefined && tab.count > 0 && (
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                  activeTab === tab.key ? "bg-white/20 text-white" : "bg-background text-foreground"
-                }`}>
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6 pb-24">
