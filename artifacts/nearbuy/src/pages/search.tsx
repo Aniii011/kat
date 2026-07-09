@@ -1,11 +1,12 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { listings as staticListings, TOP_CATEGORIES, type Listing } from "@/data/listings";
-import { useBoards } from "@/hooks/use-boards";
-import QuickViewModal from "@/components/quick-view-modal";
-import SaveToBoardModal from "@/components/save-to-board-modal";
-import { Search as SearchIcon, X, SlidersHorizontal, Star, BadgeCheck, Heart, ArrowLeft } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useCart } from "@/hooks/use-cart";
+import {
+  Search as SearchIcon, X, SlidersHorizontal, Star, BadgeCheck,
+  ArrowLeft, Camera, Image, ShoppingBag, CheckCircle2, Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
@@ -14,79 +15,190 @@ import { Slider } from "@/components/ui/slider";
 
 function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
 
-const SIZE_OPTIONS = ["XS","S","M","L","XL","XXL","36","37","38","39","40","41","42"];
-const COLOR_OPTIONS = ["Black","White","Red","Blue","Pink","Green","Beige","Brown","Gold","Silver","Multi"];
+const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL", "36", "37", "38", "39", "40", "41", "42"];
+const COLOR_OPTIONS = ["Black", "White", "Red", "Blue", "Pink", "Green", "Beige", "Brown", "Gold", "Silver"];
+const TOP_CATEGORIES = ["Women", "Men", "Kids", "Shoes", "Jewelry & Accessories", "Beauty & Health", "Gym & Outdoor", "Home"];
 
-function SearchCard({ listing, onQuickView, onSave, saved }: {
-  listing: Listing; onQuickView: (l: Listing) => void;
-  onSave: (e: React.MouseEvent, l: Listing) => void; saved: boolean;
-}) {
+function ProductCard({ product, onAddToCart, addedId }: { product: any; onAddToCart: (p: any) => void; addedId: string | null }) {
+  const added = addedId === product.id;
   return (
-    <div className="group bg-card border border-card-border rounded-2xl overflow-hidden hover:shadow-md transition-all duration-300 cursor-pointer" onClick={() => onQuickView(listing)}>
-      <div className="relative aspect-[3/4] overflow-hidden bg-muted">
-        <img src={listing.imageUrl} alt={listing.title}
-          className="w-full h-full object-cover transition-transform duration-400 group-hover:scale-105" loading="lazy" />
-        {listing.discount && (
-          <span className="absolute bottom-2 right-2 text-[9px] px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground font-bold">-{listing.discount}%</span>
-        )}
-        <motion.button onClick={(e) => onSave(e, listing)} whileTap={{ scale: 0.82 }}
-          className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center shadow-md ${saved ? "bg-primary" : "bg-white/90"}`}>
-          <Heart className={`w-3.5 h-3.5 ${saved ? "fill-white text-white" : "text-gray-600"}`} />
-        </motion.button>
-      </div>
-      <div className="p-2.5">
-        <p className="text-[10px] text-muted-foreground flex items-center gap-0.5 truncate">
-          {listing.sellerName}{listing.isVerifiedSeller && <BadgeCheck className="w-2.5 h-2.5 text-primary inline shrink-0" />}
-        </p>
-        <p className="text-xs font-semibold leading-tight line-clamp-2 mt-0.5">{listing.title}</p>
-        <div className="flex items-center justify-between mt-1.5">
-          <span className="text-xs font-black text-primary">{formatNaira(listing.price)}</span>
-          <div className="flex items-center gap-0.5">
-            <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
-            <span className="text-[10px]">{listing.rating}</span>
+    <Link href={`/listing/${product.id}`}>
+      <div className="group bg-card border border-card-border rounded-2xl overflow-hidden hover:shadow-md transition-all duration-300 cursor-pointer">
+        <div className="relative aspect-[3/4] overflow-hidden bg-muted">
+          {product.image_url ? (
+            <img src={product.image_url} alt={product.title} className="w-full h-full object-contain transition-transform duration-400 group-hover:scale-105" loading="lazy" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <ShoppingBag className="w-8 h-8 text-muted-foreground" />
+            </div>
+          )}
+          {product.discount && (
+            <span className="absolute bottom-2 left-2 text-[9px] px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground font-bold">-{product.discount}%</span>
+          )}
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAddToCart(product); }}
+            className={`absolute bottom-2 right-2 w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all ${added ? "bg-emerald-500" : "bg-primary opacity-0 group-hover:opacity-100 sm:opacity-100"}`}
+          >
+            {added ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : <ShoppingBag className="w-3.5 h-3.5 text-primary-foreground" />}
+          </button>
+        </div>
+        <div className="p-2.5">
+          <p className="text-[10px] text-muted-foreground truncate flex items-center gap-0.5">
+            {product.seller_name}
+            {product.is_verified_seller && <BadgeCheck className="w-2.5 h-2.5 text-primary inline shrink-0" />}
+          </p>
+          <p className="text-xs font-semibold leading-tight line-clamp-2 mt-0.5">{product.title}</p>
+          <div className="flex items-center justify-between mt-1.5">
+            <span className="text-xs font-black text-primary">{formatNaira(product.price)}</span>
+            {product.rating > 0 && (
+              <div className="flex items-center gap-0.5">
+                <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
+                <span className="text-[10px]">{Number(product.rating).toFixed(1)}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
 export default function Search() {
   const [query, setQuery] = useState("");
+  const [results, setResults] = useState<any[]>([]);
+  const [featured, setFeatured] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [imageSearchLoading, setImageSearchLoading] = useState(false);
+  const [imageSearchTags, setImageSearchTags] = useState<string[]>([]);
+  const [addedId, setAddedId] = useState<string | null>(null);
+
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100000]);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("rating");
-  const [quickView, setQuickView] = useState<Listing | null>(null);
-  const [saveTarget, setSaveTarget] = useState<Listing | null>(null);
+
   const inputRef = useRef<HTMLInputElement>(null);
-  const { isSaved } = useBoards();
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const imageRef = useRef<HTMLInputElement>(null);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { addItem } = useCart();
 
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => {
+    inputRef.current?.focus();
+    fetchFeatured();
+  }, []);
 
-  const results = useMemo(() => {
-    const q = query.toLowerCase().trim();
-    let filtered = staticListings.filter((l) => {
-      const matchQ = !q || l.title.toLowerCase().includes(q) || l.sellerName.toLowerCase().includes(q) || (l.tags ?? []).some((t) => t.toLowerCase().includes(q)) || l.category.toLowerCase().includes(q);
-      const matchCat = !selectedCategory || l.category === selectedCategory;
-      const matchPrice = l.price >= priceRange[0] && l.price <= priceRange[1];
-      const matchSize = selectedSizes.length === 0 || [...(l.clothingSizes ?? []), ...(l.shoeSizes ?? [])].some((s) => selectedSizes.includes(s));
-      const matchColor = selectedColors.length === 0 || (l.colors ?? []).some((c) => selectedColors.some((sel) => c.toLowerCase().includes(sel.toLowerCase())));
-      return matchQ && matchCat && matchPrice && matchSize && matchColor;
+  const fetchFeatured = async () => {
+    const { data } = await supabase.from("products").select("*").eq("is_thrift", false).order("created_at", { ascending: false }).limit(20);
+    if (data) setFeatured(data);
+  };
+
+  const searchProducts = useCallback(async (q: string) => {
+    setLoading(true);
+    let queryBuilder = supabase.from("products").select("*");
+
+    if (q.trim()) {
+      queryBuilder = queryBuilder.or(`title.ilike.%${q}%,description.ilike.%${q}%,category.ilike.%${q}%,seller_name.ilike.%${q}%`);
+    }
+    if (selectedCategory) queryBuilder = queryBuilder.eq("category", selectedCategory);
+    if (priceRange[0] > 0) queryBuilder = queryBuilder.gte("price", priceRange[0]);
+    if (priceRange[1] < 100000) queryBuilder = queryBuilder.lte("price", priceRange[1]);
+    if (sortBy === "price-asc") queryBuilder = queryBuilder.order("price", { ascending: true });
+    else if (sortBy === "price-desc") queryBuilder = queryBuilder.order("price", { ascending: false });
+    else if (sortBy === "rating") queryBuilder = queryBuilder.order("rating", { ascending: false });
+    else queryBuilder = queryBuilder.order("created_at", { ascending: false });
+
+    const { data } = await queryBuilder.limit(50);
+    setResults(data || []);
+    setLoading(false);
+  }, [selectedCategory, priceRange, sortBy]);
+
+  useEffect(() => {
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    if (!query.trim() && !selectedCategory && priceRange[0] === 0 && priceRange[1] === 100000) {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
+    searchTimeout.current = setTimeout(() => searchProducts(query), 300);
+  }, [query, selectedCategory, priceRange, sortBy]);
+
+  const handleImageSearch = async (file: File) => {
+    setImageSearchLoading(true);
+    setImageSearchTags([]);
+
+    try {
+      // Convert to base64
+      const base64 = await new Promise<string>((res, rej) => {
+        const reader = new FileReader();
+        reader.onload = () => res((reader.result as string).split(",")[1]);
+        reader.onerror = rej;
+        reader.readAsDataURL(file);
+      });
+
+      // Call Claude Vision
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          messages: [{
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: { type: "base64", media_type: file.type as "image/jpeg" | "image/png" | "image/webp", data: base64 },
+              },
+              {
+                type: "text",
+                text: `Analyze this fashion/product image and extract search tags for a Nigerian fashion marketplace. Return ONLY a JSON array of strings (no markdown, no explanation) with: category (Women/Men/Kids/Shoes/Jewelry & Accessories/Beauty & Health/Gym & Outdoor/Home), colors, styles, aesthetics (Y2K/Streetwear/Afrocentric/Minimalist/Baddie/Cottagecore/Boho/Preppy/Luxe/Casual), and key descriptive words. Example: ["Women","Pink","Dress","Bodycon","Baddie","Casual"]`,
+              },
+            ],
+          }],
+        }),
+      });
+
+      const data = await response.json();
+      const text = data.content?.[0]?.text || "[]";
+      const clean = text.replace(/```json|```/g, "").trim();
+      const tags: string[] = JSON.parse(clean);
+
+      setImageSearchTags(tags);
+
+      // Search using extracted tags
+      const searchQuery = tags.join(" ");
+      setQuery(searchQuery);
+      await searchProducts(searchQuery);
+    } catch (err) {
+      console.error("Image search failed:", err);
+      setImageSearchTags([]);
+    }
+
+    setImageSearchLoading(false);
+  };
+
+  const handleAddToCart = (product: any) => {
+    addItem({
+      listingId: product.id,
+      title: product.title,
+      price: product.price,
+      imageUrl: product.image_url,
+      sellerName: product.seller_name,
+      quantity: 1,
     });
-
-    if (sortBy === "price-asc") filtered = filtered.sort((a, b) => a.price - b.price);
-    else if (sortBy === "price-desc") filtered = filtered.sort((a, b) => b.price - a.price);
-    else if (sortBy === "discount") filtered = filtered.sort((a, b) => (b.discount ?? 0) - (a.discount ?? 0));
-    else filtered = filtered.sort((a, b) => b.rating - a.rating);
-    return filtered;
-  }, [query, selectedCategory, priceRange, selectedSizes, selectedColors, sortBy]);
+    setAddedId(product.id);
+    setTimeout(() => setAddedId(null), 1500);
+  };
 
   const toggleSize = (s: string) => setSelectedSizes((p) => p.includes(s) ? p.filter((x) => x !== s) : [...p, s]);
   const toggleColor = (c: string) => setSelectedColors((p) => p.includes(c) ? p.filter((x) => x !== c) : [...p, c]);
   const activeFilters = (selectedCategory ? 1 : 0) + selectedSizes.length + selectedColors.length + (priceRange[0] > 0 || priceRange[1] < 100000 ? 1 : 0);
   const clearAll = () => { setSelectedCategory(null); setSelectedSizes([]); setSelectedColors([]); setPriceRange([0, 100000]); };
+
+  const displayProducts = query || selectedCategory || activeFilters > 0 ? results : featured;
+  const isSearching = query || selectedCategory || activeFilters > 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -97,23 +209,48 @@ export default function Search() {
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
+
           <div className="flex-1 relative">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)}
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
               placeholder="Search KAT..."
-              className="w-full h-10 pl-9 pr-10 rounded-full bg-muted border border-transparent focus:border-primary outline-none text-sm focus:ring-1 focus:ring-primary transition-all" />
+              className="w-full h-10 pl-9 pr-10 rounded-full bg-muted border border-transparent focus:border-primary outline-none text-sm focus:ring-1 focus:ring-primary transition-all"
+            />
             {query && (
-              <button onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-muted-foreground/20 flex items-center justify-center">
+              <button onClick={() => { setQuery(""); setResults([]); setImageSearchTags([]); }} className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-muted-foreground/20 flex items-center justify-center">
                 <X className="w-3 h-3" />
               </button>
             )}
           </div>
 
-          {/* Filter sheet */}
+          {/* Image search buttons */}
+          <button
+            onClick={() => cameraRef.current?.click()}
+            className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0"
+            title="Search by camera"
+          >
+            <Camera className="w-4 h-4 text-muted-foreground" />
+          </button>
+          <button
+            onClick={() => imageRef.current?.click()}
+            className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0"
+            title="Search by image"
+          >
+            <Image className="w-4 h-4 text-muted-foreground" />
+          </button>
+
+          {/* Hidden file inputs */}
+          <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageSearch(f); }} />
+          <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageSearch(f); }} />
+
+          {/* Filter */}
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="outline" size="sm" className="rounded-full gap-1.5 shrink-0 relative">
-                <SlidersHorizontal className="w-3.5 h-3.5" /> Filter
+                <SlidersHorizontal className="w-3.5 h-3.5" />
                 {activeFilters > 0 && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-primary-foreground text-[9px] font-bold rounded-full flex items-center justify-center">{activeFilters}</span>
                 )}
@@ -127,22 +264,18 @@ export default function Search() {
                 </SheetTitle>
               </SheetHeader>
               <div className="space-y-6 mt-6">
-                {/* Sort */}
                 <div>
                   <p className="text-sm font-semibold mb-2">Sort by</p>
                   <div className="space-y-1">
-                    {[["rating","Top Rated"],["price-asc","Price: Low → High"],["price-desc","Price: High → Low"],["discount","Best Discount"]].map(([v,l]) => (
-                      <button key={v} onClick={() => setSortBy(v)}
-                        className={`w-full text-left text-sm px-3 py-2 rounded-xl transition-colors ${sortBy === v ? "bg-primary/10 text-primary font-semibold" : "hover:bg-muted"}`}>{l}</button>
+                    {[["rating", "Top Rated"], ["price-asc", "Price: Low → High"], ["price-desc", "Price: High → Low"], ["new", "Newest"]].map(([v, l]) => (
+                      <button key={v} onClick={() => setSortBy(v)} className={`w-full text-left text-sm px-3 py-2 rounded-xl transition-colors ${sortBy === v ? "bg-primary/10 text-primary font-semibold" : "hover:bg-muted"}`}>{l}</button>
                     ))}
                   </div>
                 </div>
-
-                {/* Category */}
                 <div>
                   <p className="text-sm font-semibold mb-2">Category</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {TOP_CATEGORIES.filter((c) => c !== "Thrift" && c !== "Deals").map((cat) => (
+                    {TOP_CATEGORIES.map((cat) => (
                       <button key={cat} onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
                         className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${selectedCategory === cat ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary"}`}>
                         {cat}
@@ -150,8 +283,6 @@ export default function Search() {
                     ))}
                   </div>
                 </div>
-
-                {/* Price */}
                 <div>
                   <p className="text-sm font-semibold mb-2">Price range</p>
                   <Slider min={0} max={100000} step={1000} value={priceRange} onValueChange={(v) => setPriceRange(v as [number, number])} className="my-3" />
@@ -159,8 +290,6 @@ export default function Search() {
                     <span>{formatNaira(priceRange[0])}</span><span>{formatNaira(priceRange[1])}</span>
                   </div>
                 </div>
-
-                {/* Size */}
                 <div>
                   <p className="text-sm font-semibold mb-2">Size</p>
                   <div className="flex flex-wrap gap-1.5">
@@ -170,8 +299,6 @@ export default function Search() {
                     ))}
                   </div>
                 </div>
-
-                {/* Color */}
                 <div>
                   <p className="text-sm font-semibold mb-2">Color</p>
                   <div className="flex flex-wrap gap-1.5">
@@ -188,12 +315,34 @@ export default function Search() {
       </header>
 
       <main className="max-w-5xl mx-auto px-3 py-4 pb-24">
-        {/* Popular when no query */}
-        {!query && (
+
+        {/* Image search loading */}
+        {imageSearchLoading && (
+          <div className="flex flex-col items-center justify-center py-12 gap-3">
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+            <p className="text-sm font-semibold">Analyzing image...</p>
+            <p className="text-xs text-muted-foreground">Finding similar products on KAT</p>
+          </div>
+        )}
+
+        {/* Image search tags */}
+        {!imageSearchLoading && imageSearchTags.length > 0 && (
+          <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-2xl">
+            <p className="text-xs font-bold text-primary mb-2">🔍 Searching by image tags:</p>
+            <div className="flex flex-wrap gap-1.5">
+              {imageSearchTags.map((tag) => (
+                <span key={tag} className="text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-medium">{tag}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Popular searches when idle */}
+        {!query && !imageSearchLoading && !isSearching && (
           <div className="mb-5">
             <p className="text-sm font-bold mb-3">🔥 Popular searches</p>
             <div className="flex flex-wrap gap-2">
-              {["ankara dress","gym set","wig","sneakers","blazer","bodycon","bikini","jewellery","hoodie","kente"].map((term) => (
+              {["ankara dress", "gym set", "wig", "sneakers", "blazer", "bodycon", "bikini", "jewellery", "hoodie", "kente"].map((term) => (
                 <button key={term} onClick={() => setQuery(term)}
                   className="text-xs px-3 py-1.5 rounded-full bg-muted hover:bg-accent border border-border hover:border-primary transition-all font-medium">
                   {term}
@@ -203,33 +352,55 @@ export default function Search() {
           </div>
         )}
 
-        {/* Results */}
-        {query && (
+        {/* Result count */}
+        {!imageSearchLoading && isSearching && (
           <p className="text-sm text-muted-foreground mb-3">
-            {results.length} result{results.length !== 1 ? "s" : ""} for &ldquo;<span className="font-semibold text-foreground">{query}</span>&rdquo;
+            {loading ? "Searching..." : `${results.length} result${results.length !== 1 ? "s" : ""}${query ? ` for "${query}"` : ""}`}
           </p>
         )}
 
-        {results.length === 0 && query ? (
-          <div className="text-center py-16">
-            <p className="text-4xl mb-3">🔍</p>
-            <p className="font-semibold">No results for "{query}"</p>
-            <p className="text-sm text-muted-foreground mt-1">Try a different search term or remove filters</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {(query ? results : staticListings.filter((l) => !l.isThrift)).map((listing, i) => (
-              <motion.div key={listing.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }}>
-                <SearchCard listing={listing} onQuickView={setQuickView}
-                  onSave={(e, l) => { e.stopPropagation(); setSaveTarget(l); }} saved={isSaved(listing.id)} />
-              </motion.div>
+        {/* Loading skeleton */}
+        {loading && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-2xl overflow-hidden bg-card border border-card-border animate-pulse">
+                <div className="aspect-[3/4] bg-muted" />
+                <div className="p-2.5 space-y-1.5">
+                  <div className="h-2.5 bg-muted rounded w-20" />
+                  <div className="h-3 bg-muted rounded w-full" />
+                  <div className="h-3 bg-muted rounded w-3/4" />
+                </div>
+              </div>
             ))}
           </div>
         )}
-      </main>
 
-      <QuickViewModal listing={quickView} onClose={() => setQuickView(null)} />
-      {saveTarget && <SaveToBoardModal open={!!saveTarget} onClose={() => setSaveTarget(null)} listingId={saveTarget.id} listingTitle={saveTarget.title} />}
+        {/* No results */}
+        {!loading && !imageSearchLoading && isSearching && results.length === 0 && (
+          <div className="text-center py-16">
+            <p className="text-4xl mb-3">🔍</p>
+            <p className="font-semibold">No results found</p>
+            <p className="text-sm text-muted-foreground mt-1">Try a different search term or remove filters</p>
+            <button onClick={clearAll} className="mt-3 text-xs text-primary font-semibold">Clear filters</button>
+          </div>
+        )}
+
+        {/* Results grid */}
+        {!loading && !imageSearchLoading && (
+          <div className="space-y-3">
+            {!isSearching && featured.length > 0 && (
+              <p className="text-sm font-bold">New Arrivals ✨</p>
+            )}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {displayProducts.map((product, i) => (
+                <motion.div key={product.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }}>
+                  <ProductCard product={product} onAddToCart={handleAddToCart} addedId={addedId} />
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
-}
+          }
