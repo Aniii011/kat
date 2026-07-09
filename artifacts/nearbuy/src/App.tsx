@@ -23,6 +23,7 @@ import AuthCallback from "@/pages/AuthCallback";
 import SellerOrders from "@/pages/seller-orders";
 import Store from "@/pages/store";
 import Checkout from "@/pages/checkout";
+import OrderConfirmation from "@/pages/order-confirmation";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ function Router() {
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/auth/callback" component={AuthCallback} />
       <Route component={NotFound} />
+      <Route path="/order-confirmation" component={OrderConfirmation} />
     </Switch>
   );
 }
