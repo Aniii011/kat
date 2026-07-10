@@ -16,6 +16,8 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import AuthModal from "@/components/auth-modal";
+import { useAuth } from "@/context/auth-context";
 
 function formatNaira(n: number) {
   return "₦" + Number(n || 0).toLocaleString("en-NG");
@@ -79,6 +81,7 @@ export default function ListingDetail() {
   const { listing, loading } = useListing(id);
   const { listings: relatedAll } = useListings();
   const { addItem, saveForLater, removeSaved, isSaved, isInCart } = useCart();
+  const { user } = useAuth();
 
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
@@ -164,22 +167,28 @@ export default function ListingDetail() {
     ? listing.colorImages[selectedColor]
     : undefined;
 
-  const handleAddToCart = () => {
-    addItem({
-      listingId: listing.id,
-      title: listing.title,
-      price: listing.price,
-      imageUrl: selectedVariantImage || listing.imageUrl,
-      sellerName: listing.sellerName,
-      quantity,
-      selectedSize: selectedSize || selectedShoeSize || undefined,
-      selectedColor: selectedColor || undefined,
-      variantImage: selectedVariantImage,
-    });
-    setShowAddedToCart(true);
-    if (cartToastRef.current) clearTimeout(cartToastRef.current);
-    cartToastRef.current = setTimeout(() => setShowAddedToCart(false), 2500);
-  };
+  const [showAuth, setShowAuth] = useState(false);
+
+const handleAddToCart = () => {
+  if (!user) {
+    setShowAuth(true);
+    return;
+  }
+  addItem({
+    listingId: listing.id,
+    title: listing.title,
+    price: listing.price,
+    imageUrl: selectedVariantImage || listing.imageUrl,
+    sellerName: listing.sellerName,
+    quantity,
+    selectedSize: selectedSize || selectedShoeSize || undefined,
+    selectedColor: selectedColor || undefined,
+    variantImage: selectedVariantImage,
+  });
+  setShowAddedToCart(true);
+  if (cartToastRef.current) clearTimeout(cartToastRef.current);
+  cartToastRef.current = setTimeout(() => setShowAddedToCart(false), 2500);
+};
 
   const handleSaveForLater = () => {
     if (isSaved(listing.id)) {
@@ -964,6 +973,7 @@ export default function ListingDetail() {
           )}
         </DialogContent>
       </Dialog>
+      <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
 }
