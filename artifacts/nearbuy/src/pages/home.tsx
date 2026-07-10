@@ -46,19 +46,24 @@ function ProductCard({
   saved: boolean;
 }) {
   const { addItem } = useCart();
+  const { user } = useAuth();
   const [addedToCart, setAddedToCart] = useState(false);
 
   const handleAddToCart = (e: React.MouseEvent) => {
-  const handleAddToCart = (e: React.MouseEvent) => {
-  e.preventDefault();
-  e.stopPropagation();
-  if (!user) {
-    // Can't access auth here directly, navigate to login
-    window.location.href = "/me";
-    return;
-  }
-  addItem({...});
-};
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user) {
+      window.location.href = "/me";
+      return;
+    }
+    addItem({
+      listingId: listing.id,
+      title: listing.title,
+      price: listing.price,
+      imageUrl: listing.imageUrl,
+      sellerName: listing.sellerName,
+      quantity: 1,
+    });
     setAddedToCart(true);
     setTimeout(() => setAddedToCart(false), 1500);
   };
@@ -95,8 +100,6 @@ function ProductCard({
                 -{listing.discount}%
               </span>
             )}
-
-            {/* Heart / save button */}
             <motion.button
               onClick={(e) => onSave(e, listing)}
               whileTap={{ scale: 0.8 }}
@@ -106,8 +109,6 @@ function ProductCard({
             >
               <Heart className={`w-3.5 h-3.5 ${saved ? "fill-white text-white" : "text-gray-700"}`} />
             </motion.button>
-
-            {/* Quick Add to Cart */}
             <motion.button
               onClick={handleAddToCart}
               whileTap={{ scale: 0.85 }}
@@ -124,7 +125,6 @@ function ProductCard({
               )}
             </motion.button>
           </div>
-
           <div className="p-2.5 space-y-1">
             <div className="flex items-center gap-1">
               <span className="text-[10px] text-muted-foreground truncate flex-1 leading-tight">
