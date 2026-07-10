@@ -61,26 +61,34 @@ export default function Checkout() {
       const orderIds: string[] = [];
 
       for (const item of items) {
-        const { data, error: orderError } = await supabase.from("orders").insert({
-          product_id: item.listingId,
-          buyer_id: user?.id || null,
-          buyer_name: fullName.trim(),
-          buyer_phone: phone.trim(),
-          buyer_address: `${address.trim()}, ${city.trim()}`,
-          amount: item.price,
-          quantity: item.quantity,
-          total: item.price * item.quantity,
-          status: "pending",
-          seller_status: "pending",
-          admin_status: "pending",
-          variant: item.selectedColor || item.selectedSize ? {
-            color: item.selectedColor,
-            size: item.selectedSize,
-          } : null,
-        }).select().single();
+  // Get seller_id from product
+  const { data: product } = await supabase
+    .from("products")
+    .select("seller_id")
+    .eq("id", item.listingId)
+    .single();
 
-        if (orderError) throw orderError;
-        if (data) orderIds.push(data.id);
+  const { data, error: orderError } = await supabase.from("orders").insert({
+    product_id: item.listingId,
+    buyer_id: user?.id || null,
+    buyer_name: fullName.trim(),
+    buyer_phone: phone.trim(),
+    buyer_address: `${address.trim()}, ${city.trim()}`,
+    amount: item.price,
+    quantity: item.quantity,
+    total: item.price * item.quantity,
+    status: "pending",
+    seller_status: "pending",
+    admin_status: "pending",
+    seller_id: product?.seller_id || null,
+    variant: item.selectedColor || item.selectedSize ? {
+      color: item.selectedColor,
+      size: item.selectedSize,
+    } : null,
+  }).select().single();
+
+  if (orderError) throw orderError;
+  if (data) orderIds.push(data.id);
       }
 
       // Save order info for confirmation page
