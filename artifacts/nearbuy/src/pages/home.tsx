@@ -49,16 +49,16 @@ function ProductCard({
   const [addedToCart, setAddedToCart] = useState(false);
 
   const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    addItem({
-      listingId: listing.id,
-      title: listing.title,
-      price: listing.price,
-      imageUrl: listing.imageUrl,
-      sellerName: listing.sellerName,
-      quantity: 1,
-    });
+  const handleAddToCart = (e: React.MouseEvent) => {
+  e.preventDefault();
+  e.stopPropagation();
+  if (!user) {
+    // Can't access auth here directly, navigate to login
+    window.location.href = "/me";
+    return;
+  }
+  addItem({...});
+};
     setAddedToCart(true);
     setTimeout(() => setAddedToCart(false), 1500);
   };
