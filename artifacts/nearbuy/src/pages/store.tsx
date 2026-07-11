@@ -11,10 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  ArrowLeft, Star, BadgeCheck, Users, Package, ShoppingBag,
-  MessageCircle, Search, CheckCircle2, Store as StoreIcon, Flag,
-} from "lucide-react";
+
 
 function formatNaira(n: number) {
   return "₦" + Number(n || 0).toLocaleString("en-NG");
