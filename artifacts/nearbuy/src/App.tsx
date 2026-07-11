@@ -65,6 +65,7 @@ function App() {
                 <Router />
               </main>
               <AiAssistant />
+              <WhatsAppButton />
               <Toaster />
             </WouterRouter>
           </TooltipProvider>
