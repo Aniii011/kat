@@ -41,13 +41,13 @@ function Router() {
       <Route path="/seller" component={Seller} />
       <Route path="/store/:sellerId" component={Store} />
       <Route path="/checkout" component={Checkout} />
+      <Route path="/order-confirmation" component={OrderConfirmation} />
       <Route path="/seller/orders" component={SellerOrders} />
       <Route path="/admin/sellers" component={AdminSellers} />
       <Route path="/admin/orders" component={AdminOrders} />
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/auth/callback" component={AuthCallback} />
       <Route component={NotFound} />
-      <Route path="/order-confirmation" component={OrderConfirmation} />
     </Switch>
   );
 }
