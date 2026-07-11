@@ -11,6 +11,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ArrowLeft, Star, BadgeCheck, Users, Package, ShoppingBag,
+  MessageCircle, Search, CheckCircle2, Store as StoreIcon, Flag,
+} from "lucide-react";
 
 function formatNaira(n: number) {
   return "₦" + Number(n || 0).toLocaleString("en-NG");
@@ -393,6 +397,18 @@ export default function Store() {
             <p className="text-xs text-muted-foreground mt-1">Reviews from buyers will appear here</p>
           </div>
         )}
+        <div className="pt-4 pb-2">
+  <button
+    onClick={() => {
+      if (window.confirm("Report this seller to KAT admin?")) {
+        window.open(`https://wa.me/2348103925304?text=I want to report seller: ${storeName} (ID: ${sellerId})`, "_blank");
+      }
+    }}
+    className="flex items-center gap-2 text-xs text-muted-foreground hover:text-destructive transition-colors"
+  >
+    <Flag className="w-3.5 h-3.5" /> Report this seller
+  </button>
+</div>
       </div>
     </div>
   );
