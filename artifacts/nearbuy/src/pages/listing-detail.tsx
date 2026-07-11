@@ -95,6 +95,7 @@ export default function ListingDetail() {
   const [showReport, setShowReport] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
   const [activeQA, setActiveQA] = useState<number | null>(null);
   const cartToastRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -166,8 +167,6 @@ export default function ListingDetail() {
   const selectedVariantImage = selectedColor && listing.colorImages?.[selectedColor]
     ? listing.colorImages[selectedColor]
     : undefined;
-
-  const [showAuth, setShowAuth] = useState(false);
 
 const handleAddToCart = () => {
   if (!user) {
