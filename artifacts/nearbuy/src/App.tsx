@@ -24,6 +24,7 @@ import SellerOrders from "@/pages/seller-orders";
 import Store from "@/pages/store";
 import Checkout from "@/pages/checkout";
 import OrderConfirmation from "@/pages/order-confirmation";
+import { MessageCircle } from "lucide-react";
 
 const queryClient = new QueryClient();
 
@@ -73,4 +74,17 @@ function App() {
   );
 }
 
+function WhatsAppButton() {
+  return (
+    
+      href="https://wa.me/2348103925304"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="fixed bottom-20 right-4 z-50 w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg hover:bg-emerald-600 transition-colors"
+      title="Chat with us on WhatsApp"
+    >
+      <MessageCircle className="w-6 h-6 text-white" />
+    </a>
+  );
+        }
 export default App;
