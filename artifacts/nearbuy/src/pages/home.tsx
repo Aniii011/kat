@@ -18,6 +18,10 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Search, ShoppingBag, Star, BadgeCheck, Flame, Sparkles,
+  ChevronRight, Bookmark, Heart, LogIn, CheckCircle2, Share2,
+} from "lucide-react";
 
 function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
 
@@ -100,6 +104,24 @@ function ProductCard({
                 -{listing.discount}%
               </span>
             )}
+            <button
+  onClick={async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (navigator.share) {
+      await navigator.share({
+        title: listing.title,
+        text: `Check out ${listing.title} on KAT!`,
+        url: `${window.location.origin}/listing/${listing.id}`,
+      });
+    } else {
+      await navigator.clipboard.writeText(`${window.location.origin}/listing/${listing.id}`);
+    }
+  }}
+  className="absolute top-2 left-2 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow transition-all hover:bg-white z-10"
+>
+  <Share2 className="w-3.5 h-3.5 text-gray-700" />
+</button>
             <motion.button
               onClick={(e) => onSave(e, listing)}
               whileTap={{ scale: 0.8 }}
