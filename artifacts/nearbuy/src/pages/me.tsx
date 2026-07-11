@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import ThemeSwitcher from "@/components/theme-switcher";
@@ -10,7 +10,8 @@ import {
   Package, MapPin, RotateCcw, HelpCircle, LogOut,
   ChevronRight, Edit3, Check, Shield, BadgeCheck,
   Store, LogIn, UserCircle2, ShieldCheck, AlertTriangle,
-  Palette, X, MessageCircle, Camera, Phone,
+  Palette, X, MessageCircle, Camera, Phone, Clock,
+  Truck, CheckCircle2, XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,103 @@ const ACCENT_OPTIONS = [
   { value: "sage" as const, label: "Sage", color: "#4a9e6e" },
   { value: "blue" as const, label: "Blue", color: "#3b82f6" },
 ];
+
+const ORDER_STATUS: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
+  pending:    { label: "Pending",    className: "bg-amber-100 text-amber-700",    icon: <Clock className="w-3 h-3" /> },
+  processing: { label: "Processing", className: "bg-blue-100 text-blue-700",      icon: <Package className="w-3 h-3" /> },
+  shipped:    { label: "Shipped",    className: "bg-purple-100 text-purple-700",  icon: <Truck className="w-3 h-3" /> },
+  delivered:  { label: "Delivered",  className: "bg-emerald-100 text-emerald-700", icon: <CheckCircle2 className="w-3 h-3" /> },
+  cancelled:  { label: "Cancelled",  className: "bg-red-100 text-red-700",        icon: <XCircle className="w-3 h-3" /> },
+};
+
+function OrdersSection({ userId }: { userId: string }) {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from("orders")
+      .select("*")
+      .eq("buyer_id", userId)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (data) setOrders(data);
+        setLoading(false);
+      });
+  }, [userId]);
+
+  if (loading) {
+    return (
+      <div className="bg-card border border-card-border rounded-2xl p-6 text-center">
+        <p className="text-sm text-muted-foreground">Loading orders...</p>
+      </div>
+    );
+  }
+
+  if (orders.length === 0) {
+    return (
+      <div className="bg-card border border-card-border rounded-2xl p-6 text-center">
+        <Package className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+        <p className="font-bold text-sm">No orders yet</p>
+        <p className="text-xs text-muted-foreground mt-1">Your orders will appear here once you make a purchase.</p>
+        <Link href="/">
+          <Button size="sm" className="rounded-full mt-3">Start Shopping</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {orders.map((order) => {
+        const status = order.seller_status || order.status || "pending";
+        const cfg = ORDER_STATUS[status] || ORDER_STATUS.pending;
+        return (
+          <div key={order.id} className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold">Order #{order.id.slice(0, 8)}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {new Date(order.created_at).toLocaleDateString("en-NG", {
+                    day: "numeric", month: "short", year: "numeric",
+                  })}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-black text-primary">
+                  ₦{Number(order.total || order.amount || 0).toLocaleString("en-NG")}
+                </p>
+                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${cfg.className}`}>
+                  {cfg.icon} {cfg.label}
+                </span>
+              </div>
+            </div>
+            {order.buyer_address && (
+              <div className="flex items-start gap-2 bg-muted rounded-xl p-2.5">
+                <MapPin className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                <p className="text-xs text-muted-foreground">{order.buyer_address}</p>
+              </div>
+            )}
+            {status === "shipped" && (
+              <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-xl p-2.5">
+                <p className="text-xs font-semibold text-purple-700 dark:text-purple-400 flex items-center gap-1.5">
+                  <Truck className="w-3.5 h-3.5" /> Your order is on its way! 🚚
+                </p>
+              </div>
+            )}
+            {status === "delivered" && (
+              <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-2.5">
+                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Delivered! Enjoy your purchase 🎉
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function Me() {
   const { theme, setBase, setAccent } = useTheme();
@@ -70,27 +168,18 @@ export default function Me() {
   const saveProfile = async () => {
     if (!nameInput.trim()) return;
     setSavingProfile(true);
-
     let newAvatarUrl = avatarUrl;
-
-    // Upload avatar if changed
     if (avatarFile && user?.id) {
       const fileName = `avatars/${user.id}-${Date.now()}`;
-      const { error } = await supabase.storage
-        .from("product-images")
-        .upload(fileName, avatarFile, { upsert: true });
+      const { error } = await supabase.storage.from("product-images").upload(fileName, avatarFile, { upsert: true });
       if (!error) {
         const { data } = supabase.storage.from("product-images").getPublicUrl(fileName);
         newAvatarUrl = data.publicUrl;
       }
     }
-
-    // Save to localStorage
     localStorage.setItem("kat_name", nameInput.trim());
     localStorage.setItem("kat_phone", phoneInput.trim());
     if (newAvatarUrl) localStorage.setItem("kat_avatar", newAvatarUrl);
-
-    // Save to Supabase
     if (user?.id) {
       await supabase.from("profiles").update({
         full_name: nameInput.trim(),
@@ -98,7 +187,6 @@ export default function Me() {
         avatar_url: newAvatarUrl || null,
       }).eq("id", user.id);
     }
-
     setDisplayName(nameInput.trim());
     setPhoneNumber(phoneInput.trim());
     setAvatarUrl(newAvatarUrl);
@@ -164,7 +252,6 @@ export default function Me() {
   return (
     <div className="min-h-screen bg-background">
 
-      {/* Sign out confirm */}
       <AnimatePresence>
         {showSignOutConfirm && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center px-6">
@@ -185,7 +272,6 @@ export default function Me() {
         )}
       </AnimatePresence>
 
-      {/* Help */}
       <AnimatePresence>
         {showHelp && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center px-4 pb-4 sm:pb-0">
@@ -198,13 +284,13 @@ export default function Me() {
               </div>
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">Need help? We're here for you!</p>
-                <a href="mailto:support@katmarketplace.com" className="flex items-center gap-3 p-3 rounded-xl bg-muted hover:bg-accent transition-colors">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <MessageCircle className="w-4 h-4 text-primary" />
+                <a href="https://wa.me/2348103925304" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-xl bg-muted hover:bg-accent transition-colors">
+                  <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                    <MessageCircle className="w-4 h-4 text-emerald-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold">Email Support</p>
-                    <p className="text-xs text-muted-foreground">support@katmarketplace.com</p>
+                    <p className="text-sm font-semibold">WhatsApp Support</p>
+                    <p className="text-xs text-muted-foreground">Chat with us directly</p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
                 </a>
@@ -214,7 +300,6 @@ export default function Me() {
         )}
       </AnimatePresence>
 
-      {/* Privacy */}
       <AnimatePresence>
         {showPrivacy && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center px-4 pb-4 sm:pb-0">
@@ -231,7 +316,7 @@ export default function Me() {
                   { title: "Information We Collect", content: "We collect information you provide when creating an account, making purchases, or contacting support." },
                   { title: "How We Use Your Information", content: "We use your information to process orders, send updates, and improve our services." },
                   { title: "Data Security", content: "We use industry-standard security measures. Payment details are encrypted and never stored on our servers." },
-                  { title: "Your Rights", content: "You can access, update, or delete your personal information at any time by contacting privacy@katmarketplace.com." },
+                  { title: "Your Rights", content: "You can access, update, or delete your personal information at any time by contacting us on WhatsApp." },
                 ].map(({ title, content }) => (
                   <div key={title}>
                     <p className="font-semibold text-foreground mb-1">{title}</p>
@@ -257,7 +342,6 @@ export default function Me() {
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-card-border rounded-3xl p-5">
           {editingProfile ? (
             <div className="space-y-4">
-              {/* Avatar upload */}
               <div className="flex flex-col items-center gap-2">
                 <div className="relative">
                   <div className="w-20 h-20 rounded-full bg-primary/10 border-2 border-primary/20 overflow-hidden flex items-center justify-center">
@@ -267,30 +351,15 @@ export default function Me() {
                       <span className="text-2xl font-black text-primary">{initials}</span>
                     )}
                   </div>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary flex items-center justify-center shadow-md"
-                  >
+                  <button onClick={() => fileInputRef.current?.click()} className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary flex items-center justify-center shadow-md">
                     <Camera className="w-3.5 h-3.5 text-primary-foreground" />
                   </button>
                   <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarSelect} />
                 </div>
                 <p className="text-xs text-muted-foreground">Tap camera to change photo</p>
               </div>
-
-              <Input
-                placeholder="Your name"
-                value={nameInput}
-                onChange={(e) => setNameInput(e.target.value)}
-                className="rounded-xl h-11"
-              />
-              <Input
-                placeholder="Phone number (e.g. 08012345678)"
-                value={phoneInput}
-                onChange={(e) => setPhoneInput(e.target.value)}
-                className="rounded-xl h-11"
-                type="tel"
-              />
+              <Input placeholder="Your name" value={nameInput} onChange={(e) => setNameInput(e.target.value)} className="rounded-xl h-11" />
+              <Input placeholder="Phone number (e.g. 08012345678)" value={phoneInput} onChange={(e) => setPhoneInput(e.target.value)} className="rounded-xl h-11" type="tel" />
               <div className="flex gap-2">
                 <Button className="flex-1 rounded-full" onClick={saveProfile} disabled={savingProfile}>
                   {savingProfile ? "Saving..." : "Save Profile"}
@@ -320,15 +389,7 @@ export default function Me() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="font-bold text-base truncate">{effectiveName}</p>
-                  <button
-                    onClick={() => {
-                      setNameInput(displayName);
-                      setPhoneInput(phoneNumber);
-                      setAvatarPreview(avatarUrl);
-                      setEditingProfile(true);
-                    }}
-                    className="w-6 h-6 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0"
-                  >
+                  <button onClick={() => { setNameInput(displayName); setPhoneInput(phoneNumber); setAvatarPreview(avatarUrl); setEditingProfile(true); }} className="w-6 h-6 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0">
                     <Edit3 className="w-3 h-3" />
                   </button>
                 </div>
@@ -365,13 +426,8 @@ export default function Me() {
           ))}
         </div>
 
-        {activeTab === "orders" && (
-          <div className="bg-card border border-card-border rounded-2xl p-6 text-center">
-            <Package className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-            <p className="font-bold text-sm">No orders yet</p>
-            <p className="text-xs text-muted-foreground mt-1">Your orders will appear here once you make a purchase.</p>
-          </div>
-        )}
+        {/* Orders tab — now shows real orders */}
+        {activeTab === "orders" && <OrdersSection userId={user.id} />}
 
         {activeTab === "addresses" && (
           <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
@@ -411,7 +467,9 @@ export default function Me() {
               <p>✗ Thrift items are non-refundable once payment is complete</p>
               <p>✗ Beauty and health items cannot be returned once opened</p>
             </div>
-            <Button variant="outline" size="sm" className="rounded-full w-full">Start a Return Request</Button>
+            <a href="https://wa.me/2348103925304?text=I want to start a return request" target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" size="sm" className="rounded-full w-full">Start a Return Request</Button>
+            </a>
           </div>
         )}
 
@@ -468,7 +526,6 @@ export default function Me() {
           ))}
         </div>
 
-        {/* Admin / Seller links */}
         {(user?.isAdmin || user?.sellerVerified) && (
           <div className="bg-card border border-card-border rounded-2xl overflow-hidden">
             {user?.isAdmin && (
@@ -499,4 +556,4 @@ export default function Me() {
       </main>
     </div>
   );
-         }
+            }
