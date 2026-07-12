@@ -525,6 +525,15 @@ export default function Me() {
             </React.Fragment>
           ))}
         </div>
+        <div className="bg-card border border-card-border rounded-2xl overflow-hidden">
+  <Link href="/wishlists">
+    <button className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted transition-colors text-sm">
+      <span className="text-primary"><Heart className="w-4 h-4" /></span>
+      <span className="flex-1 text-left font-medium">My Wishlists</span>
+      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+    </button>
+  </Link>
+</div>
 
         {(user?.isAdmin || user?.sellerVerified) && (
           <div className="bg-card border border-card-border rounded-2xl overflow-hidden">
