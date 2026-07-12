@@ -11,7 +11,7 @@ import {
   ChevronRight, Edit3, Check, Shield, BadgeCheck,
   Store, LogIn, UserCircle2, ShieldCheck, AlertTriangle,
   Palette, X, MessageCircle, Camera, Phone, Clock,
-  Truck, CheckCircle2, XCircle,
+  Truck, CheckCircle2, XCircle, Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
