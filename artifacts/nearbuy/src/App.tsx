@@ -25,6 +25,8 @@ import Store from "@/pages/store";
 import Checkout from "@/pages/checkout";
 import OrderConfirmation from "@/pages/order-confirmation";
 import { MessageCircle } from "lucide-react";
+import WishlistPage from "@/pages/wishlist";
+import WishlistView from "@/pages/wishlist-view";
 
 const queryClient = new QueryClient();
 
