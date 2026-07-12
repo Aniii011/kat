@@ -81,7 +81,7 @@ function App() {
 
 function WhatsAppButton() {
   return (
-    
+      <a
       href="https://wa.me/2348103925304"
       target="_blank"
       rel="noopener noreferrer"
