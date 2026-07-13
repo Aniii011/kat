@@ -284,16 +284,16 @@ export default function Me() {
               </div>
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">Need help? We're here for you!</p>
-                <a href="https://wa.me/2348103925304" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-xl bg-muted hover:bg-accent transition-colors">
-                  <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-                    <MessageCircle className="w-4 h-4 text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold">WhatsApp Support</p>
-                    <p className="text-xs text-muted-foreground">Chat with us directly</p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
-                </a>
+                <a href="mailto:support@kat.ng" className="flex items-center gap-3 p-3 rounded-xl bg-muted hover:bg-accent transition-colors">
+  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+    <MessageCircle className="w-4 h-4 text-primary" />
+  </div>
+  <div>
+    <p className="text-sm font-semibold">Email Support</p>
+    <p className="text-xs text-muted-foreground">support@kat.ng</p>
+  </div>
+  <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
+</a>
               </div>
             </motion.div>
           </motion.div>
