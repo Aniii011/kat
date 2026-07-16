@@ -24,7 +24,7 @@ import SellerOrders from "@/pages/seller-orders";
 import Store from "@/pages/store";
 import Checkout from "@/pages/checkout";
 import OrderConfirmation from "@/pages/order-confirmation";
-import { MessageCircle } from "lucide-react";
+
 
 const queryClient = new QueryClient();
 
@@ -65,7 +65,7 @@ function App() {
                 <Router />
               </main>
               <AiAssistant />
-              <WhatsAppButton />
+              
               <Toaster />
             </WouterRouter>
           </TooltipProvider>
