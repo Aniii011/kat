@@ -14,8 +14,7 @@ import Cart from "@/pages/cart";
 import Search from "@/pages/search";
 import Me from "@/pages/me";
 import Seller from "@/pages/seller";
-import AdminSellers from "@/pages/admin-sellers";
-import AdminOrders from "@/pages/admin-orders";
+import Admin from "@/pages/admin";
 import ResetPassword from "@/pages/reset-password";
 import BottomNav from "@/components/bottom-nav";
 import AiAssistant from "@/components/ai-assistant";
@@ -46,9 +45,7 @@ function Router() {
       <Route path="/order-confirmation" component={OrderConfirmation} />
       <Route path="/wishlists" component={WishlistPage} />
       <Route path="/wishlist/:id" component={WishlistView} />
-      <Route path="/seller/orders" component={SellerOrders} />
-      <Route path="/admin/sellers" component={AdminSellers} />
-      <Route path="/admin/orders" component={AdminOrders} />
+      <Route path="/admin" component={Admin} />
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/auth/callback" component={AuthCallback} />
       <Route component={NotFound} />
