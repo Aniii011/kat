@@ -538,7 +538,7 @@ export default function Me() {
         {(user?.isAdmin || user?.sellerVerified) && (
           <div className="bg-card border border-card-border rounded-2xl overflow-hidden">
             {user?.isAdmin && (
-              <Link href="/admin/sellers">
+              <Link href="/admin">
                 <button className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted transition-colors text-sm">
                   <span className="text-primary"><ShieldCheck className="w-4 h-4" /></span>
                   <span className="flex-1 text-left font-medium">Admin Panel</span>
