@@ -66,100 +66,23 @@ const handlePlaceOrder = async () => {
   try {
     const PaystackPop = (window as any).PaystackPop;
 
-const popup = new PaystackPop();
-
-popup.newTransaction({
+const handler = PaystackPop.setup({
   key: "pk_live_f218e98651f0632991476fc40400f095b76953ba",
   email: user?.email || "customer@kat.ng",
   amount: total * 100,
   currency: "NGN",
   ref: `KAT-${Date.now()}`,
 
-  metadata: {
-    buyer_name: fullName,
-    buyer_phone: phone,
-    buyer_address: `${address}, ${city}`,
+  callback: function(response: any) {
+    console.log("Payment success:", response);
   },
 
-  onSuccess: async (response: any) => {
-    try {
-      const orderIds: string[] = [];
-
-      for (const item of items) {
-        const { data: product } = await supabase
-          .from("products")
-          .select("seller_id")
-          .eq("id", item.listingId)
-          .single();
-
-        const { data, error: orderError } = await supabase
-          .from("orders")
-          .insert({
-            product_id: item.listingId,
-            buyer_id: user?.id || null,
-            buyer_name: fullName.trim(),
-            buyer_phone: phone.trim(),
-            buyer_address: `${address.trim()}, ${city.trim()}`,
-            amount: item.price,
-            quantity: item.quantity,
-            total: item.price * item.quantity,
-            status: "pending",
-            seller_status: "pending",
-            admin_status: "pending",
-            seller_id: product?.seller_id || null,
-            payment_ref: response.reference,
-            variant:
-              item.selectedColor || item.selectedSize
-                ? {
-                    color: item.selectedColor,
-                    size: item.selectedSize,
-                  }
-                : null,
-          })
-          .select()
-          .single();
-
-        if (orderError) throw orderError;
-        if (data) orderIds.push(data.id);
-      }
-
-      sessionStorage.setItem(
-        "kat_order_confirmed",
-        JSON.stringify({
-          orderIds,
-          items,
-          total,
-          delivery,
-          fullName,
-          phone,
-          address: `${address}, ${city}`,
-          paymentMethod,
-          paymentRef: response.reference,
-          createdAt: new Date().toISOString(),
-        })
-      );
-
-      sessionStorage.removeItem("kat_checkout_items");
-      clearCart();
-      setPlacing(false);
-      navigate("/order-confirmation");
-
-    } catch (err) {
-      setError(
-        "Payment succeeded but order creation failed. Reference: " +
-          response.reference
-      );
-      setPlacing(false);
-    }
-  },
-
-  onCancel: () => {
-    setPlacing(false);
+  onClose: function() {
+    console.log("Payment closed");
   },
 });
-            
 
-    handler.openIframe();
+handler.openIframe();
   } catch (err: any) {
     setError("DEBUG: " + (err?.message || JSON.stringify(err) || "Unknown error in Paystack setup/openIframe"));
     setPlacing(false);
