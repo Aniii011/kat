@@ -91,14 +91,20 @@ const handleSuccessfulPayment = async (response: any) => {
     }
 
     sessionStorage.setItem(
-      "kat_order_confirmed",
-      JSON.stringify({
-        orderIds,
-        items,
-        total,
-        paymentRef: response.reference,
-      })
-    );
+  "kat_order_confirmed",
+  JSON.stringify({
+    orderIds,
+    items,
+    total,
+    delivery,
+    fullName,
+    phone,
+    address: `${address}, ${city}`,
+    paymentMethod,
+    paymentRef: response.reference,
+    createdAt: new Date().toISOString(),
+  })
+);
 
     sessionStorage.removeItem("kat_checkout_items");
     clearCart();
