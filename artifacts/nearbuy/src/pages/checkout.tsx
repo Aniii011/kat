@@ -172,6 +172,7 @@ if (existingOrder) {
   }
 
   try {
+    console.log("PaystackPop =", PaystackPop);
     const handler = PaystackPop.setup({
   key: "pk_test_f4a152b1348a3c6f5c4b415f3341691ea02b2e2c",
   email: user?.email || "customer@kat.ng",
