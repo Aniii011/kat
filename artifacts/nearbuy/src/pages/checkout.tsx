@@ -57,6 +57,12 @@ const handlePlaceOrder = async () => {
   setPlacing(true);
   setError("");
 
+  if (!(window as any).PaystackPop) {
+    setError("DEBUG: window.PaystackPop is undefined — Paystack script did not load.");
+    setPlacing(false);
+    return;
+  }
+
   try {
     const handler = (window as any).PaystackPop.setup({
       key: "pk_live_f218e98651f0632991476fc40400f095b76953ba",
@@ -133,7 +139,7 @@ const handlePlaceOrder = async () => {
 
     handler.openIframe();
   } catch (err: any) {
-    setError("Payment failed. Please try again.");
+    setError("DEBUG: " + (err?.message || JSON.stringify(err) || "Unknown error in Paystack setup/openIframe"));
     setPlacing(false);
   }
 };
