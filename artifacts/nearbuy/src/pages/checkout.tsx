@@ -74,8 +74,62 @@ const handler = PaystackPop.setup({
   ref: `KAT-${Date.now()}`,
 
   callback: async function(response: any) {
-  console.log("Payment success:", response);
+  console.log("1. PAYSTACK SUCCESS:", response);
 
+  try {
+    console.log("2. Starting order creation");
+
+    const orderIds: string[] = [];
+
+    for (const item of items) {
+      console.log("3. Creating order for:", item.title);
+
+      const { data: product, error: productError } = await supabase
+        .from("products")
+        .select("seller_id")
+        .eq("id", item.listingId)
+        .single();
+
+      console.log("4. Product:", product, productError);
+
+      const { data, error: orderError } = await supabase
+        .from("orders")
+        .insert({
+          product_id: item.listingId,
+          buyer_id: user?.id || null,
+          buyer_name: fullName.trim(),
+          buyer_phone: phone.trim(),
+          buyer_address: `${address.trim()}, ${city.trim()}`,
+          amount: item.price,
+          quantity: item.quantity,
+          total: item.price * item.quantity,
+          status: "pending",
+          seller_status: "pending",
+          admin_status: "pending",
+          seller_id: product?.seller_id || null,
+          payment_ref: response.reference,
+        })
+        .select()
+        .single();
+
+      console.log("5. Order:", data, orderError);
+
+      if (orderError) throw orderError;
+
+      if (data) orderIds.push(data.id);
+    }
+
+    console.log("6. ALL ORDERS CREATED");
+
+    setPlacing(false);
+    navigate("/order-confirmation");
+
+  } catch (err) {
+    console.error("ORDER ERROR:", err);
+    setError("Order creation failed");
+    setPlacing(false);
+  }
+},
   try {
     const orderIds: string[] = [];
 
@@ -143,22 +197,19 @@ const handler = PaystackPop.setup({
     navigate("/order-confirmation");
 
   } catch (err: any) {
-    console.error("Order creation error:", err);
-
-    setError(
-      "Payment successful but order creation failed. Reference: " +
-      response.reference
-    );
-
-    setPlacing(false);
-  }
+  console.error("FULL ERROR:", err);
+  setError(err?.message || "Something went wrong");
+  setPlacing(false);
+}
 },
 
   onClose: function() {
   setPlacing(false);
 },
 
+console.log("Opening Paystack...");
 handler.openIframe();
+console.log("Paystack opened");
   } catch (err: any) {
     setError("DEBUG: " + (err?.message || JSON.stringify(err) || "Unknown error in Paystack setup/openIframe"));
     setPlacing(false);
