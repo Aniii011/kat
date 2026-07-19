@@ -51,7 +51,66 @@ export default function Checkout() {
   const delivery = subtotal >= 25000 ? 0 : 1500;
   const total = subtotal + delivery;
   const canPlaceOrder = fullName.trim() && phone.trim() && address.trim() && city.trim();
+const handleSuccessfulPayment = async (response: any) => {
+  console.log("Payment successful:", response);
 
+  try {
+    const orderIds: string[] = [];
+
+    for (const item of items) {
+      const { data: product } = await supabase
+        .from("products")
+        .select("seller_id")
+        .eq("id", item.listingId)
+        .single();
+
+      const { data, error } = await supabase
+        .from("orders")
+        .insert({
+          product_id: item.listingId,
+          buyer_id: user?.id || null,
+          buyer_name: fullName.trim(),
+          buyer_phone: phone.trim(),
+          buyer_address: `${address.trim()}, ${city.trim()}`,
+          amount: item.price,
+          quantity: item.quantity,
+          total: item.price * item.quantity,
+          status: "pending",
+          seller_status: "pending",
+          admin_status: "pending",
+          seller_id: product?.seller_id || null,
+          payment_ref: response.reference,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) orderIds.push(data.id);
+    }
+
+    sessionStorage.setItem(
+      "kat_order_confirmed",
+      JSON.stringify({
+        orderIds,
+        items,
+        total,
+        paymentRef: response.reference,
+      })
+    );
+
+    sessionStorage.removeItem("kat_checkout_items");
+    clearCart();
+
+    setPlacing(false);
+    navigate("/order-confirmation");
+
+  } catch (err: any) {
+    console.error("ORDER ERROR:", err);
+    setError(err.message);
+    setPlacing(false);
+  }
+};
  const handlePlaceOrder = async () => {
   if (!canPlaceOrder) return;
 
@@ -74,7 +133,9 @@ export default function Checkout() {
       currency: "NGN",
       ref: `KAT-${Date.now()}`,
 
-      callback: async (response: any) => {
+      callback: function(response: any) {
+  handleSuccessfulPayment(response);
+},
         console.log("Payment successful:", response);
 
         try {
