@@ -55,7 +55,26 @@ export default function Checkout() {
 const handleSuccessfulPayment = async (response: any) => {
   console.log("Payment successful:", response);
 
+  const verify = await fetch("/api/verify-payment", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      reference: response.reference,
+    }),
+  });
+
+  const result = await verify.json();
+
+  if (!result.verified) {
+    setError("Payment verification failed");
+    setPlacing(false);
+    return;
+  }
+
   try {
+  
     const orderIds: string[] = [];
 
     for (const item of items) {
