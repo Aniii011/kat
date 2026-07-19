@@ -169,36 +169,35 @@ if (existingOrder) {
   currency: "NGN",
   ref: `KAT-${Date.now()}`,
 
-  callback: async function(response: any) {
+  callback: async (response: any) => {
+    console.log("Paystack response:", response);
 
-  const verify = await fetch("/api/verify-payment", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      reference: response.reference
-    })
-  });
+    const verify = await fetch("/api/verify-payment", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        reference: response.reference,
+      }),
+    });
 
-  const result = await verify.json();
+    const result = await verify.json();
 
-  console.log("Verification:", result);
+    console.log("Verification result:", result);
 
-  if (result.verified) {
-    handleSuccessfulPayment(response);
-  } else {
-    setError("Payment verification failed");
-    setPlacing(false);
-  }
+    if (result.verified) {
+      handleSuccessfulPayment(response);
+    } else {
+      setError("Payment verification failed");
+      setPlacing(false);
+    }
+  },
 
-},
-
-  onClose: function() {
+  onClose: () => {
     setPlacing(false);
   },
 });
-
 handler.openIframe();
 
   } catch (err: any) {
