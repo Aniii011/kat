@@ -158,9 +158,10 @@ export default function Checkout() {
     handler.openIframe();
 
   } catch (err: any) {
-    console.error(err);
-    setError(err.message || "Payment failed");
-    setPlacing(false);
+  console.error("ORDER ERROR FULL:", err);
+  alert(JSON.stringify(err));
+  setError(err.message || "Order creation failed");
+  setPlacing(false);
   }
 };
             
