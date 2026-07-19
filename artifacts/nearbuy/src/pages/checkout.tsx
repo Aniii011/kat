@@ -191,7 +191,8 @@ handler.openIframe();
 
   } catch (err: any) {
   console.error("ORDER ERROR FULL:", err);
-  alert(JSON.stringify(err));
+  console.error(err);
+alert(err?.message || "Unknown error");
   setError(err.message || "Order creation failed");
   setPlacing(false);
   }
