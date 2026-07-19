@@ -51,6 +51,7 @@ export default function Checkout() {
   const delivery = subtotal >= 25000 ? 0 : 1500;
   const total = subtotal + delivery;
   const canPlaceOrder = fullName.trim() && phone.trim() && address.trim() && city.trim();
+  
 const handleSuccessfulPayment = async (response: any) => {
   console.log("Payment successful:", response);
 
@@ -127,96 +128,22 @@ const handleSuccessfulPayment = async (response: any) => {
 
   try {
     const handler = PaystackPop.setup({
-      key: "pk_test_f4a152b1348a3c6f5c4b415f3341691ea02b2e2c",
-      email: user?.email || "customer@kat.ng",
-      amount: total * 100,
-      currency: "NGN",
-      ref: `KAT-${Date.now()}`,
+  key: "pk_test_f4a152b1348a3c6f5c4b415f3341691ea02b2e2c",
+  email: user?.email || "customer@kat.ng",
+  amount: total * 100,
+  currency: "NGN",
+  ref: `KAT-${Date.now()}`,
 
-      callback: function(response: any) {
-  handleSuccessfulPayment(response);
-},
-        console.log("Payment successful:", response);
+  callback: function(response: any) {
+    handleSuccessfulPayment(response);
+  },
 
-        try {
-          const orderIds: string[] = [];
+  onClose: function() {
+    setPlacing(false);
+  },
+});
 
-          for (const item of items) {
-            const { data: product } = await supabase
-              .from("products")
-              .select("seller_id")
-              .eq("id", item.listingId)
-              .single();
-
-            const { data, error } = await supabase
-              .from("orders")
-              .insert({
-                product_id: item.listingId,
-                buyer_id: user?.id || null,
-                buyer_name: fullName.trim(),
-                buyer_phone: phone.trim(),
-                buyer_address: `${address.trim()}, ${city.trim()}`,
-                amount: item.price,
-                quantity: item.quantity,
-                total: item.price * item.quantity,
-                status: "pending",
-                seller_status: "pending",
-                admin_status: "pending",
-                seller_id: product?.seller_id || null,
-                payment_ref: response.reference,
-                variant:
-                  item.selectedColor || item.selectedSize
-                    ? {
-                        color: item.selectedColor,
-                        size: item.selectedSize,
-                      }
-                    : null,
-              })
-              .select()
-              .single();
-
-            if (error) throw error;
-
-            if (data) orderIds.push(data.id);
-          }
-
-          sessionStorage.setItem(
-            "kat_order_confirmed",
-            JSON.stringify({
-              orderIds,
-              items,
-              total,
-              delivery,
-              fullName,
-              phone,
-              address: `${address}, ${city}`,
-              paymentMethod,
-              paymentRef: response.reference,
-              createdAt: new Date().toISOString(),
-            })
-          );
-
-          sessionStorage.removeItem("kat_checkout_items");
-
-          clearCart();
-
-          setPlacing(false);
-
-          navigate("/order-confirmation");
-
-        } catch (err: any) {
-          console.error(err);
-          setError(err.message || "Order creation failed");
-          setPlacing(false);
-        }
-      },
-
-      onClose: () => {
-        setPlacing(false);
-      },
-    });
-
-    handler.openIframe();
+handler.openIframe();
 
   } catch (err: any) {
   console.error("ORDER ERROR FULL:", err);
