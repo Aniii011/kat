@@ -53,25 +53,33 @@ export default function Checkout() {
   const canPlaceOrder = fullName.trim() && phone.trim() && address.trim() && city.trim();
   
 const handleSuccessfulPayment = async (response: any) => {
-  console.log("Payment successful:", response);
+  console.log("STEP 1: Payment callback received", response);
 
-  const verify = await fetch("/api/verify-payment", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      reference: response.reference,
-    }),
-  });
+  try {
+    console.log("STEP 2: Verifying payment");
 
-  const result = await verify.json();
+    const verify = await fetch("/api/verify-payment", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        reference: response.reference,
+      }),
+    });
 
-  if (!result.verified) {
-    setError("Payment verification failed");
-    setPlacing(false);
-    return;
-  }
+    const result = await verify.json();
+
+    console.log("STEP 3: Verification result", result);
+
+    if (!result.verified) {
+      console.log("FAILED VERIFICATION");
+      setError("Payment verification failed");
+      setPlacing(false);
+      return;
+    }
+
+    console.log("STEP 4: Creating orders");
 
   try {
   
@@ -88,6 +96,7 @@ if (existingOrder) {
   return;
 }
     for (const item of items) {
+      console.log("CREATING ORDER FOR:", item.title);
       const { data: product } = await supabase
         .from("products")
         .select("seller_id")
@@ -113,6 +122,7 @@ if (existingOrder) {
         })
         .select()
         .single();
+      console.log("ORDER RESULT:", data, error);
 
       if (error) throw error;
 
