@@ -81,7 +81,7 @@ const handleSuccessfulPayment = async (response: any) => {
 
     console.log("STEP 4: Creating orders");
 
-  try {
+  
   
     const orderIds: string[] = [];
 
