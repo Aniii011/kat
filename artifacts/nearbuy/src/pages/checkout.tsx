@@ -169,30 +169,9 @@ if (existingOrder) {
   currency: "NGN",
   ref: `KAT-${Date.now()}`,
 
-  callback: async (response: any) => {
-    console.log("Paystack response:", response);
-
-    const verify = await fetch("/api/verify-payment", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        reference: response.reference,
-      }),
-    });
-
-    const result = await verify.json();
-
-    console.log("Verification result:", result);
-
-    if (result.verified) {
-      handleSuccessfulPayment(response);
-    } else {
-      setError("Payment verification failed");
-      setPlacing(false);
-    }
-  },
+  callback: (response: any) => {
+  handleSuccessfulPayment(response);
+},
 
   onClose: () => {
     setPlacing(false);
