@@ -52,169 +52,118 @@ export default function Checkout() {
   const total = subtotal + delivery;
   const canPlaceOrder = fullName.trim() && phone.trim() && address.trim() && city.trim();
 
-const handlePlaceOrder = async () => {
+ const handlePlaceOrder = async () => {
   if (!canPlaceOrder) return;
+
   setPlacing(true);
   setError("");
 
-  if (!(window as any).PaystackPop) {
-    setError("DEBUG: window.PaystackPop is undefined — Paystack script did not load.");
+  const PaystackPop = (window as any).PaystackPop;
+
+  if (!PaystackPop) {
+    setError("Paystack failed to load.");
     setPlacing(false);
     return;
   }
 
   try {
-    const PaystackPop = (window as any).PaystackPop;
+    const handler = PaystackPop.setup({
+      key: "pk_test_f4a152b1348a3c6f5c4b415f3341691ea02b2e2c",
+      email: user?.email || "customer@kat.ng",
+      amount: total * 100,
+      currency: "NGN",
+      ref: `KAT-${Date.now()}`,
 
-const handler = PaystackPop.setup({
-  key: "pk_test_f4a152b1348a3c6f5c4b415f3341691ea02b2e2c",
-  email: user?.email || "customer@kat.ng",
-  amount: total * 100,
-  currency: "NGN",
-  ref: `KAT-${Date.now()}`,
+      callback: async (response: any) => {
+        console.log("Payment successful:", response);
 
-  callback: async function(response: any) {
-  console.log("1. PAYSTACK SUCCESS:", response);
+        try {
+          const orderIds: string[] = [];
 
-  try {
-    console.log("2. Starting order creation");
+          for (const item of items) {
+            const { data: product } = await supabase
+              .from("products")
+              .select("seller_id")
+              .eq("id", item.listingId)
+              .single();
 
-    const orderIds: string[] = [];
+            const { data, error } = await supabase
+              .from("orders")
+              .insert({
+                product_id: item.listingId,
+                buyer_id: user?.id || null,
+                buyer_name: fullName.trim(),
+                buyer_phone: phone.trim(),
+                buyer_address: `${address.trim()}, ${city.trim()}`,
+                amount: item.price,
+                quantity: item.quantity,
+                total: item.price * item.quantity,
+                status: "pending",
+                seller_status: "pending",
+                admin_status: "pending",
+                seller_id: product?.seller_id || null,
+                payment_ref: response.reference,
+                variant:
+                  item.selectedColor || item.selectedSize
+                    ? {
+                        color: item.selectedColor,
+                        size: item.selectedSize,
+                      }
+                    : null,
+              })
+              .select()
+              .single();
 
-    for (const item of items) {
-      console.log("3. Creating order for:", item.title);
+            if (error) throw error;
 
-      const { data: product, error: productError } = await supabase
-        .from("products")
-        .select("seller_id")
-        .eq("id", item.listingId)
-        .single();
+            if (data) orderIds.push(data.id);
+          }
 
-      console.log("4. Product:", product, productError);
+          sessionStorage.setItem(
+            "kat_order_confirmed",
+            JSON.stringify({
+              orderIds,
+              items,
+              total,
+              delivery,
+              fullName,
+              phone,
+              address: `${address}, ${city}`,
+              paymentMethod,
+              paymentRef: response.reference,
+              createdAt: new Date().toISOString(),
+            })
+          );
 
-      const { data, error: orderError } = await supabase
-        .from("orders")
-        .insert({
-          product_id: item.listingId,
-          buyer_id: user?.id || null,
-          buyer_name: fullName.trim(),
-          buyer_phone: phone.trim(),
-          buyer_address: `${address.trim()}, ${city.trim()}`,
-          amount: item.price,
-          quantity: item.quantity,
-          total: item.price * item.quantity,
-          status: "pending",
-          seller_status: "pending",
-          admin_status: "pending",
-          seller_id: product?.seller_id || null,
-          payment_ref: response.reference,
-        })
-        .select()
-        .single();
+          sessionStorage.removeItem("kat_checkout_items");
 
-      console.log("5. Order:", data, orderError);
+          clearCart();
 
-      if (orderError) throw orderError;
+          setPlacing(false);
 
-      if (data) orderIds.push(data.id);
-    }
+          navigate("/order-confirmation");
 
-    console.log("6. ALL ORDERS CREATED");
+        } catch (err: any) {
+          console.error(err);
+          setError(err.message || "Order creation failed");
+          setPlacing(false);
+        }
+      },
 
-    setPlacing(false);
-    navigate("/order-confirmation");
+      onClose: () => {
+        setPlacing(false);
+      },
+    });
 
-  } catch (err) {
-    console.error("ORDER ERROR:", err);
-    setError("Order creation failed");
-    setPlacing(false);
-  }
-},
-  try {
-    const orderIds: string[] = [];
-
-    for (const item of items) {
-      const { data: product } = await supabase
-        .from("products")
-        .select("seller_id")
-        .eq("id", item.listingId)
-        .single();
-
-      const { data, error: orderError } = await supabase
-        .from("orders")
-        .insert({
-          product_id: item.listingId,
-          buyer_id: user?.id || null,
-          buyer_name: fullName.trim(),
-          buyer_phone: phone.trim(),
-          buyer_address: `${address.trim()}, ${city.trim()}`,
-          amount: item.price,
-          quantity: item.quantity,
-          total: item.price * item.quantity,
-          status: "pending",
-          seller_status: "pending",
-          admin_status: "pending",
-          seller_id: product?.seller_id || null,
-          payment_ref: response.reference,
-          variant:
-            item.selectedColor || item.selectedSize
-              ? {
-                  color: item.selectedColor,
-                  size: item.selectedSize,
-                }
-              : null,
-        })
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      if (data) orderIds.push(data.id);
-    }
-
-    sessionStorage.setItem(
-      "kat_order_confirmed",
-      JSON.stringify({
-        orderIds,
-        items,
-        total,
-        delivery,
-        fullName,
-        phone,
-        address: `${address}, ${city}`,
-        paymentMethod,
-        paymentRef: response.reference,
-        createdAt: new Date().toISOString(),
-      })
-    );
-
-    sessionStorage.removeItem("kat_checkout_items");
-
-    clearCart();
-
-    setPlacing(false);
-
-    navigate("/order-confirmation");
+    handler.openIframe();
 
   } catch (err: any) {
-  console.error("FULL ERROR:", err);
-  setError(err?.message || "Something went wrong");
-  setPlacing(false);
-}
-},
-
-  onClose: function() {
-  setPlacing(false);
-},
-
-console.log("Opening Paystack...");
-handler.openIframe();
-console.log("Paystack opened");
-  } catch (err: any) {
-    setError("DEBUG: " + (err?.message || JSON.stringify(err) || "Unknown error in Paystack setup/openIframe"));
+    console.error(err);
+    setError(err.message || "Payment failed");
     setPlacing(false);
   }
 };
+            
 
   if (items.length === 0) {
     return (
