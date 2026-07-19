@@ -159,9 +159,30 @@ const handleSuccessfulPayment = async (response: any) => {
   currency: "NGN",
   ref: `KAT-${Date.now()}`,
 
-  callback: function(response: any) {
+  callback: async function(response: any) {
+
+  const verify = await fetch("/api/verify-payment", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      reference: response.reference
+    })
+  });
+
+  const result = await verify.json();
+
+  console.log("Verification:", result);
+
+  if (result.verified) {
     handleSuccessfulPayment(response);
-  },
+  } else {
+    setError("Payment verification failed");
+    setPlacing(false);
+  }
+
+},
 
   onClose: function() {
     setPlacing(false);
