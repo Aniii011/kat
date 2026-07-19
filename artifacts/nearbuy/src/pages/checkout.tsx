@@ -77,6 +77,16 @@ const handleSuccessfulPayment = async (response: any) => {
   
     const orderIds: string[] = [];
 
+    const { data: existingOrder } = await supabase
+  .from("orders")
+  .select("id")
+  .eq("payment_ref", response.reference)
+  .single();
+
+if (existingOrder) {
+  console.log("Order already created");
+  return;
+}
     for (const item of items) {
       const { data: product } = await supabase
         .from("products")
