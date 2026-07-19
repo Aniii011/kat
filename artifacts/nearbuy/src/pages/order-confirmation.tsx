@@ -166,16 +166,19 @@ export default function OrderConfirmation() {
           transition={{ delay: 0.7 }}
           className="space-y-2"
         >
-          <Link href="/">
-            <Button className="w-full rounded-full font-bold h-12 gap-2">
-              <Home className="w-4 h-4" /> Continue Shopping
-            </Button>
-          </Link>
-          <Link href="/me">
-            <Button variant="outline" className="w-full rounded-full font-bold h-12 gap-2">
-              <ShoppingBag className="w-4 h-4" /> View My Orders
-            </Button>
-          </Link>
+          <Button
+  className="w-full rounded-full font-bold h-12 gap-2"
+  onClick={() => navigate("/")}
+>
+  <Home className="w-4 h-4" /> Continue Shopping
+</Button>
+          <Button
+  variant="outline"
+  className="w-full rounded-full font-bold h-12 gap-2"
+  onClick={() => navigate("/me")}
+>
+  <ShoppingBag className="w-4 h-4" /> View My Orders
+</Button>
         </motion.div>
       </main>
     </div>
