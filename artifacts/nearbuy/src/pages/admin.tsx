@@ -519,7 +519,8 @@ View
                   <p className="font-semibold text-sm">No sellers found</p>
                 </div>
               ) : (
-                {filteredSellers.map((seller, i) => {
+              <>
+                {filteredSellers.map((seller) => {
   const sellerProducts = products.filter((p) => p.seller_id === seller.id);
   const sellerOrders = orders.filter((o) => o.seller_id === seller.id);
   const sellerRevenue = sellerOrders.reduce(
@@ -538,9 +539,10 @@ View
       rejectSeller={rejectSeller}
       actionLoading={actionLoading}
     />
-  );
+  );           
 })}
-
+</>
+)}
           {/* ── PRODUCTS ── */}
           {section === "products" && (
             <div className="space-y-4">
