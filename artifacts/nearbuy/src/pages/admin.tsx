@@ -519,18 +519,27 @@ View
                   <p className="font-semibold text-sm">No sellers found</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {filteredSellers.map((seller, i) => {
-                    <SellerCard
- seller={seller}
- products={sellerProducts}
- orders={sellerOrders}
- revenue={sellerRevenue}
- approveSeller={approveSeller}
- rejectSeller={rejectSeller}
- actionLoading={actionLoading}
-/>
-          
+                {filteredSellers.map((seller, i) => {
+  const sellerProducts = products.filter((p) => p.seller_id === seller.id);
+  const sellerOrders = orders.filter((o) => o.seller_id === seller.id);
+  const sellerRevenue = sellerOrders.reduce(
+    (s, o) => s + (o.total || 0),
+    0
+  );
+
+  return (
+    <SellerCard
+      key={seller.id}
+      seller={seller}
+      products={sellerProducts}
+      orders={sellerOrders}
+      revenue={sellerRevenue}
+      approveSeller={approveSeller}
+      rejectSeller={rejectSeller}
+      actionLoading={actionLoading}
+    />
+  );
+})}
 
           {/* ── PRODUCTS ── */}
           {section === "products" && (
