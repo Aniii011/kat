@@ -18,6 +18,7 @@ import {
   CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import AdminStats from "@/components/admin/AdminStats";
+import QuickActions from "@/components/admin/QuickActions";
 
 function formatNaira(n: number) { return "₦" + Number(n || 0).toLocaleString("en-NG"); }
 
@@ -260,6 +261,8 @@ const sellersToday = sellers.filter(
   pendingSellers={pendingSellers}
   formatNaira={formatNaira}
 />
+              <QuickActions setSection={setSection} />
+              
               {/* Command Center Stats */}
 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
 
