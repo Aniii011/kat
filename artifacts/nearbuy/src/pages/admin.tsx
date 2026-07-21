@@ -88,6 +88,24 @@ export default function Admin() {
 
   // Stats
   const totalRevenue = orders.reduce((s, o) => s + (o.total || o.amount || 0), 0);
+  const today = new Date().toDateString();
+
+const ordersToday = orders.filter(
+  (o) => new Date(o.created_at).toDateString() === today
+);
+
+const revenueToday = ordersToday.reduce(
+  (sum, o) => sum + (o.total || o.amount || 0),
+  0
+);
+
+const usersToday = users.filter(
+  (u) => new Date(u.created_at).toDateString() === today
+);
+
+const sellersToday = sellers.filter(
+  (s) => new Date(s.created_at).toDateString() === today
+);
   const pendingOrders = orders.filter((o) => (o.admin_status || "pending") === "pending").length;
   const pendingSellers = sellers.filter((s) => s.is_seller && !s.seller_verified).length;
   const totalBuyers = users.filter((u) => !u.is_seller && !u.is_admin).length;
@@ -230,22 +248,155 @@ export default function Admin() {
                 <p className="text-sm text-muted-foreground">Here's what's happening on KAT</p>
               </div>
 
-              {/* KPI cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { label: "Total Revenue", value: formatNaira(totalRevenue), icon: <DollarSign className="w-4 h-4 text-primary" />, sub: `${orders.length} orders` },
-                  { label: "Buyers", value: totalBuyers, icon: <Users className="w-4 h-4 text-primary" />, sub: "registered" },
-                  { label: "Sellers", value: sellers.length, icon: <Store className="w-4 h-4 text-primary" />, sub: `${pendingSellers} pending` },
-                  { label: "Products", value: products.length, icon: <Package className="w-4 h-4 text-primary" />, sub: "listed" },
-                ].map((s) => (
-                  <div key={s.label} className="bg-card border border-card-border rounded-2xl p-4">
-                    {s.icon}
-                    <p className="text-xl font-black mt-1">{s.value}</p>
-                    <p className="text-xs font-semibold">{s.label}</p>
-                    <p className="text-[10px] text-muted-foreground">{s.sub}</p>
-                  </div>
-                ))}
-              </div>
+              {/* Command Center Stats */}
+<div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+
+{[
+  {
+    label: "Revenue Today",
+    value: formatNaira(revenueToday),
+    icon: <DollarSign className="w-4 h-4 text-primary"/>,
+    sub: `${ordersToday.length} orders`
+  },
+  {
+    label: "Orders Today",
+    value: ordersToday.length,
+    icon: <ShoppingCart className="w-4 h-4 text-primary"/>,
+    sub: "new orders"
+  },
+  {
+    label: "New Users",
+    value: usersToday.length,
+    icon: <Users className="w-4 h-4 text-primary"/>,
+    sub: "joined today"
+  },
+  {
+    label: "New Sellers",
+    value: sellersToday.length,
+    icon: <Store className="w-4 h-4 text-primary"/>,
+    sub: `${pendingSellers} pending`
+  }
+
+].map((s)=>(
+<div
+key={s.label}
+className="bg-card border border-card-border rounded-2xl p-4"
+>
+{s.icon}
+
+<p className="text-xl font-black mt-2">
+{s.value}
+</p>
+
+<p className="text-xs font-semibold">
+{s.label}
+</p>
+
+<p className="text-[10px] text-muted-foreground">
+{s.sub}
+</p>
+
+</div>
+))}
+
+</div>
+
+              {/* Quick Actions */}
+
+<div className="bg-card border border-card-border rounded-2xl p-4">
+
+<p className="font-bold text-sm mb-3">
+Quick Actions
+</p>
+
+
+<div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+
+<button
+onClick={()=>setSection("sellers")}
+className="rounded-xl bg-primary/10 p-3 text-xs font-bold text-primary"
+>
+✓ Verify Sellers
+</button>
+
+
+<button
+onClick={()=>setSection("products")}
+className="rounded-xl bg-muted p-3 text-xs font-bold"
+>
+📦 Review Products
+</button>
+
+
+<button
+onClick={()=>setSection("orders")}
+className="rounded-xl bg-muted p-3 text-xs font-bold"
+>
+🛒 Manage Orders
+</button>
+
+
+<button
+onClick={()=>setSection("reports")}
+className="rounded-xl bg-muted p-3 text-xs font-bold"
+>
+🚩 Reports
+</button>
+
+
+</div>
+
+</div>
+
+              <div className="bg-card border border-card-border rounded-2xl p-4">
+
+<p className="font-bold text-sm mb-3">
+Needs Attention
+</p>
+
+
+<div className="space-y-2">
+
+
+{pendingSellers > 0 && (
+<div className="flex justify-between bg-amber-50 rounded-xl p-3">
+<span className="text-xs font-semibold">
+⚠ {pendingSellers} sellers waiting
+</span>
+
+<button
+onClick={()=>setSection("sellers")}
+className="text-xs font-bold text-primary"
+>
+Review
+</button>
+
+</div>
+)}
+
+
+
+{pendingOrders > 0 && (
+<div className="flex justify-between bg-red-50 rounded-xl p-3">
+
+<span className="text-xs font-semibold">
+🚨 {pendingOrders} orders pending
+</span>
+
+<button
+onClick={()=>setSection("orders")}
+className="text-xs font-bold text-primary"
+>
+View
+</button>
+
+</div>
+)}
+
+
+</div>
+
+</div>
 
               {/* Marketplace health */}
               <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
