@@ -17,6 +17,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
+import AdminStats from "@/components/admin/AdminStats";
 
 function formatNaira(n: number) { return "₦" + Number(n || 0).toLocaleString("en-NG"); }
 
@@ -85,6 +86,8 @@ export default function Admin() {
       </div>
     );
   }
+
+  
 
   // Stats
   const totalRevenue = orders.reduce((s, o) => s + (o.total || o.amount || 0), 0);
@@ -247,7 +250,16 @@ const sellersToday = sellers.filter(
                 <h1 className="text-xl font-black">Good day, {user.name?.split(" ")[0] || "Admin"} 👋</h1>
                 <p className="text-sm text-muted-foreground">Here's what's happening on KAT</p>
               </div>
-
+              
+              {/* KPI cards */}
+        <AdminStats
+  revenueToday={revenueToday}
+  ordersToday={ordersToday.length}
+  usersToday={usersToday.length}
+  sellersToday={sellersToday.length}
+  pendingSellers={pendingSellers}
+  formatNaira={formatNaira}
+/>
               {/* Command Center Stats */}
 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
 
