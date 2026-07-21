@@ -530,7 +530,7 @@ View
  rejectSeller={rejectSeller}
  actionLoading={actionLoading}
 />
-          )}
+          
 
           {/* ── PRODUCTS ── */}
           {section === "products" && (
