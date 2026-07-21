@@ -20,6 +20,7 @@ import {
 import AdminStats from "@/components/admin/AdminStats";
 import QuickActions from "@/components/admin/QuickActions";
 import NeedsAttention from "@/components/admin/NeedsAttention";
+import SellerCard from "@/components/admin/SellerCard";
 
 function formatNaira(n: number) { return "₦" + Number(n || 0).toLocaleString("en-NG"); }
 
@@ -520,67 +521,15 @@ View
               ) : (
                 <div className="space-y-3">
                   {filteredSellers.map((seller, i) => {
-                    const status = seller.seller_verified ? "approved" : "pending";
-                    const sellerProducts = products.filter((p) => p.seller_id === seller.id);
-                    const sellerOrders = orders.filter((o) => o.seller_id === seller.id);
-                    const sellerRevenue = sellerOrders.reduce((s, o) => s + (o.total || 0), 0);
-                    return (
-                      <motion.div key={seller.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-                        className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
-                        <div className="flex items-start gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                            <span className="text-sm font-black text-primary">{(seller.full_name || seller.email || "?").slice(0, 2).toUpperCase()}</span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-bold text-sm">{seller.full_name || "Unnamed"}</p>
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${status === "approved" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                                {status === "approved" ? "Verified" : "Pending"}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">{seller.email}</p>
-                            <div className="flex gap-3 mt-1">
-                              <span className="text-[10px] text-muted-foreground">{sellerProducts.length} products</span>
-                              <span className="text-[10px] text-muted-foreground">{sellerOrders.length} orders</span>
-                              <span className="text-[10px] text-primary font-semibold">{formatNaira(sellerRevenue)}</span>
-                            </div>
-                          </div>
-                          <div className="flex gap-1.5 shrink-0">
-                            {status !== "approved" && (
-                              <Button size="sm" onClick={() => approveSeller(seller.id)} disabled={actionLoading === seller.id}
-                                className="rounded-full h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700">
-                                <Check className="w-3 h-3 mr-1" /> Verify
-                              </Button>
-                            )}
-                            {status === "approved" && (
-                              <Button size="sm" variant="outline" onClick={() => rejectSeller(seller.id)} disabled={actionLoading === seller.id}
-                                className="rounded-full h-8 px-3 text-xs border-destructive/40 text-destructive hover:bg-destructive/10">
-                                <X className="w-3 h-3 mr-1" /> Revoke
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        {seller.store_name && (
-                          <p className="text-xs text-muted-foreground">🏪 {seller.store_name}</p>
-                        )}
-                        <div className="flex gap-2">
-                          <Link href={`/store/${seller.id}`}>
-                            <Button size="sm" variant="outline" className="rounded-full text-xs h-7 gap-1">
-                              <Eye className="w-3 h-3" /> View Store
-                            </Button>
-                          </Link>
-                          <a href={`mailto:${seller.email}`}>
-                            <Button size="sm" variant="outline" className="rounded-full text-xs h-7 gap-1">
-                              <Mail className="w-3 h-3" /> Email
-                            </Button>
-                          </a>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                    <SellerCard
+ seller={seller}
+ products={sellerProducts}
+ orders={sellerOrders}
+ revenue={sellerRevenue}
+ approveSeller={approveSeller}
+ rejectSeller={rejectSeller}
+ actionLoading={actionLoading}
+/>
           )}
 
           {/* ── PRODUCTS ── */}
