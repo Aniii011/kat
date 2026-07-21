@@ -19,6 +19,7 @@ import {
 } from "recharts";
 import AdminStats from "@/components/admin/AdminStats";
 import QuickActions from "@/components/admin/QuickActions";
+import NeedsAttention from "@/components/admin/NeedsAttention";
 
 function formatNaira(n: number) { return "₦" + Number(n || 0).toLocaleString("en-NG"); }
 
@@ -262,7 +263,12 @@ const sellersToday = sellers.filter(
   formatNaira={formatNaira}
 />
               <QuickActions setSection={setSection} />
-              
+            
+              <NeedsAttention
+  pendingSellers={pendingSellers}
+  pendingOrders={pendingOrders}
+  setSection={setSection}
+/>
               {/* Command Center Stats */}
 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
 
