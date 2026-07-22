@@ -247,13 +247,37 @@ const sellersToday = sellers.filter(
         <div className="max-w-5xl mx-auto px-4 py-6 space-y-5">
 
           {/* ── HOME ── */}
-          {section === "home" && (
-            <div className="space-y-5">
-              <div>
-                <h1 className="text-xl font-black">Good day, {user.name?.split(" ")[0] || "Admin"} 👋</h1>
-                <p className="text-sm text-muted-foreground">Here's what's happening on KAT</p>
-              </div>
-              
+          <div className="rounded-3xl bg-gradient-to-r from-primary via-purple-500 to-pink-500 text-white p-6 shadow-xl">
+  <p className="text-sm opacity-90">
+    Welcome back
+  </p>
+
+  <h1 className="text-3xl font-black mt-1">
+    {user.name?.split(" ")[0] || "Admin"} 👋
+  </h1>
+
+  <p className="text-white/80 mt-2">
+    Here's what's happening on KAT today.
+  </p>
+
+  <div className="flex gap-6 mt-5 text-sm">
+    <div>
+      <p className="font-bold">{orders.length}</p>
+      <p className="text-white/70">Orders</p>
+    </div>
+
+    <div>
+      <p className="font-bold">{users.length}</p>
+      <p className="text-white/70">Users</p>
+    </div>
+
+    <div>
+      <p className="font-bold">{sellers.length}</p>
+      <p className="text-white/70">Sellers</p>
+    </div>
+  </div>
+</div>
+          
               {/* KPI cards */}
         <AdminStats
   revenueToday={revenueToday}
