@@ -454,6 +454,27 @@ View
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <div className="bg-card border border-card-border rounded-2xl p-5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+    <p className="text-sm text-muted-foreground">Total Revenue</p>
+    <h2 className="text-3xl font-black mt-2">
+      {formatNaira(totalRevenue)}
+    </h2>
+    <p className="text-emerald-500 text-sm mt-2">
+      Marketplace earnings
+    </p>
+  </div>
+
+  <div className="bg-card border border-card-border rounded-2xl p-5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+    <p className="text-sm text-muted-foreground">Orders</p>
+    <h2 className="text-3xl font-black mt-2">
+      {orders.length}
+    </h2>
+    <p className="text-blue-500 text-sm mt-2">
+      {pendingOrders} pending
+    </p>
+  </div>
+</div>
               {/* Revenue chart */}
               <div className="bg-card border border-card-border rounded-2xl p-4">
                 <p className="font-bold text-sm mb-4">Revenue — Last 7 Days</p>
