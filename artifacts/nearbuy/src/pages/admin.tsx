@@ -593,6 +593,9 @@ View
               )}
             </div>
           )}
+            </div>
+          )}
+
 
           {/* ── ORDERS ── */}
           {section === "orders" && (
