@@ -3,6 +3,14 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Trash2, Pencil, Plus, Power } from "lucide-react";
+import { NIGERIAN_STATES } from "@/lib/nigeriaStates";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 function formatNaira(n: number) {
   return "₦" + Number(n || 0).toLocaleString("en-NG");
@@ -116,12 +124,19 @@ const [editFee, setEditFee] = useState("");
         </p>
 
 
-        <Input
-          placeholder="State (e.g Oyo)"
-          value={state}
-          onChange={(e)=>setState(e.target.value)}
-        />
+        <Select value={state} onValueChange={setState}>
+  <SelectTrigger>
+    <SelectValue placeholder="Select State" />
+  </SelectTrigger>
 
+  <SelectContent>
+    {NIGERIAN_STATES.map((s) => (
+      <SelectItem key={s} value={s}>
+        {s}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
 
         <Input
           placeholder="City / Area (e.g Ibadan Bodija)"
@@ -156,12 +171,20 @@ const [editFee, setEditFee] = useState("");
   <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
     <h3 className="font-bold">Edit Delivery Area</h3>
 
-    <Input
-      value={editState}
-      onChange={(e) => setEditState(e.target.value)}
-      placeholder="State"
-    />
+<Select value={editState} onValueChange={setEditState}>
+  <SelectTrigger>
+    <SelectValue placeholder="Select State" />
+  </SelectTrigger>
 
+  <SelectContent>
+    {NIGERIAN_STATES.map((s) => (
+      <SelectItem key={s} value={s}>
+        {s}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+    
     <Input
       value={editCity}
       onChange={(e) => setEditCity(e.target.value)}
