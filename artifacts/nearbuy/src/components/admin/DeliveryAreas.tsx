@@ -15,6 +15,10 @@ export default function DeliveryAreas() {
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
   const [fee, setFee] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+const [editState, setEditState] = useState("");
+const [editCity, setEditCity] = useState("");
+const [editFee, setEditFee] = useState("");
 
   const fetchAreas = async () => {
     setLoading(true);
@@ -70,6 +74,22 @@ export default function DeliveryAreas() {
 
     fetchAreas();
   };
+
+    const updateArea = async () => {
+  if (!editingId) return;
+
+  await supabase
+    .from("delivery_areas")
+    .update({
+      state: editState,
+      city: editCity,
+      delivery_fee: Number(editFee),
+    })
+    .eq("id", editingId);
+
+  setEditingId(null);
+  fetchAreas();
+};
 
 
   return (
@@ -155,7 +175,18 @@ export default function DeliveryAreas() {
               </p>
 
             </div>
-
+<Button
+  size="icon"
+  variant="outline"
+  onClick={() => {
+    setEditingId(area.id);
+    setEditState(area.state);
+    setEditCity(area.city);
+    setEditFee(String(area.delivery_fee));
+  }}
+>
+  <Pencil className="w-4 h-4" />
+</Button>
 
             <Button
               size="icon"
