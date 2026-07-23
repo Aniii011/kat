@@ -55,6 +55,7 @@ export default function Admin() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [orderFilter, setOrderFilter] = useState("all");
   const [sellerFilter, setSellerFilter] = useState("all");
 
@@ -526,10 +527,10 @@ export default function Admin() {
                   filteredOrders.map((order) => {
                     const status = order.admin_status || "pending";
                     const cfg = ORDER_STATUS[status] || ORDER_STATUS.pending;
-                    const isExpanded = expanded === order.id;
+                    const isSelected = selectedOrder?.id === order.id;
                     return (
                       <div key={order.id} className="bg-card border border-card-border rounded-2xl overflow-hidden">
-                        <div className="p-4 flex items-center gap-3 cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setExpanded(isExpanded ? null : order.id)}>
+                        <div className="p-4 flex items-center gap-3 cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setSelectedOrder(order)}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5">
                               <p className="font-mono text-[11px] text-muted-foreground">#{order.id.slice(0, 8)}</p>
@@ -539,7 +540,7 @@ export default function Admin() {
                             <p className="text-[11px] text-muted-foreground">{new Date(order.created_at).toLocaleDateString()}</p>
                           </div>
                           <p className="font-black text-primary shrink-0">{formatNaira(order.total || order.amount)}</p>
-                          {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                          <Eye className="w-4 h-4 text-primary" />
                         </div>
                         {isExpanded && (
                           <div className="border-t border-border p-4 space-y-3">
