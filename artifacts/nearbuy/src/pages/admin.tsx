@@ -90,28 +90,26 @@ export default function Admin() {
     );
   }
 
-  
-
   // Stats
   const totalRevenue = orders.reduce((s, o) => s + (o.total || o.amount || 0), 0);
   const today = new Date().toDateString();
 
-const ordersToday = orders.filter(
-  (o) => new Date(o.created_at).toDateString() === today
-);
+  const ordersToday = orders.filter(
+    (o) => new Date(o.created_at).toDateString() === today
+  );
 
-const revenueToday = ordersToday.reduce(
-  (sum, o) => sum + (o.total || o.amount || 0),
-  0
-);
+  const revenueToday = ordersToday.reduce(
+    (sum, o) => sum + (o.total || o.amount || 0),
+    0
+  );
 
-const usersToday = users.filter(
-  (u) => new Date(u.created_at).toDateString() === today
-);
+  const usersToday = users.filter(
+    (u) => new Date(u.created_at).toDateString() === today
+  );
 
-const sellersToday = sellers.filter(
-  (s) => new Date(s.created_at).toDateString() === today
-);
+  const sellersToday = sellers.filter(
+    (s) => new Date(s.created_at).toDateString() === today
+  );
   const pendingOrders = orders.filter((o) => (o.admin_status || "pending") === "pending").length;
   const pendingSellers = sellers.filter((s) => s.is_seller && !s.seller_verified).length;
   const totalBuyers = users.filter((u) => !u.is_seller && !u.is_admin).length;
@@ -248,203 +246,52 @@ const sellersToday = sellers.filter(
 
           {/* ── HOME ── */}
           {section === "home" && (
-<>
-          <div className="rounded-3xl bg-gradient-to-r from-primary via-purple-500 to-pink-500 text-white p-6 shadow-xl">
-  <p className="text-sm opacity-90">
-    Welcome back
-  </p>
+            <>
+              <div className="rounded-3xl bg-gradient-to-r from-primary via-purple-500 to-pink-500 text-white p-6 shadow-xl">
+                <p className="text-sm opacity-90">Welcome back</p>
 
-  <h1 className="text-3xl font-black mt-1">
-    {user.name?.split(" ")[0] || "Admin"} 👋
-  </h1>
+                <h1 className="text-3xl font-black mt-1">
+                  {user.name?.split(" ")[0] || "Admin"} 👋
+                </h1>
 
-  <p className="text-white/80 mt-2">
-    Here's what's happening on KAT today.
-  </p>
+                <p className="text-white/80 mt-2">
+                  Here's what's happening on KAT today.
+                </p>
 
-  <div className="flex gap-6 mt-5 text-sm">
-    <div>
-      <p className="font-bold">{orders.length}</p>
-      <p className="text-white/70">Orders</p>
-    </div>
+                <div className="flex gap-6 mt-5 text-sm">
+                  <div>
+                    <p className="font-bold">{orders.length}</p>
+                    <p className="text-white/70">Orders</p>
+                  </div>
 
-    <div>
-      <p className="font-bold">{users.length}</p>
-      <p className="text-white/70">Users</p>
-    </div>
+                  <div>
+                    <p className="font-bold">{users.length}</p>
+                    <p className="text-white/70">Users</p>
+                  </div>
 
-    <div>
-      <p className="font-bold">{sellers.length}</p>
-      <p className="text-white/70">Sellers</p>
-    </div>
-  </div>
-</div>
-          
+                  <div>
+                    <p className="font-bold">{sellers.length}</p>
+                    <p className="text-white/70">Sellers</p>
+                  </div>
+                </div>
+              </div>
+
               {/* KPI cards */}
-        <AdminStats
-  revenueToday={revenueToday}
-  ordersToday={ordersToday.length}
-  usersToday={usersToday.length}
-  sellersToday={sellersToday.length}
-  pendingSellers={pendingSellers}
-  formatNaira={formatNaira}
-/>
+              <AdminStats
+                revenueToday={revenueToday}
+                ordersToday={ordersToday.length}
+                usersToday={usersToday.length}
+                sellersToday={sellersToday.length}
+                pendingSellers={pendingSellers}
+                formatNaira={formatNaira}
+              />
               <QuickActions setSection={setSection} />
-            
+
               <NeedsAttention
-  pendingSellers={pendingSellers}
-  pendingOrders={pendingOrders}
-  setSection={setSection}
-/>
-              {/* Command Center Stats */}
-<div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-
-{[
-  {
-    label: "Revenue Today",
-    value: formatNaira(revenueToday),
-    icon: <DollarSign className="w-4 h-4 text-primary"/>,
-    sub: `${ordersToday.length} orders`
-  },
-  {
-    label: "Orders Today",
-    value: ordersToday.length,
-    icon: <ShoppingCart className="w-4 h-4 text-primary"/>,
-    sub: "new orders"
-  },
-  {
-    label: "New Users",
-    value: usersToday.length,
-    icon: <Users className="w-4 h-4 text-primary"/>,
-    sub: "joined today"
-  },
-  {
-    label: "New Sellers",
-    value: sellersToday.length,
-    icon: <Store className="w-4 h-4 text-primary"/>,
-    sub: `${pendingSellers} pending`
-  }
-
-].map((s)=>(
-<div
-key={s.label}
-className="bg-card border border-card-border rounded-2xl p-4"
->
-{s.icon}
-
-<p className="text-xl font-black mt-2">
-{s.value}
-</p>
-
-<p className="text-xs font-semibold">
-{s.label}
-</p>
-
-<p className="text-[10px] text-muted-foreground">
-{s.sub}
-</p>
-
-</div>
-))}
-
-</div>
-
-              {/* Quick Actions */}
-
-<div className="bg-card border border-card-border rounded-2xl p-4">
-
-<p className="font-bold text-sm mb-3">
-Quick Actions
-</p>
-
-
-<div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-
-<button
-onClick={()=>setSection("sellers")}
-className="rounded-xl bg-primary/10 p-3 text-xs font-bold text-primary"
->
-✓ Verify Sellers
-</button>
-
-
-<button
-onClick={()=>setSection("products")}
-className="rounded-xl bg-muted p-3 text-xs font-bold"
->
-📦 Review Products
-</button>
-
-
-<button
-onClick={()=>setSection("orders")}
-className="rounded-xl bg-muted p-3 text-xs font-bold"
->
-🛒 Manage Orders
-</button>
-
-
-<button
-onClick={()=>setSection("reports")}
-className="rounded-xl bg-muted p-3 text-xs font-bold"
->
-🚩 Reports
-</button>
-
-
-</div>
-
-</div>
-
-              <div className="bg-card border border-card-border rounded-2xl p-4">
-
-<p className="font-bold text-sm mb-3">
-Needs Attention
-</p>
-
-
-<div className="space-y-2">
-
-
-{pendingSellers > 0 && (
-<div className="flex justify-between bg-amber-50 rounded-xl p-3">
-<span className="text-xs font-semibold">
-⚠ {pendingSellers} sellers waiting
-</span>
-
-<button
-onClick={()=>setSection("sellers")}
-className="text-xs font-bold text-primary"
->
-Review
-</button>
-
-</div>
-)}
-
-
-
-{pendingOrders > 0 && (
-<div className="flex justify-between bg-red-50 rounded-xl p-3">
-
-<span className="text-xs font-semibold">
-🚨 {pendingOrders} orders pending
-</span>
-
-<button
-onClick={()=>setSection("orders")}
-className="text-xs font-bold text-primary"
->
-View
-</button>
-
-</div>
-)}
-
-
-</div>
-
-</div>
+                pendingSellers={pendingSellers}
+                pendingOrders={pendingOrders}
+                setSection={setSection}
+              />
 
               {/* Marketplace health */}
               <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
@@ -481,26 +328,27 @@ View
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-  <div className="bg-card border border-card-border rounded-2xl p-5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
-    <p className="text-sm text-muted-foreground">Total Revenue</p>
-    <h2 className="text-3xl font-black mt-2">
-      {formatNaira(totalRevenue)}
-    </h2>
-    <p className="text-emerald-500 text-sm mt-2">
-      Marketplace earnings
-    </p>
-  </div>
+                <div className="bg-card border border-card-border rounded-2xl p-5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+                  <p className="text-sm text-muted-foreground">Total Revenue</p>
+                  <h2 className="text-3xl font-black mt-2">
+                    {formatNaira(totalRevenue)}
+                  </h2>
+                  <p className="text-emerald-500 text-sm mt-2">
+                    Marketplace earnings
+                  </p>
+                </div>
 
-  <div className="bg-card border border-card-border rounded-2xl p-5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
-    <p className="text-sm text-muted-foreground">Orders</p>
-    <h2 className="text-3xl font-black mt-2">
-      {orders.length}
-    </h2>
-    <p className="text-blue-500 text-sm mt-2">
-      {pendingOrders} pending
-    </p>
-  </div>
-</div>
+                <div className="bg-card border border-card-border rounded-2xl p-5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+                  <p className="text-sm text-muted-foreground">Orders</p>
+                  <h2 className="text-3xl font-black mt-2">
+                    {orders.length}
+                  </h2>
+                  <p className="text-blue-500 text-sm mt-2">
+                    {pendingOrders} pending
+                  </p>
+                </div>
+              </div>
+
               {/* Revenue chart */}
               <div className="bg-card border border-card-border rounded-2xl p-4">
                 <p className="font-bold text-sm mb-4">Revenue — Last 7 Days</p>
@@ -539,10 +387,8 @@ View
                   );
                 })}
               </div>
-            </div>
+            </>
           )}
-          </>
-)}
 
           {/* ── SELLERS ── */}
           {section === "sellers" && (
@@ -568,33 +414,33 @@ View
                   <p className="font-semibold text-sm">No sellers found</p>
                 </div>
               ) : (
-              <>
-                {filteredSellers.map((seller) => {
-  const sellerProducts = products.filter((p) => p.seller_id === seller.id);
-  const sellerOrders = orders.filter((o) => o.seller_id === seller.id);
-  const sellerRevenue = sellerOrders.reduce(
-    (s, o) => s + (o.total || 0),
-    0
-  );
+                <>
+                  {filteredSellers.map((seller) => {
+                    const sellerProducts = products.filter((p) => p.seller_id === seller.id);
+                    const sellerOrders = orders.filter((o) => o.seller_id === seller.id);
+                    const sellerRevenue = sellerOrders.reduce(
+                      (s, o) => s + (o.total || 0),
+                      0
+                    );
 
-  return (
-    <SellerCard
-      key={seller.id}
-      seller={seller}
-      products={sellerProducts}
-      orders={sellerOrders}
-      revenue={sellerRevenue}
-      approveSeller={approveSeller}
-      rejectSeller={rejectSeller}
-      actionLoading={actionLoading}
-    />
-  );           
-})}
-</>
-)}
-  </div>
-    )}
-  
+                    return (
+                      <SellerCard
+                        key={seller.id}
+                        seller={seller}
+                        products={sellerProducts}
+                        orders={sellerOrders}
+                        revenue={sellerRevenue}
+                        approveSeller={approveSeller}
+                        rejectSeller={rejectSeller}
+                        actionLoading={actionLoading}
+                      />
+                    );
+                  })}
+                </>
+              )}
+            </div>
+          )}
+
           {/* ── PRODUCTS ── */}
           {section === "products" && (
             <div className="space-y-4">
@@ -645,7 +491,6 @@ View
               )}
             </div>
           )}
-            
 
           {/* ── ORDERS ── */}
           {section === "orders" && (
@@ -861,4 +706,4 @@ View
       </main>
     </div>
   );
-}
+    }
