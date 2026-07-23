@@ -21,6 +21,7 @@ import AdminStats from "@/components/admin/AdminStats";
 import QuickActions from "@/components/admin/QuickActions";
 import NeedsAttention from "@/components/admin/NeedsAttention";
 import SellerCard from "@/components/admin/SellerCard";
+import OrderDetailsDialog from "@/components/admin/OrderDetailsDialog";
 
 function formatNaira(n: number) { return "₦" + Number(n || 0).toLocaleString("en-NG"); }
 
@@ -115,6 +116,12 @@ export default function Admin() {
         <ShieldCheck className="w-12 h-12 text-destructive mb-4" />
         <h1 className="text-xl font-black mb-2">Admin Access Only</h1>
         <Link href="/"><Button variant="outline" className="rounded-full mt-2">Back to Home</Button></Link>
+        <OrderDetailsDialog
+  open={!!selectedOrder}
+  order={selectedOrder}
+  onClose={() => setSelectedOrder(null)}
+  onUpdateStatus={updateOrderStatus}
+/>
       </div>
     );
   }
@@ -558,8 +565,10 @@ export default function Admin() {
                     const isSelected = selectedOrder?.id === order.id;
                     return (
                       <div key={order.id} className="bg-card border border-card-border rounded-2xl overflow-hidden">
-                        <div className="p-4 flex items-center gap-3 cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setSelectedOrder(order)}
-                          >
+                        <div
+  className="p-4 flex items-center gap-3 cursor-pointer hover:bg-muted/30 transition-colors"
+  onClick={() => setSelectedOrder(order)}
+>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5">
                               <p className="font-mono text-[11px] text-muted-foreground">#{order.id.slice(0, 8)}</p>
