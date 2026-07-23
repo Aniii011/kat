@@ -40,6 +40,31 @@ export default function OrderDetailsDialog({
             <p className="text-xs text-muted-foreground">Buyer</p>
             <p className="font-bold">{order.buyer_name}</p>
 
+            <div className="grid grid-cols-2 gap-3">
+
+  <div className="rounded-2xl bg-muted p-4">
+    <p className="text-xs text-muted-foreground">
+      Delivery Area
+    </p>
+
+    <p className="font-bold">
+      {order.delivery_area || "Not assigned"}
+    </p>
+  </div>
+
+
+  <div className="rounded-2xl bg-muted p-4">
+    <p className="text-xs text-muted-foreground">
+      Delivery Fee
+    </p>
+
+    <p className="font-bold text-primary">
+      {formatNaira(order.delivery_fee)}
+    </p>
+  </div>
+
+</div>
+
             <a
               href={`tel:${order.buyer_phone}`}
               className="text-primary text-sm"
