@@ -531,6 +531,7 @@ export default function Admin() {
                     return (
                       <div key={order.id} className="bg-card border border-card-border rounded-2xl overflow-hidden">
                         <div className="p-4 flex items-center gap-3 cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setSelectedOrder(order)}
+                          >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5">
                               <p className="font-mono text-[11px] text-muted-foreground">#{order.id.slice(0, 8)}</p>
