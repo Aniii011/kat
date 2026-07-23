@@ -55,7 +55,7 @@ export default function Admin() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [orderFilter, setOrderFilter] = useState("all");
   const [sellerFilter, setSellerFilter] = useState("all");
 
