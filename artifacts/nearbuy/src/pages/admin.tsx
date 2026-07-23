@@ -38,10 +38,38 @@ const NAV_ITEMS: { key: AdminSection; label: string; icon: React.ReactNode }[] =
 ];
 
 const ORDER_STATUS: Record<string, { label: string; color: string }> = {
-  pending:   { label: "Pending",   color: "bg-amber-100 text-amber-700" },
-  assigned:  { label: "Assigned",  color: "bg-blue-100 text-blue-700" },
-  completed: { label: "Completed", color: "bg-emerald-100 text-emerald-700" },
-  cancelled: { label: "Cancelled", color: "bg-red-100 text-red-700" },
+  pending: {
+    label: "Pending",
+    color: "bg-yellow-100 text-yellow-700",
+  },
+  accepted: {
+    label: "Accepted",
+    color: "bg-sky-100 text-sky-700",
+  },
+  preparing: {
+    label: "Preparing",
+    color: "bg-indigo-100 text-indigo-700",
+  },
+  ready_for_pickup: {
+    label: "Ready for Pickup",
+    color: "bg-purple-100 text-purple-700",
+  },
+  out_for_delivery: {
+    label: "Out for Delivery",
+    color: "bg-orange-100 text-orange-700",
+  },
+  delivered: {
+    label: "Delivered",
+    color: "bg-emerald-100 text-emerald-700",
+  },
+  completed: {
+    label: "Completed",
+    color: "bg-green-100 text-green-700",
+  },
+  cancelled: {
+    label: "Cancelled",
+    color: "bg-red-100 text-red-700",
+  },
 };
 
 export default function Admin() {
