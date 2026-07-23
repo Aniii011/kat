@@ -247,6 +247,8 @@ const sellersToday = sellers.filter(
         <div className="max-w-5xl mx-auto px-4 py-6 space-y-5">
 
           {/* ── HOME ── */}
+          {section === "home" && (
+<>
           <div className="rounded-3xl bg-gradient-to-r from-primary via-purple-500 to-pink-500 text-white p-6 shadow-xl">
   <p className="text-sm opacity-90">
     Welcome back
@@ -539,6 +541,8 @@ View
               </div>
             </div>
           )}
+          </>
+)}
 
           {/* ── SELLERS ── */}
           {section === "sellers" && (
@@ -588,6 +592,9 @@ View
 })}
 </>
 )}
+  </div>
+    )}
+  
           {/* ── PRODUCTS ── */}
           {section === "products" && (
             <div className="space-y-4">
@@ -638,9 +645,7 @@ View
               )}
             </div>
           )}
-            </div>
-          )}
-
+            
 
           {/* ── ORDERS ── */}
           {section === "orders" && (
