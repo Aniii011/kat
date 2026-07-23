@@ -152,6 +152,47 @@ const [editFee, setEditFee] = useState("");
       {/* List */}
 
       <div className="space-y-3">
+        {editingId && (
+  <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
+    <h3 className="font-bold">Edit Delivery Area</h3>
+
+    <Input
+      value={editState}
+      onChange={(e) => setEditState(e.target.value)}
+      placeholder="State"
+    />
+
+    <Input
+      value={editCity}
+      onChange={(e) => setEditCity(e.target.value)}
+      placeholder="City / Area"
+    />
+
+    <Input
+      type="number"
+      value={editFee}
+      onChange={(e) => setEditFee(e.target.value)}
+      placeholder="Delivery Fee"
+    />
+
+    <div className="flex gap-2">
+      <Button
+        onClick={updateArea}
+        className="rounded-full"
+      >
+        Save
+      </Button>
+
+      <Button
+        variant="outline"
+        onClick={() => setEditingId(null)}
+        className="rounded-full"
+      >
+        Cancel
+      </Button>
+    </div>
+  </div>
+)}
 
         {loading ? (
           <p className="text-sm text-muted-foreground">
