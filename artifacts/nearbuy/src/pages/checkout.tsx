@@ -32,7 +32,10 @@ export default function Checkout() {
   const [fullName, setFullName] = useState(user?.name || localStorage.getItem("kat_name") || "");
   const [phone, setPhone] = useState(localStorage.getItem("kat_phone") || "");
   const [address, setAddress] = useState(localStorage.getItem("kat_address") || "");
-  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+const [city, setCity] = useState("");
+const [deliveryFee, setDeliveryFee] = useState(0);
+const [cities, setCities] = useState<any[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<"card" | "transfer">("card");
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState("");
@@ -47,6 +50,26 @@ export default function Checkout() {
     }
   }, []);
 
+  useEffect(() => {
+  if (!state) {
+    setCities([]);
+    return;
+  }
+
+  const fetchCities = async () => {
+    const { data } = await supabase
+      .from("delivery_areas")
+      .select("*")
+      .eq("state", state)
+      .eq("active", true)
+      .order("city");
+
+    if (data) setCities(data);
+  };
+
+  fetchCities();
+}, [state]);
+  
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   const delivery = subtotal >= 25000 ? 0 : 1500;
   const total = subtotal + delivery;
