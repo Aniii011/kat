@@ -9,6 +9,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
 
@@ -71,7 +78,7 @@ const [cities, setCities] = useState<any[]>([]);
 }, [state]);
   
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const delivery = subtotal >= 25000 ? 0 : 1500;
+  const delivery = subtotal >= 25000 ? 0 : deliveryFee;
   const total = subtotal + delivery;
   const canPlaceOrder = fullName.trim() && phone.trim() && address.trim() && city.trim();
   
@@ -253,7 +260,48 @@ alert(err?.message || "Unknown error");
           <Input placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} className="rounded-xl h-11" />
           <Input placeholder="Phone number" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl h-11" type="tel" />
           <Input placeholder="Delivery address" value={address} onChange={(e) => setAddress(e.target.value)} className="rounded-xl h-11" />
-          <Input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} className="rounded-xl h-11" />
+          <Select
+  value={state}
+  onValueChange={(value) => {
+    setState(value);
+    setCity("");
+    setDeliveryFee(0);
+  }}
+>
+  <SelectTrigger className="rounded-xl h-11">
+    <SelectValue placeholder="Select State" />
+  </SelectTrigger>
+
+  <SelectContent>
+    {NIGERIAN_STATES.map((s) => (
+      <SelectItem key={s} value={s}>
+        {s}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+
+<Select
+  value={city}
+  onValueChange={(value) => {
+    setCity(value);
+
+    const selected = cities.find((c) => c.city === value);
+    setDeliveryFee(selected?.delivery_fee || 0);
+  }}
+>
+  <SelectTrigger className="rounded-xl h-11">
+    <SelectValue placeholder="Select City" />
+  </SelectTrigger>
+
+  <SelectContent>
+    {cities.map((c) => (
+      <SelectItem key={c.id} value={c.city}>
+        {c.city}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
         </div>
 
         <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
