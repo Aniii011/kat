@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { NIGERIAN_STATES } from "@/lib/nigeria";
+import { NIGERIAN_STATES } from "@/lib/nigeriaStates";
 
 function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
 
