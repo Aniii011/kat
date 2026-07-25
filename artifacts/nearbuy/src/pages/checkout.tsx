@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { NIGERIAN_STATES } from "@/lib/nigeria";
 
 function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
 
@@ -140,7 +141,10 @@ if (existingOrder) {
           buyer_id: user?.id || null,
           buyer_name: fullName.trim(),
           buyer_phone: phone.trim(),
-          buyer_address: `${address.trim()}, ${city.trim()}`,
+          buyer_address: address.trim(),
+delivery_state: state,
+delivery_area: city,
+delivery_fee: delivery,
           amount: item.price,
           quantity: item.quantity,
           total: item.price * item.quantity,
