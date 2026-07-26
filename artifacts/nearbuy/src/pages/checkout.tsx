@@ -265,48 +265,47 @@ alert(err?.message || "Unknown error");
           <Input placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} className="rounded-xl h-11" />
           <Input placeholder="Phone number" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl h-11" type="tel" />
           <Input placeholder="Delivery address" value={address} onChange={(e) => setAddress(e.target.value)} className="rounded-xl h-11" />
-          <Select
+          <select
   value={state}
-  onValueChange={(value) => {
-    setState(value);
+  onChange={(e) => {
+    setState(e.target.value);
     setCity("");
     setDeliveryFee(0);
   }}
+  className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
 >
-  <SelectTrigger className="rounded-xl h-11">
-    <SelectValue placeholder="Select State" />
-  </SelectTrigger>
+  <option value="">Select State</option>
 
-  <SelectContent>
-    {NIGERIAN_STATES.map((s) => (
-      <SelectItem key={s} value={s}>
-        {s}
-      </SelectItem>
-    ))}
-  </SelectContent>
-</Select>
+  {NIGERIAN_STATES.map((s) => (
+    <option key={s} value={s}>
+      {s}
+    </option>
+  ))}
+</select>
 
-<Select
+<select
   value={city}
-  onValueChange={(value) => {
+  onChange={(e) => {
+    const value = e.target.value;
     setCity(value);
 
     const selected = cities.find((c) => c.city === value);
     setDeliveryFee(selected?.delivery_fee || 0);
   }}
+  disabled={!state}
+  className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
 >
-  <SelectTrigger className="rounded-xl h-11">
-    <SelectValue placeholder="Select City" />
-  </SelectTrigger>
+  <option value="">
+    {state ? "Select City" : "Select State First"}
+  </option>
 
-  <SelectContent>
-    {cities.map((c) => (
-      <SelectItem key={c.id} value={c.city}>
-        {c.city}
-      </SelectItem>
-    ))}
-  </SelectContent>
-</Select>
+  {cities.map((c) => (
+    <option key={c.id} value={c.city}>
+      {c.city}
+    </option>
+  ))}
+</select>
+
         </div>
 
         <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
