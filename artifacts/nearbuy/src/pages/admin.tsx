@@ -691,9 +691,11 @@ export default function Admin() {
       <OrderDetailsDialog
         open={!!selectedOrder}
         order={selectedOrder}
+        product={selectedOrder ? products.find((p) => p.id === selectedOrder.product_id) : null}
+        seller={selectedOrder ? users.find((u) => u.id === selectedOrder.seller_id) : null}
         onClose={() => setSelectedOrder(null)}
         onUpdateStatus={updateOrderStatus}
       />
     </div>
   );
-   }
+      }
