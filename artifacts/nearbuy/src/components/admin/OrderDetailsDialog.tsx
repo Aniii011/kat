@@ -89,7 +89,7 @@ export default function OrderDetailsDialog({
           <div className="rounded-2xl bg-muted p-4 space-y-1">
             <p className="text-xs text-muted-foreground">Buyer</p>
             <p className="font-bold">{order.buyer_name}</p>
-            
+            <a
               href={`tel:${order.buyer_phone}`}
               className="text-primary text-sm block"
             >
@@ -141,4 +141,4 @@ export default function OrderDetailsDialog({
       </DialogContent>
     </Dialog>
   );
-}
+              }
