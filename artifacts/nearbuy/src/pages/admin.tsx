@@ -37,42 +37,18 @@ const NAV_ITEMS: { key: AdminSection; label: string; icon: React.ReactNode }[] =
   { key: "analytics", label: "Analytics",  icon: <BarChart2 className="w-4 h-4" /> },
   { key: "reports",   label: "Reports",    icon: <Flag className="w-4 h-4" /> },
   { key: "delivery",  label: "Delivery",   icon: <Truck className="w-4 h-4" /> },
-  { key: "settings",  label: "Settings",  icon: <Settings className="w-4 h-4" /> },
+  { key: "settings",  label: "Settings",   icon: <Settings className="w-4 h-4" /> },
 ];
 
 const ORDER_STATUS: Record<string, { label: string; color: string }> = {
-  pending: {
-    label: "Pending",
-    color: "bg-yellow-100 text-yellow-700",
-  },
-  accepted: {
-    label: "Accepted",
-    color: "bg-sky-100 text-sky-700",
-  },
-  preparing: {
-    label: "Preparing",
-    color: "bg-indigo-100 text-indigo-700",
-  },
-  ready_for_pickup: {
-    label: "Ready for Pickup",
-    color: "bg-purple-100 text-purple-700",
-  },
-  out_for_delivery: {
-    label: "Out for Delivery",
-    color: "bg-orange-100 text-orange-700",
-  },
-  delivered: {
-    label: "Delivered",
-    color: "bg-emerald-100 text-emerald-700",
-  },
-  completed: {
-    label: "Completed",
-    color: "bg-green-100 text-green-700",
-  },
-  cancelled: {
-    label: "Cancelled",
-    color: "bg-red-100 text-red-700",
-  },
+  pending:          { label: "Pending",          color: "bg-yellow-100 text-yellow-700" },
+  accepted:         { label: "Accepted",         color: "bg-sky-100 text-sky-700" },
+  preparing:        { label: "Preparing",        color: "bg-indigo-100 text-indigo-700" },
+  ready_for_pickup: { label: "Ready for Pickup", color: "bg-purple-100 text-purple-700" },
+  out_for_delivery: { label: "Out for Delivery", color: "bg-orange-100 text-orange-700" },
+  delivered:        { label: "Delivered",        color: "bg-emerald-100 text-emerald-700" },
+  completed:        { label: "Completed",        color: "bg-green-100 text-green-700" },
+  cancelled:        { label: "Cancelled",        color: "bg-red-100 text-red-700" },
 };
 
 export default function Admin() {
@@ -85,7 +61,6 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [expanded, setExpanded] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [orderFilter, setOrderFilter] = useState("all");
   const [sellerFilter, setSellerFilter] = useState("all");
@@ -118,12 +93,6 @@ export default function Admin() {
         <ShieldCheck className="w-12 h-12 text-destructive mb-4" />
         <h1 className="text-xl font-black mb-2">Admin Access Only</h1>
         <Link href="/"><Button variant="outline" className="rounded-full mt-2">Back to Home</Button></Link>
-        <OrderDetailsDialog
-  open={!!selectedOrder}
-  order={selectedOrder}
-  onClose={() => setSelectedOrder(null)}
-  onUpdateStatus={updateOrderStatus}
-/>
       </div>
     );
   }
@@ -186,6 +155,7 @@ export default function Admin() {
     setActionLoading(orderId);
     await supabase.from("orders").update({ admin_status: status, updated_at: new Date().toISOString() }).eq("id", orderId);
     setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, admin_status: status } : o));
+    setSelectedOrder((prev: any) => prev && prev.id === orderId ? { ...prev, admin_status: status } : prev);
     setActionLoading(null);
   };
 
@@ -564,13 +534,12 @@ export default function Admin() {
                   filteredOrders.map((order) => {
                     const status = order.admin_status || "pending";
                     const cfg = ORDER_STATUS[status] || ORDER_STATUS.pending;
-                    const isSelected = selectedOrder?.id === order.id;
                     return (
                       <div key={order.id} className="bg-card border border-card-border rounded-2xl overflow-hidden">
                         <div
-  className="p-4 flex items-center gap-3 cursor-pointer hover:bg-muted/30 transition-colors"
-  onClick={() => setSelectedOrder(order)}
->
+                          className="p-4 flex items-center gap-3 cursor-pointer hover:bg-muted/30 transition-colors"
+                          onClick={() => setSelectedOrder(order)}
+                        >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5">
                               <p className="font-mono text-[11px] text-muted-foreground">#{order.id.slice(0, 8)}</p>
@@ -580,40 +549,8 @@ export default function Admin() {
                             <p className="text-[11px] text-muted-foreground">{new Date(order.created_at).toLocaleDateString()}</p>
                           </div>
                           <p className="font-black text-primary shrink-0">{formatNaira(order.total || order.amount)}</p>
-                          <Eye className="w-4 h-4 text-primary" />
+                          <Eye className="w-4 h-4 text-primary shrink-0" />
                         </div>
-                        {isExpanded && (
-                          <div className="border-t border-border p-4 space-y-3">
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="bg-muted rounded-xl p-3">
-                                <p className="text-[10px] text-muted-foreground mb-1">Buyer</p>
-                                <p className="text-sm font-bold">{order.buyer_name || "—"}</p>
-                                <p className="text-xs text-muted-foreground">{order.buyer_phone || "—"}</p>
-                              </div>
-                              <div className="bg-muted rounded-xl p-3">
-                                <p className="text-[10px] text-muted-foreground mb-1">Address</p>
-                                <p className="text-xs font-semibold">{order.buyer_address || "—"}</p>
-                              </div>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {status !== "completed" && (
-                                <Button size="sm" className="rounded-full text-xs" onClick={() => updateOrderStatus(order.id, "completed")} disabled={actionLoading === order.id}>
-                                  Mark Completed
-                                </Button>
-                              )}
-                              {status !== "cancelled" && (
-                                <Button size="sm" variant="outline" className="rounded-full text-xs border-destructive/40 text-destructive" onClick={() => updateOrderStatus(order.id, "cancelled")} disabled={actionLoading === order.id}>
-                                  Cancel Order
-                                </Button>
-                              )}
-                              {status === "cancelled" && (
-                                <Button size="sm" variant="outline" className="rounded-full text-xs" onClick={() => updateOrderStatus(order.id, "pending")} disabled={actionLoading === order.id}>
-                                  Reopen
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     );
                   })
@@ -711,9 +648,9 @@ export default function Admin() {
           )}
 
           {/* ── DELIVERY AREAS ── */}
-{section === "delivery" && (
-  <DeliveryAreas />
-)}
+          {section === "delivery" && (
+            <DeliveryAreas />
+          )}
 
           {/* ── REPORTS ── */}
           {section === "reports" && (
@@ -750,6 +687,13 @@ export default function Admin() {
 
         </div>
       </main>
+
+      <OrderDetailsDialog
+        open={!!selectedOrder}
+        order={selectedOrder}
+        onClose={() => setSelectedOrder(null)}
+        onUpdateStatus={updateOrderStatus}
+      />
     </div>
   );
-    }
+   }
