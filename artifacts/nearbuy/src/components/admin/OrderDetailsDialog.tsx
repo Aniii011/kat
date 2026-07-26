@@ -1,77 +1,287 @@
-import React from "react";
-import { X, Phone, MapPin, Store, Package, Clock } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Package } from "lucide-react";
 
-function formatNaira(n: number) { return "₦" + Number(n || 0).toLocaleString("en-NG"); }
+type Props = {
+  open: boolean;
+  order: any | null;
+  product?: any | null;
+  seller?: any | null;
+  onClose: () => void;
+  onUpdateStatus: (id: string, status: string) => void;
+};
+
+function formatNaira(n: number) {
+  return "₦" + Number(n || 0).toLocaleString("en-NG");
+}
 
 export default function OrderDetailsDialog({
   open,
   order,
+  product,
+  seller,
   onClose,
   onUpdateStatus,
-}: {
-  open: boolean;
-  order: any | null;
-  onClose: () => void;
-  onUpdateStatus: (orderId: string, status: string) => void;
-}) {
-  if (!open || !order) return null;
+}: Props) {
+  if (!order) return null;
 
-  const status = order.admin_status || "pending";
+  const color = order.variant?.color;
+  const size = order.variant?.size;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full sm:w-[440px] h-full bg-card overflow-y-auto shadow-2xl">
-        <div className="sticky top-0 bg-card border-b border-border p-4 flex items-center justify-between z-10">
-          <div>
-            <p className="text-xs text-muted-foreground font-mono">#{order.id.slice(0, 8)}</p>
-            <p className="font-black text-lg">{formatNaira(order.total || order.amount)}</p>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-xl rounded-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            Order #{order.id.slice(0, 8)}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+
+          {/* Product / variant */}
+          <div className="rounded-2xl bg-muted p-4 flex gap-4">
+            {product?.image_url ? (
+              <img
+                src={product.image_url}
+                alt={product?.title}
+                className="w-20 h-20 rounded-xl object-cover shrink-0"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-xl bg-background flex items-center justify-center shrink-0">
+                <Package className="w-6 h-6 text-muted-foreground" />
+              </div>
+            )}
+
+            <div className="space-y-1 min-w-0">
+              <p className="font-bold truncate">
+                {product?.title || "Product unavailable"}
+              </p>
+
+              {(color || size) && (
+                <p className="text-sm text-muted-foreground">
+                  {color ? `Color: ${color}` : ""}{color && size ? " · " : ""}{size ? `Size: ${size}` : ""}
+                </p>
+              )}
+
+              <p className="text-sm">
+                Qty: {order.quantity}
+              </p>
+
+              <p className="font-bold text-primary">
+                {formatNaira(order.total)}
+              </p>
+
+              {seller?.full_name && (
+                <p className="text-xs text-muted-foreground">
+                  Sold by {seller.full_name}
+                </p>
+              )}
+            </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-            <X className="w-4 h-4" />
-          </button>
+
+          {/* Buyer */}
+          <div className="rounded-2xl bg-muted p-4 space-y-1">
+            <p className="text-xs text-muted-foreground">Buyer</p>
+            <p className="font-bold">{order.buyer_name}</p>
+            <a
+              href={`tel:${order.buyer_phone}`}
+              className="text-primary text-sm block"
+            >
+              {order.buyer_phone}
+            </a>
+          </div>
+
+          {/* Delivery */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-muted p-4">
+              <p className="text-xs text-muted-foreground">Delivery Area</p>
+              <p className="font-bold">{order.delivery_area || "Not assigned"}</p>
+            </div>
+
+            <div className="rounded-2xl bg-muted p-4">
+              <p className="text-xs text-muted-foreground">Delivery Fee</p>
+              <p className="font-bold text-primary">{formatNaira(order.delivery_fee)}</p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-muted p-4">
+            <p className="text-xs text-muted-foreground">Delivery Address</p>
+            <p>{order.buyer_address}</p>
+          </div>
+
+          <div className="rounded-2xl bg-muted p-4">
+            <p className="text-xs text-muted-foreground">Payment Reference</p>
+            <p className="font-mono text-sm break-all">{order.payment_ref}</p>
+          </div>
+
+          {/* Status actions */}
+          <div className="grid grid-cols-2 gap-2">
+            <Button onClick={() => onUpdateStatus(order.id, "accepted")}>Accept</Button>
+            <Button variant="outline" onClick={() => onUpdateStatus(order.id, "preparing")}>Preparing</Button>
+            <Button variant="outline" onClick={() => onUpdateStatus(order.id, "ready_for_pickup")}>Ready</Button>
+            <Button variant="outline" onClick={() => onUpdateStatus(order.id, "out_for_delivery")}>Delivering</Button>
+            <Button variant="outline" onClick={() => onUpdateStatus(order.id, "delivered")}>Delivered</Button>
+            <Button onClick={() => onUpdateStatus(order.id, "completed")}>Complete</Button>
+            <Button
+              variant="destructive"
+              className="col-span-2"
+              onClick={() => onUpdateStatus(order.id, "cancelled")}
+            >
+              Cancel Order
+            </Button>
+          </div>
+
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+      }import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Package } from "lucide-react";
 
-        <div className="p-4 space-y-4">
-          <section className="bg-muted rounded-2xl p-4 space-y-1.5">
-            <p className="text-xs font-bold text-muted-foreground">Buyer</p>
-            <p className="font-bold text-sm">{order.buyer_name || "Unknown"}</p>
-            {order.buyer_phone && (
-              <a href={`tel:${order.buyer_phone}`} className="flex items-center gap-1.5 text-sm text-primary font-semibold">
-                <Phone className="w-3.5 h-3.5" /> {order.buyer_phone}
-              </a>
-            )}
-            <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
-              <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" /> {order.buyer_address || "No address on file"}
-            </p>
-          </section>
+type Props = {
+  open: boolean;
+  order: any | null;
+  product?: any | null;
+  seller?: any | null;
+  onClose: () => void;
+  onUpdateStatus: (id: string, status: string) => void;
+};
 
-          <section className="bg-muted rounded-2xl p-4 space-y-1.5">
-            <p className="text-xs font-bold text-muted-foreground flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Order Info</p>
-            <p className="text-sm">Placed: {new Date(order.created_at).toLocaleString()}</p>
-            <p className="text-sm">Status: <span className="font-bold capitalize">{status}</span></p>
-          </section>
+function formatNaira(n: number) {
+  return "₦" + Number(n || 0).toLocaleString("en-NG");
+}
 
-          <section className="flex flex-wrap gap-2 pb-4">
-            {status !== "completed" && (
-              <Button size="sm" className="rounded-full text-xs" onClick={() => onUpdateStatus(order.id, "completed")}>
-                Mark Completed
-              </Button>
+export default function OrderDetailsDialog({
+  open,
+  order,
+  product,
+  seller,
+  onClose,
+  onUpdateStatus,
+}: Props) {
+  if (!order) return null;
+
+  const color = order.variant?.color;
+  const size = order.variant?.size;
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-xl rounded-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            Order #{order.id.slice(0, 8)}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+
+          {/* Product / variant */}
+          <div className="rounded-2xl bg-muted p-4 flex gap-4">
+            {product?.image_url ? (
+              <img
+                src={product.image_url}
+                alt={product?.title}
+                className="w-20 h-20 rounded-xl object-cover shrink-0"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-xl bg-background flex items-center justify-center shrink-0">
+                <Package className="w-6 h-6 text-muted-foreground" />
+              </div>
             )}
-            {status !== "cancelled" && (
-              <Button size="sm" variant="outline" className="rounded-full text-xs border-destructive/40 text-destructive" onClick={() => onUpdateStatus(order.id, "cancelled")}>
-                Cancel Order
-              </Button>
-            )}
-            {status === "cancelled" && (
-              <Button size="sm" variant="outline" className="rounded-full text-xs" onClick={() => onUpdateStatus(order.id, "pending")}>
-                Reopen
-              </Button>
-            )}
-          </section>
+
+            <div className="space-y-1 min-w-0">
+              <p className="font-bold truncate">
+                {product?.title || "Product unavailable"}
+              </p>
+
+              {(color || size) && (
+                <p className="text-sm text-muted-foreground">
+                  {color ? `Color: ${color}` : ""}{color && size ? " · " : ""}{size ? `Size: ${size}` : ""}
+                </p>
+              )}
+
+              <p className="text-sm">
+                Qty: {order.quantity}
+              </p>
+
+              <p className="font-bold text-primary">
+                {formatNaira(order.total)}
+              </p>
+
+              {seller?.full_name && (
+                <p className="text-xs text-muted-foreground">
+                  Sold by {seller.full_name}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Buyer */}
+          <div className="rounded-2xl bg-muted p-4 space-y-1">
+            <p className="text-xs text-muted-foreground">Buyer</p>
+            <p className="font-bold">{order.buyer_name}</p>
+            <a
+              href={`tel:${order.buyer_phone}`}
+              className="text-primary text-sm block"
+            >
+              {order.buyer_phone}
+            </a>
+          </div>
+
+          {/* Delivery */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-muted p-4">
+              <p className="text-xs text-muted-foreground">Delivery Area</p>
+              <p className="font-bold">{order.delivery_area || "Not assigned"}</p>
+            </div>
+
+            <div className="rounded-2xl bg-muted p-4">
+              <p className="text-xs text-muted-foreground">Delivery Fee</p>
+              <p className="font-bold text-primary">{formatNaira(order.delivery_fee)}</p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-muted p-4">
+            <p className="text-xs text-muted-foreground">Delivery Address</p>
+            <p>{order.buyer_address}</p>
+          </div>
+
+          <div className="rounded-2xl bg-muted p-4">
+            <p className="text-xs text-muted-foreground">Payment Reference</p>
+            <p className="font-mono text-sm break-all">{order.payment_ref}</p>
+          </div>
+
+          {/* Status actions */}
+          <div className="grid grid-cols-2 gap-2">
+            <Button onClick={() => onUpdateStatus(order.id, "accepted")}>Accept</Button>
+            <Button variant="outline" onClick={() => onUpdateStatus(order.id, "preparing")}>Preparing</Button>
+            <Button variant="outline" onClick={() => onUpdateStatus(order.id, "ready_for_pickup")}>Ready</Button>
+            <Button variant="outline" onClick={() => onUpdateStatus(order.id, "out_for_delivery")}>Delivering</Button>
+            <Button variant="outline" onClick={() => onUpdateStatus(order.id, "delivered")}>Delivered</Button>
+            <Button onClick={() => onUpdateStatus(order.id, "completed")}>Complete</Button>
+            <Button
+              variant="destructive"
+              className="col-span-2"
+              onClick={() => onUpdateStatus(order.id, "cancelled")}
+            >
+              Cancel Order
+            </Button>
+          </div>
+
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
