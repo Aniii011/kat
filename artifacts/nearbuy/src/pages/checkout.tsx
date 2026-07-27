@@ -37,6 +37,10 @@ export default function Checkout() {
   const [city, setCity] = useState("");
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [cities, setCities] = useState<any[]>([]);
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<any | null>(null);
+  const [couponError, setCouponError] = useState("");
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState("");
 
@@ -74,7 +78,14 @@ export default function Checkout() {
   const citySelected = !!city;
   // Don't claim delivery is "Free" before we actually know the fee for the chosen area.
   const delivery = citySelected ? (subtotal >= 25000 ? 0 : deliveryFee) : 0;
-  const total = subtotal + delivery;
+
+  const discount = appliedCoupon
+    ? appliedCoupon.discount_type === "percent"
+      ? Math.round(subtotal * (appliedCoupon.discount_value / 100))
+      : Math.min(appliedCoupon.discount_value, subtotal)
+    : 0;
+
+  const total = subtotal + delivery - discount;
 
   const canPlaceOrder =
     fullName.trim().length > 0 &&
@@ -82,6 +93,58 @@ export default function Checkout() {
     address.trim().length > 0 &&
     !!state &&
     !!city;
+
+  const applyCoupon = async () => {
+    const code = couponInput.trim().toUpperCase();
+    if (!code) return;
+
+    setApplyingCoupon(true);
+    setCouponError("");
+
+    const { data, error } = await supabase
+      .from("coupons")
+      .select("*")
+      .eq("code", code)
+      .eq("active", true)
+      .single();
+
+    if (error || !data) {
+      setCouponError("Invalid or expired coupon code.");
+      setAppliedCoupon(null);
+      setApplyingCoupon(false);
+      return;
+    }
+
+    if (data.expires_at && new Date(data.expires_at) < new Date()) {
+      setCouponError("This coupon has expired.");
+      setAppliedCoupon(null);
+      setApplyingCoupon(false);
+      return;
+    }
+
+    if (data.usage_limit && data.times_used >= data.usage_limit) {
+      setCouponError("This coupon has reached its usage limit.");
+      setAppliedCoupon(null);
+      setApplyingCoupon(false);
+      return;
+    }
+
+    if (data.min_order_amount && subtotal < data.min_order_amount) {
+      setCouponError(`This code requires a minimum order of ${formatNaira(data.min_order_amount)}.`);
+      setAppliedCoupon(null);
+      setApplyingCoupon(false);
+      return;
+    }
+
+    setAppliedCoupon(data);
+    setApplyingCoupon(false);
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponError("");
+  };
 
   const handleSuccessfulPayment = async (response: any) => {
     try {
@@ -137,6 +200,8 @@ export default function Checkout() {
             quantity: item.quantity,
             total: item.price * item.quantity,
             variant: { color: item.selectedColor || null, size: item.selectedSize || null },
+            coupon_code: appliedCoupon?.code || null,
+            discount_amount: discount,
             status: "pending",
             seller_status: "pending",
             admin_status: "pending",
@@ -152,6 +217,13 @@ export default function Checkout() {
           orderIds.push(data.id);
           await supabase.from("order_events").insert({ order_id: data.id, status: "pending" });
         }
+      }
+
+      if (appliedCoupon) {
+        await supabase
+          .from("coupons")
+          .update({ times_used: (appliedCoupon.times_used || 0) + 1 })
+          .eq("id", appliedCoupon.id);
       }
 
       sessionStorage.setItem(
@@ -314,11 +386,47 @@ export default function Checkout() {
           ))}
         </div>
 
+        <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
+          <p className="text-sm font-bold flex items-center gap-2">
+            🏷️ Coupon Code
+          </p>
+          {appliedCoupon ? (
+            <div className="flex items-center justify-between bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2.5">
+              <div>
+                <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400 font-mono">{appliedCoupon.code}</p>
+                <p className="text-xs text-emerald-600 dark:text-emerald-500">
+                  {appliedCoupon.discount_type === "percent" ? `${appliedCoupon.discount_value}% off applied` : `${formatNaira(appliedCoupon.discount_value)} off applied`}
+                </p>
+              </div>
+              <button onClick={removeCoupon} className="text-xs font-semibold text-muted-foreground underline">Remove</button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter code"
+                value={couponInput}
+                onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                className="rounded-xl h-11 font-mono flex-1"
+              />
+              <Button variant="outline" className="rounded-xl h-11" onClick={applyCoupon} disabled={applyingCoupon || !couponInput.trim()}>
+                {applyingCoupon ? "..." : "Apply"}
+              </Button>
+            </div>
+          )}
+          {couponError && <p className="text-xs text-destructive font-medium">{couponError}</p>}
+        </div>
+
         <div className="bg-card border border-card-border rounded-2xl p-4 space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Subtotal</span>
             <span className="font-medium">{formatNaira(subtotal)}</span>
           </div>
+          {discount > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Discount ({appliedCoupon.code})</span>
+              <span className="font-medium text-emerald-600">-{formatNaira(discount)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Delivery</span>
             {!citySelected ? (
@@ -334,6 +442,9 @@ export default function Checkout() {
             <span>Total</span>
             <span className="text-primary">{formatNaira(total)}</span>
           </div>
+          {discount > 0 && (
+            <p className="text-xs text-emerald-600 font-semibold text-right">You saved {formatNaira(discount)} 🎉</p>
+          )}
         </div>
 
         <p className="text-[11px] text-muted-foreground text-center px-4">
