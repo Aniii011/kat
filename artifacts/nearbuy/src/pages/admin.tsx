@@ -57,6 +57,7 @@ export default function Admin() {
   const [sellers, setSellers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
+  const [orderEvents, setOrderEvents] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -69,10 +70,11 @@ export default function Admin() {
 
   const fetchAll = async () => {
     setLoading(true);
-    const [{ data: profilesData }, { data: productsData }, { data: ordersData }] = await Promise.all([
+    const [{ data: profilesData }, { data: productsData }, { data: ordersData }, { data: eventsData }] = await Promise.all([
       supabase.from("profiles").select("*").order("created_at", { ascending: false }),
       supabase.from("products").select("*").order("created_at", { ascending: false }),
       supabase.from("orders").select("*").order("created_at", { ascending: false }),
+      supabase.from("order_events").select("*"),
     ]);
     if (profilesData) {
       setSellers(profilesData.filter((p) => p.is_seller));
@@ -80,6 +82,7 @@ export default function Admin() {
     }
     if (productsData) setProducts(productsData);
     if (ordersData) setOrders(ordersData);
+    if (eventsData) setOrderEvents(eventsData);
     setLoading(false);
   };
 
@@ -120,6 +123,40 @@ export default function Admin() {
   const pendingOrders = orders.filter((o) => (o.admin_status || "pending") === "pending").length;
   const pendingSellers = sellers.filter((s) => s.is_seller && !s.seller_verified).length;
   const totalBuyers = users.filter((u) => !u.is_seller && !u.is_admin).length;
+  const cancelledOrders = orders.filter((o) => o.admin_status === "cancelled").length;
+
+  // Average delivery time: for each order, find its "pending" and "delivered" events
+  // and average the gap between them across all orders that reached delivered.
+  const eventsByOrder: Record<string, any[]> = {};
+  orderEvents.forEach((e) => {
+    if (!eventsByOrder[e.order_id]) eventsByOrder[e.order_id] = [];
+    eventsByOrder[e.order_id].push(e);
+  });
+  const deliveryDurationsMs: number[] = [];
+  Object.values(eventsByOrder).forEach((evts) => {
+    const placed = evts.find((e) => e.status === "pending");
+    const delivered = evts.find((e) => e.status === "delivered");
+    if (placed && delivered) {
+      const diff = new Date(delivered.created_at).getTime() - new Date(placed.created_at).getTime();
+      if (diff > 0) deliveryDurationsMs.push(diff);
+    }
+  });
+  const avgDeliveryMs = deliveryDurationsMs.length > 0
+    ? deliveryDurationsMs.reduce((s, d) => s + d, 0) / deliveryDurationsMs.length
+    : null;
+  const avgDeliveryLabel = avgDeliveryMs === null
+    ? "No data yet"
+    : avgDeliveryMs < 24 * 60 * 60 * 1000
+      ? `${(avgDeliveryMs / (60 * 60 * 1000)).toFixed(1)} hrs`
+      : `${(avgDeliveryMs / (24 * 60 * 60 * 1000)).toFixed(1)} days`;
+
+  // Top delivery area: most frequent delivery_area among orders that have one set.
+  const areaCounts: Record<string, number> = {};
+  orders.forEach((o) => {
+    if (o.delivery_area) areaCounts[o.delivery_area] = (areaCounts[o.delivery_area] || 0) + 1;
+  });
+  const topAreaEntry = Object.entries(areaCounts).sort((a, b) => b[1] - a[1])[0];
+  const topAreaLabel = topAreaEntry ? `${topAreaEntry[0]} (${topAreaEntry[1]})` : "No data yet";
 
   // Actions
   const approveSeller = async (id: string) => {
@@ -629,6 +666,9 @@ export default function Admin() {
                   { label: "Total Orders", value: orders.length },
                   { label: "Avg Order Value", value: formatNaira(orders.length > 0 ? totalRevenue / orders.length : 0) },
                   { label: "Active Sellers", value: sellers.filter((s) => s.seller_verified).length },
+                  { label: "Cancelled Orders", value: cancelledOrders },
+                  { label: "Avg Delivery Time", value: avgDeliveryLabel },
+                  { label: "Top Delivery Area", value: topAreaLabel },
                 ].map((s) => (
                   <div key={s.label} className="bg-card border border-card-border rounded-2xl p-4">
                     <p className="text-xl font-black text-primary">{s.value}</p>
@@ -716,4 +756,4 @@ export default function Admin() {
       />
     </div>
   );
-      }
+  }
