@@ -170,7 +170,23 @@ export default function Admin() {
 
   const filteredOrders = orders.filter((o) => {
     const matchFilter = orderFilter === "all" || (o.admin_status || "pending") === orderFilter;
-    const matchSearch = !search || [o.id, o.buyer_name, o.buyer_address].some((f) => f?.toLowerCase().includes(search.toLowerCase()));
+    if (!search) return matchFilter;
+
+    const q = search.toLowerCase();
+    const product = products.find((p) => p.id === o.product_id);
+    const seller = users.find((u) => u.id === o.seller_id);
+
+    const matchSearch = [
+      o.id,
+      o.buyer_name,
+      o.buyer_phone,
+      o.buyer_address,
+      o.delivery_area,
+      o.delivery_state,
+      product?.title,
+      seller?.full_name,
+    ].some((f) => f?.toLowerCase().includes(q));
+
     return matchFilter && matchSearch;
   });
 
@@ -510,19 +526,20 @@ export default function Admin() {
                 </button>
               </div>
               <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1">
-                {["all", "pending", "assigned", "completed", "cancelled"].map((f) => {
+                {["all", "pending", "accepted", "preparing", "ready_for_pickup", "out_for_delivery", "delivered", "completed", "cancelled"].map((f) => {
                   const count = f === "all" ? orders.length : orders.filter((o) => (o.admin_status || "pending") === f).length;
+                  const label = f === "all" ? "All" : (ORDER_STATUS[f]?.label || f);
                   return (
                     <button key={f} onClick={() => setOrderFilter(f)}
-                      className={`shrink-0 text-xs px-3 py-1.5 rounded-full border font-medium transition-all capitalize ${orderFilter === f ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground"}`}>
-                      {f} ({count})
+                      className={`shrink-0 text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${orderFilter === f ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground"}`}>
+                      {label} ({count})
                     </button>
                   );
                 })}
               </div>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search orders..." className="rounded-xl pl-9 h-9 text-sm" />
+                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by order ID, buyer, phone, seller, product, or area..." className="rounded-xl pl-9 h-9 text-sm" />
               </div>
               <div className="space-y-3">
                 {filteredOrders.length === 0 ? (
