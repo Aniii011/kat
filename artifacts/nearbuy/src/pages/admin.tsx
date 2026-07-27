@@ -22,11 +22,12 @@ import QuickActions from "@/components/admin/QuickActions";
 import NeedsAttention from "@/components/admin/NeedsAttention";
 import SellerCard from "@/components/admin/SellerCard";
 import DeliveryAreas from "@/components/admin/DeliveryAreas";
+import Coupons from "@/components/admin/Coupons";
 import OrderDetailsDialog from "@/components/admin/OrderDetailsDialog";
 
 function formatNaira(n: number) { return "₦" + Number(n || 0).toLocaleString("en-NG"); }
 
-type AdminSection = "home" | "sellers" | "products" | "orders" | "users" | "analytics" | "reports" | "delivery" | "settings";
+type AdminSection = "home" | "sellers" | "products" | "orders" | "users" | "analytics" | "reports" | "delivery" | "coupons" | "settings";
 
 const NAV_ITEMS: { key: AdminSection; label: string; icon: React.ReactNode }[] = [
   { key: "home",      label: "Dashboard",  icon: <Home className="w-4 h-4" /> },
@@ -37,6 +38,7 @@ const NAV_ITEMS: { key: AdminSection; label: string; icon: React.ReactNode }[] =
   { key: "analytics", label: "Analytics",  icon: <BarChart2 className="w-4 h-4" /> },
   { key: "reports",   label: "Reports",    icon: <Flag className="w-4 h-4" /> },
   { key: "delivery",  label: "Delivery",   icon: <Truck className="w-4 h-4" /> },
+  { key: "coupons",   label: "Coupons",    icon: <Package className="w-4 h-4" /> },
   { key: "settings",  label: "Settings",   icon: <Settings className="w-4 h-4" /> },
 ];
 
@@ -710,6 +712,11 @@ export default function Admin() {
             <DeliveryAreas />
           )}
 
+          {/* ── COUPONS ── */}
+          {section === "coupons" && (
+            <Coupons />
+          )}
+
           {/* ── REPORTS ── */}
           {section === "reports" && (
             <div className="space-y-4">
@@ -756,4 +763,4 @@ export default function Admin() {
       />
     </div>
   );
-  }
+      }
