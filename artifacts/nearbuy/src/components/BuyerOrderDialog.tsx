@@ -1,9 +1,11 @@
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { supabase } from "@/lib/supabase";
 import { Package, MapPin, CheckCircle2 } from "lucide-react";
 
 function formatNaira(n: number) {
@@ -28,6 +30,18 @@ type Props = {
 };
 
 export default function BuyerOrderDialog({ open, order, product, onClose }: Props) {
+  const [events, setEvents] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!order) return;
+    supabase
+      .from("order_events")
+      .select("*")
+      .eq("order_id", order.id)
+      .order("created_at", { ascending: true })
+      .then(({ data }) => setEvents(data || []));
+  }, [order?.id]);
+
   if (!order) return null;
 
   const status = order.admin_status || "pending";
@@ -88,6 +102,7 @@ export default function BuyerOrderDialog({ open, order, product, onClose }: Prop
               <p className="text-xs font-bold text-muted-foreground">Order Status</p>
               {WORKFLOW.map((step, i) => {
                 const done = i <= currentStepIndex;
+                const evt = events.find((e) => e.status === step.key);
                 return (
                   <div key={step.key} className="flex items-center gap-2.5">
                     {done ? (
@@ -95,7 +110,12 @@ export default function BuyerOrderDialog({ open, order, product, onClose }: Prop
                     ) : (
                       <div className="w-4 h-4 rounded-full border-2 border-border shrink-0" />
                     )}
-                    <p className={`text-sm ${done ? "font-semibold" : "text-muted-foreground"}`}>{step.label}</p>
+                    <p className={`text-sm flex-1 ${done ? "font-semibold" : "text-muted-foreground"}`}>{step.label}</p>
+                    {evt && (
+                      <span className="text-[10px] text-muted-foreground shrink-0">
+                        {new Date(evt.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}
+                      </span>
+                    )}
                   </div>
                 );
               })}
@@ -105,4 +125,4 @@ export default function BuyerOrderDialog({ open, order, product, onClose }: Prop
       </DialogContent>
     </Dialog>
   );
-}
+                }
