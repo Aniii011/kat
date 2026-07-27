@@ -6,12 +6,13 @@ import { useTheme } from "@/context/theme-context";
 import { useAuth } from "@/context/auth-context";
 import AuthModal from "@/components/auth-modal";
 import { supabase } from "@/lib/supabase";
+import BuyerOrderDialog from "@/components/BuyerOrderDialog";
 import {
   Package, MapPin, RotateCcw, HelpCircle, LogOut,
   ChevronRight, Edit3, Check, Shield, BadgeCheck,
   Store, LogIn, UserCircle2, ShieldCheck, AlertTriangle,
   Palette, X, MessageCircle, Camera, Phone, Clock,
-  Truck, CheckCircle2, XCircle, Heart,
+  Truck, CheckCircle2, XCircle, Heart, Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,28 +31,52 @@ const ACCENT_OPTIONS = [
   { value: "blue" as const, label: "Blue", color: "#3b82f6" },
 ];
 
+// These keys must match what Admin's OrderDetailsDialog writes to admin_status.
 const ORDER_STATUS: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
-  pending:    { label: "Pending",    className: "bg-amber-100 text-amber-700",    icon: <Clock className="w-3 h-3" /> },
-  processing: { label: "Processing", className: "bg-blue-100 text-blue-700",      icon: <Package className="w-3 h-3" /> },
-  shipped:    { label: "Shipped",    className: "bg-purple-100 text-purple-700",  icon: <Truck className="w-3 h-3" /> },
-  delivered:  { label: "Delivered",  className: "bg-emerald-100 text-emerald-700", icon: <CheckCircle2 className="w-3 h-3" /> },
-  cancelled:  { label: "Cancelled",  className: "bg-red-100 text-red-700",        icon: <XCircle className="w-3 h-3" /> },
+  pending:          { label: "Pending",          className: "bg-amber-100 text-amber-700",    icon: <Clock className="w-3 h-3" /> },
+  accepted:         { label: "Accepted",         className: "bg-sky-100 text-sky-700",         icon: <Package className="w-3 h-3" /> },
+  preparing:        { label: "Preparing",        className: "bg-blue-100 text-blue-700",       icon: <Package className="w-3 h-3" /> },
+  ready_for_pickup: { label: "Ready for Pickup", className: "bg-purple-100 text-purple-700",    icon: <Package className="w-3 h-3" /> },
+  out_for_delivery: { label: "Out for Delivery", className: "bg-orange-100 text-orange-700",    icon: <Truck className="w-3 h-3" /> },
+  delivered:        { label: "Delivered",        className: "bg-emerald-100 text-emerald-700", icon: <CheckCircle2 className="w-3 h-3" /> },
+  completed:        { label: "Completed",        className: "bg-green-100 text-green-700",     icon: <CheckCircle2 className="w-3 h-3" /> },
+  cancelled:        { label: "Cancelled",        className: "bg-red-100 text-red-700",         icon: <XCircle className="w-3 h-3" /> },
 };
 
 function OrdersSection({ userId }: { userId: string }) {
   const [orders, setOrders] = useState<any[]>([]);
+  const [products, setProducts] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
 
   useEffect(() => {
-    supabase
-      .from("orders")
-      .select("*")
-      .eq("buyer_id", userId)
-      .order("created_at", { ascending: false })
-      .then(({ data }) => {
-        if (data) setOrders(data);
-        setLoading(false);
-      });
+    const load = async () => {
+      const { data: ordersData } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("buyer_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (ordersData) {
+        setOrders(ordersData);
+
+        const productIds = [...new Set(ordersData.map((o) => o.product_id).filter(Boolean))];
+        if (productIds.length > 0) {
+          const { data: productsData } = await supabase
+            .from("products")
+            .select("id, title, image_url")
+            .in("id", productIds);
+
+          if (productsData) {
+            const map: Record<string, any> = {};
+            productsData.forEach((p) => { map[p.id] = p; });
+            setProducts(map);
+          }
+        }
+      }
+      setLoading(false);
+    };
+    load();
   }, [userId]);
 
   if (loading) {
@@ -76,54 +101,82 @@ function OrdersSection({ userId }: { userId: string }) {
   }
 
   return (
-    <div className="space-y-3">
-      {orders.map((order) => {
-        const status = order.seller_status || order.status || "pending";
-        const cfg = ORDER_STATUS[status] || ORDER_STATUS.pending;
-        return (
-          <div key={order.id} className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-bold">Order #{order.id.slice(0, 8)}</p>
-                <p className="text-[11px] text-muted-foreground">
-                  {new Date(order.created_at).toLocaleDateString("en-NG", {
-                    day: "numeric", month: "short", year: "numeric",
-                  })}
-                </p>
+    <>
+      <div className="space-y-3">
+        {orders.map((order) => {
+          const status = order.admin_status || "pending";
+          const cfg = ORDER_STATUS[status] || ORDER_STATUS.pending;
+          const product = products[order.product_id];
+          return (
+            <button
+              key={order.id}
+              onClick={() => setSelectedOrder(order)}
+              className="w-full text-left bg-card border border-card-border rounded-2xl p-4 space-y-3 hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold">Order #{order.id.slice(0, 8)}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {new Date(order.created_at).toLocaleDateString("en-NG", {
+                      day: "numeric", month: "short", year: "numeric",
+                    })}
+                  </p>
+                </div>
+                <div className="text-right flex items-center gap-2">
+                  <div>
+                    <p className="text-sm font-black text-primary">
+                      ₦{Number(order.total || order.amount || 0).toLocaleString("en-NG")}
+                    </p>
+                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${cfg.className}`}>
+                      {cfg.icon} {cfg.label}
+                    </span>
+                  </div>
+                  <Eye className="w-4 h-4 text-muted-foreground shrink-0" />
+                </div>
               </div>
-              <div className="text-right">
-                <p className="text-sm font-black text-primary">
-                  ₦{Number(order.total || order.amount || 0).toLocaleString("en-NG")}
-                </p>
-                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${cfg.className}`}>
-                  {cfg.icon} {cfg.label}
-                </span>
-              </div>
-            </div>
-            {order.buyer_address && (
-              <div className="flex items-start gap-2 bg-muted rounded-xl p-2.5">
-                <MapPin className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
-                <p className="text-xs text-muted-foreground">{order.buyer_address}</p>
-              </div>
-            )}
-            {status === "shipped" && (
-              <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-xl p-2.5">
-                <p className="text-xs font-semibold text-purple-700 dark:text-purple-400 flex items-center gap-1.5">
-                  <Truck className="w-3.5 h-3.5" /> Your order is on its way! 🚚
-                </p>
-              </div>
-            )}
-            {status === "delivered" && (
-              <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-2.5">
-                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Delivered! Enjoy your purchase 🎉
-                </p>
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
+
+              {product?.title && (
+                <div className="flex items-center gap-2">
+                  {product.image_url && (
+                    <img src={product.image_url} alt={product.title} className="w-8 h-8 rounded-lg object-cover shrink-0" />
+                  )}
+                  <p className="text-xs text-muted-foreground line-clamp-1">{product.title}</p>
+                </div>
+              )}
+
+              {order.buyer_address && (
+                <div className="flex items-start gap-2 bg-muted rounded-xl p-2.5">
+                  <MapPin className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground">{order.buyer_address}</p>
+                </div>
+              )}
+
+              {status === "out_for_delivery" && (
+                <div className="bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-xl p-2.5">
+                  <p className="text-xs font-semibold text-orange-700 dark:text-orange-400 flex items-center gap-1.5">
+                    <Truck className="w-3.5 h-3.5" /> Your order is on its way! 🚚
+                  </p>
+                </div>
+              )}
+              {(status === "delivered" || status === "completed") && (
+                <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-2.5">
+                  <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Delivered! Enjoy your purchase 🎉
+                  </p>
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <BuyerOrderDialog
+        open={!!selectedOrder}
+        order={selectedOrder}
+        product={selectedOrder ? products[selectedOrder.product_id] : null}
+        onClose={() => setSelectedOrder(null)}
+      />
+    </>
   );
 }
 
@@ -565,4 +618,4 @@ export default function Me() {
       </main>
     </div>
   );
-            }
+    }
