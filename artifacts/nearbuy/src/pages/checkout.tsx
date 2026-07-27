@@ -148,7 +148,10 @@ export default function Checkout() {
 
         if (error) throw error;
 
-        if (data) orderIds.push(data.id);
+        if (data) {
+          orderIds.push(data.id);
+          await supabase.from("order_events").insert({ order_id: data.id, status: "pending" });
+        }
       }
 
       sessionStorage.setItem(
@@ -358,4 +361,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-                                         }
+        }
