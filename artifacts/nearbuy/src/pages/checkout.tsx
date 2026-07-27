@@ -4,18 +4,11 @@ import { useAuth } from "@/context/auth-context";
 import { useCart } from "@/hooks/use-cart";
 import { supabase } from "@/lib/supabase";
 import {
-  ArrowLeft, MapPin, CreditCard, Banknote, Lock, ShoppingBag,
+  ArrowLeft, MapPin, ShoppingBag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { NIGERIAN_STATES } from "@/lib/nigeriaStates";
 
 function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
@@ -41,10 +34,9 @@ export default function Checkout() {
   const [phone, setPhone] = useState(localStorage.getItem("kat_phone") || "");
   const [address, setAddress] = useState(localStorage.getItem("kat_address") || "");
   const [state, setState] = useState("");
-const [city, setCity] = useState("");
-const [deliveryFee, setDeliveryFee] = useState(0);
-const [cities, setCities] = useState<any[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<"card" | "transfer">("card");
+  const [city, setCity] = useState("");
+  const [deliveryFee, setDeliveryFee] = useState(0);
+  const [cities, setCities] = useState<any[]>([]);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState("");
 
@@ -59,181 +51,177 @@ const [cities, setCities] = useState<any[]>([]);
   }, []);
 
   useEffect(() => {
-  if (!state) {
-    setCities([]);
-    return;
-  }
+    if (!state) {
+      setCities([]);
+      return;
+    }
 
-  const fetchCities = async () => {
-    const { data } = await supabase
-      .from("delivery_areas")
-      .select("*")
-      .eq("state", state)
-      .eq("active", true)
-      .order("city");
+    const fetchCities = async () => {
+      const { data } = await supabase
+        .from("delivery_areas")
+        .select("*")
+        .eq("state", state)
+        .eq("active", true)
+        .order("city");
 
-    if (data) setCities(data);
+      if (data) setCities(data);
+    };
+
+    fetchCities();
+  }, [state]);
+
+  const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
+  const citySelected = !!city;
+  // Don't claim delivery is "Free" before we actually know the fee for the chosen area.
+  const delivery = citySelected ? (subtotal >= 25000 ? 0 : deliveryFee) : 0;
+  const total = subtotal + delivery;
+
+  const canPlaceOrder =
+    fullName.trim().length > 0 &&
+    phone.trim().length > 0 &&
+    address.trim().length > 0 &&
+    !!state &&
+    !!city;
+
+  const handleSuccessfulPayment = async (response: any) => {
+    try {
+      const verify = await fetch("/api/verify-payment", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          reference: response.reference,
+        }),
+      });
+
+      const result = await verify.json();
+
+      if (!result.verified) {
+        setError("Payment verification failed");
+        setPlacing(false);
+        return;
+      }
+
+      const orderIds: string[] = [];
+
+      const { data: existingOrder } = await supabase
+        .from("orders")
+        .select("id")
+        .eq("payment_ref", response.reference)
+        .single();
+
+      if (existingOrder) {
+        return;
+      }
+
+      for (const item of items) {
+        const { data: product } = await supabase
+          .from("products")
+          .select("seller_id")
+          .eq("id", item.listingId)
+          .single();
+
+        const { data, error } = await supabase
+          .from("orders")
+          .insert({
+            product_id: item.listingId,
+            buyer_id: user?.id || null,
+            buyer_name: fullName.trim(),
+            buyer_phone: phone.trim(),
+            buyer_address: address.trim(),
+            delivery_state: state,
+            delivery_area: city,
+            delivery_fee: delivery,
+            amount: item.price,
+            quantity: item.quantity,
+            total: item.price * item.quantity,
+            variant: { color: item.selectedColor || null, size: item.selectedSize || null },
+            status: "pending",
+            seller_status: "pending",
+            admin_status: "pending",
+            seller_id: product?.seller_id || null,
+            payment_ref: response.reference,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        if (data) orderIds.push(data.id);
+      }
+
+      sessionStorage.setItem(
+        "kat_order_confirmed",
+        JSON.stringify({
+          orderIds,
+          items,
+          total,
+          delivery,
+          fullName: fullName.trim(),
+          phone: phone.trim(),
+          address: `${address.trim()}, ${city.trim()}`,
+          paymentRef: response.reference,
+          createdAt: new Date().toISOString(),
+        })
+      );
+
+      sessionStorage.removeItem("kat_checkout_items");
+      clearCart();
+
+      setPlacing(false);
+      navigate("/order-confirmation");
+
+    } catch (err: any) {
+      console.error("ORDER ERROR:", err);
+      setError(err.message);
+      setPlacing(false);
+    }
   };
 
-  fetchCities();
-}, [state]);
-  
-  const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const delivery = subtotal >= 25000 ? 0 : deliveryFee;
-  const total = subtotal + delivery;
-  const canPlaceOrder = fullName.trim() && phone.trim() && address.trim() && city.trim();
-  
-const handleSuccessfulPayment = async (response: any) => {
-  console.log("STEP 1: Payment callback received", response);
+  const handlePlaceOrder = async () => {
+    if (!canPlaceOrder) return;
 
-  try {
-    console.log("STEP 2: Verifying payment");
+    setPlacing(true);
+    setError("");
 
-    const verify = await fetch("/api/verify-payment", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        reference: response.reference,
-      }),
-    });
+    const PaystackPop = (window as any).PaystackPop;
 
-    const result = await verify.json();
-
-    console.log("STEP 3: Verification result", result);
-
-    if (!result.verified) {
-      console.log("FAILED VERIFICATION");
-      setError("Payment verification failed");
+    if (!PaystackPop) {
+      setError("Paystack failed to load.");
       setPlacing(false);
       return;
     }
 
-    console.log("STEP 4: Creating orders");
+    try {
+      // Paystack Popup v2 API — the script tag in index.html must be
+      // https://js.paystack.co/v2/inline.js for this to work.
+      const popup = new PaystackPop();
+      popup.newTransaction({
+        key: "pk_test_f4a152b1348a3c6f5c4b415f3341691ea02b2e2c",
+        email: user?.email || "customer@kat.ng",
+        amount: total * 100,
+        currency: "NGN",
+        reference: `KAT-${Date.now()}`,
+        onSuccess: (response: any) => {
+          handleSuccessfulPayment(response);
+        },
+        onCancel: () => {
+          setPlacing(false);
+        },
+        onError: (err: any) => {
+          console.error("PAYSTACK ERROR:", err);
+          setError(err?.message || "Payment failed");
+          setPlacing(false);
+        },
+      });
 
-  
-  
-    const orderIds: string[] = [];
-
-    const { data: existingOrder } = await supabase
-  .from("orders")
-  .select("id")
-  .eq("payment_ref", response.reference)
-  .single();
-
-if (existingOrder) {
-  console.log("Order already created");
-  return;
-}
-    for (const item of items) {
-      console.log("CREATING ORDER FOR:", item.title);
-      const { data: product } = await supabase
-        .from("products")
-        .select("seller_id")
-        .eq("id", item.listingId)
-        .single();
-
-      const { data, error } = await supabase
-        .from("orders")
-        .insert({
-          product_id: item.listingId,
-          buyer_id: user?.id || null,
-          buyer_name: fullName.trim(),
-          buyer_phone: phone.trim(),
-          buyer_address: address.trim(),
-delivery_state: state,
-delivery_area: city,
-delivery_fee: delivery,
-          amount: item.price,
-          quantity: item.quantity,
-          total: item.price * item.quantity,
-          variant: { color: item.selectedColor || null, size: item.selectedSize || null },
-          status: "pending",
-          seller_status: "pending",
-          admin_status: "pending",
-          seller_id: product?.seller_id || null,
-          payment_ref: response.reference,
-        })
-        .select()
-        .single();
-      console.log("ORDER RESULT:", data, error);
-
-      if (error) throw error;
-
-      if (data) orderIds.push(data.id);
+    } catch (err: any) {
+      console.error("ORDER ERROR FULL:", err);
+      setError(err.message || "Order creation failed");
+      setPlacing(false);
     }
-
-    sessionStorage.setItem(
-  "kat_order_confirmed",
-  JSON.stringify({
-    orderIds,
-    items,
-    total,
-    delivery,
-    fullName: fullName.trim(),
-    phone: phone.trim(),
-    address: `${address.trim()}, ${city.trim()}`,
-    paymentMethod,
-    paymentRef: response.reference,
-    createdAt: new Date().toISOString(),
-  })
-);
-
-    sessionStorage.removeItem("kat_checkout_items");
-    clearCart();
-
-    setPlacing(false);
-    navigate("/order-confirmation");
-
-  } catch (err: any) {
-    console.error("ORDER ERROR:", err);
-    setError(err.message);
-    setPlacing(false);
-  }
-};
- const handlePlaceOrder = async () => {
-  if (!canPlaceOrder) return;
-
-  setPlacing(true);
-  setError("");
-
-  const PaystackPop = (window as any).PaystackPop;
-
-  if (!PaystackPop) {
-    setError("Paystack failed to load.");
-    setPlacing(false);
-    return;
-  }
-
-  try {
-    console.log("PaystackPop =", PaystackPop);
-    const handler = PaystackPop.setup({
-  key: "pk_test_f4a152b1348a3c6f5c4b415f3341691ea02b2e2c",
-  email: user?.email || "customer@kat.ng",
-  amount: total * 100,
-  currency: "NGN",
-  ref: `KAT-${Date.now()}`,
-
-  callback: (response: any) => {
-  handleSuccessfulPayment(response);
-},
-
-  onClose: () => {
-    setPlacing(false);
-  },
-});
-handler.openIframe();
-
-  } catch (err: any) {
-  console.error("ORDER ERROR FULL:", err);
-  console.error(err);
-alert(err?.message || "Unknown error");
-  setError(err.message || "Order creation failed");
-  setPlacing(false);
-  }
-};
-            
+  };
 
   if (items.length === 0) {
     return (
@@ -265,66 +253,44 @@ alert(err?.message || "Unknown error");
           <Input placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} className="rounded-xl h-11" />
           <Input placeholder="Phone number" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl h-11" type="tel" />
           <Input placeholder="Delivery address" value={address} onChange={(e) => setAddress(e.target.value)} className="rounded-xl h-11" />
+
           <select
-  value={state}
-  onChange={(e) => {
-    setState(e.target.value);
-    setCity("");
-    setDeliveryFee(0);
-  }}
-  className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
->
-  <option value="">Select State</option>
+            value={state}
+            onChange={(e) => {
+              setState(e.target.value);
+              setCity("");
+              setDeliveryFee(0);
+            }}
+            className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="">Select State</option>
+            {NIGERIAN_STATES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
 
-  {NIGERIAN_STATES.map((s) => (
-    <option key={s} value={s}>
-      {s}
-    </option>
-  ))}
-</select>
-
-<select
-  value={city}
-  onChange={(e) => {
-    const value = e.target.value;
-    setCity(value);
-
-    const selected = cities.find((c) => c.city === value);
-    setDeliveryFee(selected?.delivery_fee || 0);
-  }}
-  disabled={!state}
-  className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
->
-  <option value="">
-    {state ? "Select City" : "Select State First"}
-  </option>
-
-  {cities.map((c) => (
-    <option key={c.id} value={c.city}>
-      {c.city}
-    </option>
-  ))}
-</select>
-
-        </div>
-
-        <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
-          <p className="text-sm font-bold flex items-center gap-2">
-            <CreditCard className="w-4 h-4 text-primary" /> Payment Method
-          </p>
-          <button onClick={() => setPaymentMethod("card")}
-            className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${paymentMethod === "card" ? "border-primary bg-primary/5" : "border-border"}`}>
-            <CreditCard className="w-4 h-4 text-primary shrink-0" />
-            <span className="text-sm font-semibold flex-1 text-left">Debit/Credit Card</span>
-            {paymentMethod === "card" && <Lock className="w-3.5 h-3.5 text-primary" />}
-          </button>
-          <button onClick={() => setPaymentMethod("transfer")}
-            className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${paymentMethod === "transfer" ? "border-primary bg-primary/5" : "border-border"}`}>
-            <Banknote className="w-4 h-4 text-primary shrink-0" />
-            <span className="text-sm font-semibold flex-1 text-left">Bank Transfer</span>
-            {paymentMethod === "transfer" && <Lock className="w-3.5 h-3.5 text-primary" />}
-          </button>
-          <p className="text-[11px] text-muted-foreground">Secure payment powered by Paystack. Your card details are encrypted and never stored.</p>
+          <select
+            value={city}
+            onChange={(e) => {
+              const value = e.target.value;
+              setCity(value);
+              const selected = cities.find((c) => c.city === value);
+              setDeliveryFee(selected?.delivery_fee || 0);
+            }}
+            disabled={!state}
+            className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+          >
+            <option value="">
+              {state ? "Select City" : "Select State First"}
+            </option>
+            {cities.map((c) => (
+              <option key={c.id} value={c.city}>
+                {c.city}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
@@ -352,9 +318,13 @@ alert(err?.message || "Unknown error");
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Delivery</span>
-            <span className={`font-medium ${delivery === 0 ? "text-emerald-600" : ""}`}>
-              {delivery === 0 ? "Free 🎉" : formatNaira(delivery)}
-            </span>
+            {!citySelected ? (
+              <span className="font-medium text-muted-foreground">Select delivery area</span>
+            ) : (
+              <span className={`font-medium ${delivery === 0 ? "text-emerald-600" : ""}`}>
+                {delivery === 0 ? "Free 🎉" : formatNaira(delivery)}
+              </span>
+            )}
           </div>
           <Separator />
           <div className="flex justify-between font-black text-base">
@@ -362,6 +332,10 @@ alert(err?.message || "Unknown error");
             <span className="text-primary">{formatNaira(total)}</span>
           </div>
         </div>
+
+        <p className="text-[11px] text-muted-foreground text-center px-4">
+          🔒 Payment is secured by Paystack. Your card details are encrypted and never stored on KAT.
+        </p>
 
         {error && (
           <div className="bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-3">
@@ -371,7 +345,12 @@ alert(err?.message || "Unknown error");
       </main>
 
       <div className="fixed bottom-[62px] left-0 right-0 p-4 bg-background/95 backdrop-blur-md border-t border-border z-30">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl mx-auto space-y-2">
+          {!canPlaceOrder && (
+            <p className="text-xs text-center text-muted-foreground">
+              Fill in your name, phone, address, state and delivery area to continue
+            </p>
+          )}
           <Button className="w-full rounded-full font-bold h-12 text-sm" disabled={!canPlaceOrder || placing} onClick={handlePlaceOrder}>
             {placing ? "Placing order..." : `Place Order — ${formatNaira(total)}`}
           </Button>
@@ -379,4 +358,4 @@ alert(err?.message || "Unknown error");
       </div>
     </div>
   );
-    }
+                                         }
