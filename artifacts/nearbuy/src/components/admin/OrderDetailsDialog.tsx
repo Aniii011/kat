@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +21,28 @@ function formatNaira(n: number) {
   return "₦" + Number(n || 0).toLocaleString("en-NG");
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  accepted: "Accepted",
+  preparing: "Preparing",
+  ready_for_pickup: "Ready for Pickup",
+  out_for_delivery: "Out for Delivery",
+  delivered: "Delivered",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-700",
+  accepted: "bg-sky-100 text-sky-700",
+  preparing: "bg-blue-100 text-blue-700",
+  ready_for_pickup: "bg-purple-100 text-purple-700",
+  out_for_delivery: "bg-orange-100 text-orange-700",
+  delivered: "bg-emerald-100 text-emerald-700",
+  completed: "bg-green-100 text-green-700",
+  cancelled: "bg-red-100 text-red-700",
+};
+
 export default function OrderDetailsDialog({
   open,
   order,
@@ -28,17 +51,44 @@ export default function OrderDetailsDialog({
   onClose,
   onUpdateStatus,
 }: Props) {
+  const [updating, setUpdating] = useState(false);
+
   if (!order) return null;
 
+  const status = order.admin_status || "pending";
   const color = order.variant?.color;
   const size = order.variant?.size;
+
+  const handleClick = async (newStatus: string) => {
+    setUpdating(true);
+    await onUpdateStatus(order.id, newStatus);
+    setUpdating(false);
+  };
+
+  const statusButton = (key: string, label: string) => {
+    const isCurrent = status === key;
+    return (
+      <Button
+        key={key}
+        variant={isCurrent ? "default" : "outline"}
+        disabled={updating || isCurrent}
+        onClick={() => handleClick(key)}
+        className={isCurrent ? "ring-2 ring-primary ring-offset-1" : ""}
+      >
+        {isCurrent ? `✓ ${label}` : label}
+      </Button>
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-xl rounded-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
             Order #{order.id.slice(0, 8)}
+            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${STATUS_COLORS[status] || STATUS_COLORS.pending}`}>
+              {STATUS_LABELS[status] || status}
+            </span>
           </DialogTitle>
         </DialogHeader>
 
@@ -121,24 +171,28 @@ export default function OrderDetailsDialog({
           </div>
 
           {/* Status actions */}
-          <div className="grid grid-cols-2 gap-2">
-            <Button onClick={() => onUpdateStatus(order.id, "accepted")}>Accept</Button>
-            <Button variant="outline" onClick={() => onUpdateStatus(order.id, "preparing")}>Preparing</Button>
-            <Button variant="outline" onClick={() => onUpdateStatus(order.id, "ready_for_pickup")}>Ready</Button>
-            <Button variant="outline" onClick={() => onUpdateStatus(order.id, "out_for_delivery")}>Delivering</Button>
-            <Button variant="outline" onClick={() => onUpdateStatus(order.id, "delivered")}>Delivered</Button>
-            <Button onClick={() => onUpdateStatus(order.id, "completed")}>Complete</Button>
-            <Button
-              variant="destructive"
-              className="col-span-2"
-              onClick={() => onUpdateStatus(order.id, "cancelled")}
-            >
-              Cancel Order
-            </Button>
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">Tap to update status — the checkmark shows the current one</p>
+            <div className="grid grid-cols-2 gap-2">
+              {statusButton("accepted", "Accept")}
+              {statusButton("preparing", "Preparing")}
+              {statusButton("ready_for_pickup", "Ready")}
+              {statusButton("out_for_delivery", "Delivering")}
+              {statusButton("delivered", "Delivered")}
+              {statusButton("completed", "Complete")}
+              <Button
+                variant="destructive"
+                className="col-span-2"
+                disabled={updating || status === "cancelled"}
+                onClick={() => handleClick("cancelled")}
+              >
+                {status === "cancelled" ? "✓ Cancelled" : "Cancel Order"}
+              </Button>
+            </div>
           </div>
 
         </div>
       </DialogContent>
     </Dialog>
   );
-              }
+          }
