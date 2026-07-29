@@ -192,7 +192,13 @@ export default function Admin() {
 
   const updateOrderStatus = async (orderId: string, status: string) => {
     setActionLoading(orderId);
-    await supabase.from("orders").update({ admin_status: status, updated_at: new Date().toISOString() }).eq("id", orderId);
+    const { error } = await supabase.from("orders").update({ admin_status: status, updated_at: new Date().toISOString() }).eq("id", orderId);
+    if (error) {
+      console.error("STATUS UPDATE FAILED:", error);
+      alert("Failed to update order status: " + error.message);
+      setActionLoading(null);
+      return;
+    }
     await supabase.from("order_events").insert({ order_id: orderId, status });
     setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, admin_status: status } : o));
     setSelectedOrder((prev: any) => prev && prev.id === orderId ? { ...prev, admin_status: status } : prev);
@@ -763,4 +769,4 @@ export default function Admin() {
       />
     </div>
   );
-      }
+                     }
