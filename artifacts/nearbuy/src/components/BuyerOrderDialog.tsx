@@ -14,9 +14,7 @@ function formatNaira(n: number) {
 
 const WORKFLOW = [
   { key: "pending",          label: "Order Placed" },
-  { key: "accepted",         label: "Accepted by Seller" },
   { key: "preparing",        label: "Preparing" },
-  { key: "ready_for_pickup", label: "Ready for Pickup" },
   { key: "out_for_delivery", label: "Out for Delivery" },
   { key: "delivered",        label: "Delivered" },
   { key: "completed",        label: "Completed" },
