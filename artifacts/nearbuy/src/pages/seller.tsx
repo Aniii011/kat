@@ -185,7 +185,7 @@ export default function Seller() {
 
   const openEdit = (p: any) => {
     setEditingProductId(p.id);
-    setTitle(p.title || ""); setBasePrice(String(p.price ?? "")); setDescription(p.description || "");
+    setTitle(p.title || ""); setBasePrice(String(p.seller_price ?? p.price ?? "")); setDescription(p.description || "");
     setCategory(p.category || ""); setSelectedAesthetics(p.aesthetics || []);
     setIsThrift(Boolean(p.is_thrift)); setThriftCondition(p.thrift_condition || "");
     setDepositAmount(String(p.deposit_amount ?? "")); setPackageSize(p.package_size || "");
@@ -293,7 +293,8 @@ export default function Seller() {
     const payload = {
       title, description, category,
       aesthetics: selectedAesthetics.length > 0 ? selectedAesthetics : null,
-      price: Number(basePrice),
+      seller_price: Number(basePrice),
+      price: Math.round(Number(basePrice) * 1.095),
       image_url: allImages[0] || "",
       images: allImages,
       video_url: videoUrl || null,
@@ -363,7 +364,16 @@ export default function Seller() {
           <div className="space-y-3">
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Basic Info</p>
             <Input placeholder="Product title *" value={title} onChange={(e) => setTitle(e.target.value)} className="rounded-xl h-11" />
-            <Input placeholder="Base price (₦) *" type="number" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} className="rounded-xl h-11" />
+            <div>
+              <Input placeholder="Your price — what you want to earn (₦) *" type="number" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} className="rounded-xl h-11" />
+              {basePrice && Number(basePrice) > 0 && (
+                <div className="mt-2 bg-primary/5 border border-primary/20 rounded-xl p-3 flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Buyers will pay</span>
+                  <span className="font-black text-primary">{formatNaira(Number(basePrice) * 1.095)}</span>
+                </div>
+              )}
+              <p className="text-[10px] text-muted-foreground mt-1">Includes KAT's 9.5% platform fee — you keep exactly what you type above.</p>
+            </div>
             <Input placeholder="Stock quantity" type="number" value={stockCount} onChange={(e) => setStockCount(e.target.value)} className="rounded-xl h-11" />
             <Textarea placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} className="rounded-xl resize-none" rows={3} />
           </div>
@@ -974,8 +984,10 @@ function SellerOrdersSection({ orders, onUpdateStatus }: any) {
 
 // ── STATEMENTS SECTION ──
 function SellerStatementsSection({ orders, revenue }: any) {
-  const commission = revenue * 0.095;
-  const netEarnings = revenue - commission;
+  // revenue = what buyers paid, which already includes the 9.5% markup.
+  // Back out the seller's true share instead of taking another 9.5% off the top.
+  const netEarnings = revenue / 1.095;
+  const commission = revenue - netEarnings;
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-black">Account Statements</h2>
@@ -1034,4 +1046,4 @@ function SellerSettingsSection({ user }: any) {
       </div>
     </div>
   );
-}
+    }
