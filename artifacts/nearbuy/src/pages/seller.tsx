@@ -42,12 +42,19 @@ const PACKAGE_SIZES = [
   { value: "large", label: "Large", desc: "15–35kg · 140×80×60cm", example: "Microwaves, bulk items" },
 ];
 
+// Sellers can only move an order through the steps they actually control.
+// Once it's ready for pickup, admin/logistics takes over (out_for_delivery → delivered → completed).
+const SELLER_CONTROLLED_STATUSES = ["accepted", "preparing", "ready_for_pickup"];
+
 const ORDER_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  pending:    { label: "Pending",    className: "bg-amber-100 text-amber-700" },
-  processing: { label: "Processing", className: "bg-blue-100 text-blue-700" },
-  shipped:    { label: "Shipped",    className: "bg-purple-100 text-purple-700" },
-  delivered:  { label: "Delivered",  className: "bg-emerald-100 text-emerald-700" },
-  cancelled:  { label: "Cancelled",  className: "bg-red-100 text-red-700" },
+  pending:          { label: "Pending",          className: "bg-amber-100 text-amber-700" },
+  accepted:         { label: "Accepted",         className: "bg-sky-100 text-sky-700" },
+  preparing:        { label: "Preparing",        className: "bg-blue-100 text-blue-700" },
+  ready_for_pickup: { label: "Ready for Pickup", className: "bg-purple-100 text-purple-700" },
+  out_for_delivery: { label: "Out for Delivery", className: "bg-orange-100 text-orange-700" },
+  delivered:        { label: "Delivered",        className: "bg-emerald-100 text-emerald-700" },
+  completed:        { label: "Completed",        className: "bg-green-100 text-green-700" },
+  cancelled:        { label: "Cancelled",        className: "bg-red-100 text-red-700" },
 };
 
 const NAV_ITEMS: { key: SellerSection; label: string; icon: React.ReactNode }[] = [
@@ -160,8 +167,8 @@ export default function Seller() {
   }
 
   const revenue = orders.reduce((s, o) => s + (o.total || o.amount || 0), 0);
-  const pendingOrders = orders.filter((o) => (o.seller_status || "pending") === "pending");
-  const toShip = orders.filter((o) => o.seller_status === "processing");
+  const pendingOrders = orders.filter((o) => (o.admin_status || "pending") === "pending");
+  const toShip = orders.filter((o) => o.admin_status === "preparing" || o.admin_status === "accepted");
   const incompleteProducts = products.filter((p) => !p.title || !p.price || !p.image_url);
 
   const resetForm = () => {
@@ -325,8 +332,14 @@ export default function Seller() {
   };
 
   const updateOrderStatus = async (orderId: string, status: string) => {
-    await supabase.from("orders").update({ seller_status: status, updated_at: new Date().toISOString() }).eq("id", orderId);
-    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, seller_status: status } : o));
+    const { error } = await supabase.from("orders").update({ admin_status: status, updated_at: new Date().toISOString() }).eq("id", orderId);
+    if (error) {
+      console.error("SELLER STATUS UPDATE FAILED:", error);
+      alert("Couldn't update order status: " + error.message);
+      return;
+    }
+    await supabase.from("order_events").insert({ order_id: orderId, status });
+    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, admin_status: status } : o));
   };
 
   const totalImages = existingImages.length + imageFiles.length;
@@ -753,9 +766,9 @@ function SellerHomeSection({ user, products, orders, pendingOrders, toShip, inco
           )}
           {toShip.length > 0 && (
             <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-2xl p-4">
-              <p className="text-sm font-bold mb-1 text-blue-700 dark:text-blue-400">Ready to ship ({toShip.length})</p>
-              <p className="text-xs text-muted-foreground mb-3">Mark these as shipped once sent</p>
-              <Button size="sm" className="rounded-full text-xs" onClick={() => onNavigate("orders")}>Ship Orders</Button>
+              <p className="text-sm font-bold mb-1 text-blue-700 dark:text-blue-400">In progress ({toShip.length})</p>
+              <p className="text-xs text-muted-foreground mb-3">Mark these ready for pickup once packed</p>
+              <Button size="sm" className="rounded-full text-xs" onClick={() => onNavigate("orders")}>View Orders</Button>
             </div>
           )}
           {products.length > 0 && pendingOrders.length === 0 && toShip.length === 0 && incompleteProducts.length === 0 && (
@@ -883,10 +896,8 @@ function SellerOrdersSection({ orders, onUpdateStatus }: any) {
 
   const filtered = orders.filter((o: any) => {
     if (filter === "all") return true;
-    return (o.seller_status || "pending") === filter;
+    return (o.admin_status || "pending") === filter;
   });
-
-  const SELLER_STATUSES = ["pending", "processing", "shipped", "delivered"];
 
   return (
     <div className="space-y-4">
@@ -898,12 +909,13 @@ function SellerOrdersSection({ orders, onUpdateStatus }: any) {
       </div>
 
       <div className="flex gap-1 overflow-x-auto scrollbar-hide">
-        {["all", "pending", "processing", "shipped", "delivered"].map((s) => {
-          const count = s === "all" ? orders.length : orders.filter((o: any) => (o.seller_status || "pending") === s).length;
+        {["all", "pending", "accepted", "preparing", "ready_for_pickup", "out_for_delivery", "delivered", "completed", "cancelled"].map((s) => {
+          const count = s === "all" ? orders.length : orders.filter((o: any) => (o.admin_status || "pending") === s).length;
+          const label = s === "all" ? "All" : (ORDER_STATUS_CONFIG[s]?.label || s);
           return (
             <button key={s} onClick={() => setFilter(s)}
-              className={`shrink-0 text-xs px-3 py-1.5 rounded-full border font-medium transition-all capitalize ${filter === s ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/50"}`}>
-              {s} ({count})
+              className={`shrink-0 text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${filter === s ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/50"}`}>
+              {label} ({count})
             </button>
           );
         })}
@@ -917,8 +929,9 @@ function SellerOrdersSection({ orders, onUpdateStatus }: any) {
       ) : (
         <div className="space-y-3">
           {filtered.map((o: any) => {
-            const status = o.seller_status || "pending";
+            const status = o.admin_status || "pending";
             const cfg = ORDER_STATUS_CONFIG[status] || ORDER_STATUS_CONFIG.pending;
+            const handedOff = !SELLER_CONTROLLED_STATUSES.includes(status) && status !== "pending";
             return (
               <div key={o.id} className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
@@ -938,14 +951,18 @@ function SellerOrdersSection({ orders, onUpdateStatus }: any) {
                     {o.buyer_address && <p><span className="font-semibold">Address:</span> {o.buyer_address}</p>}
                   </div>
                 )}
-                <div className="flex gap-1.5 flex-wrap">
-                  {SELLER_STATUSES.map((s) => (
-                    <button key={s} onClick={() => onUpdateStatus(o.id, s)}
-                      className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all capitalize ${status === s ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/50"}`}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
+                {handedOff ? (
+                  <p className="text-xs text-muted-foreground italic">This order has been picked up — KAT logistics is now handling delivery.</p>
+                ) : (
+                  <div className="flex gap-1.5 flex-wrap">
+                    {SELLER_CONTROLLED_STATUSES.map((s) => (
+                      <button key={s} onClick={() => onUpdateStatus(o.id, s)}
+                        className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${status === s ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/50"}`}>
+                        {ORDER_STATUS_CONFIG[s].label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -957,7 +974,7 @@ function SellerOrdersSection({ orders, onUpdateStatus }: any) {
 
 // ── STATEMENTS SECTION ──
 function SellerStatementsSection({ orders, revenue }: any) {
-  const commission = revenue * 0.05;
+  const commission = revenue * 0.095;
   const netEarnings = revenue - commission;
   return (
     <div className="space-y-4">
@@ -965,7 +982,7 @@ function SellerStatementsSection({ orders, revenue }: any) {
       <div className="bg-card border border-card-border rounded-2xl p-5 space-y-3">
         {[
           { label: "Gross Revenue", value: formatNaira(revenue) },
-          { label: "KAT Commission (5%)", value: `-${formatNaira(commission)}`, negative: true },
+          { label: "KAT Commission (9.5%)", value: `-${formatNaira(commission)}`, negative: true },
           { label: "Net Earnings", value: formatNaira(netEarnings), bold: true },
         ].map((row) => (
           <div key={row.label} className="flex items-center justify-between py-2 border-b border-border last:border-0">
@@ -1017,4 +1034,4 @@ function SellerSettingsSection({ user }: any) {
       </div>
     </div>
   );
-    }
+}
