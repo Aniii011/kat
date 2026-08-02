@@ -1087,12 +1087,27 @@ function SellerOrdersSection({ orders, onUpdateStatus }: any) {
                   <p className="text-xs text-muted-foreground italic">This order has been picked up — KAT logistics is now handling delivery.</p>
                 ) : (
                   <div className="flex gap-1.5 flex-wrap">
-                    {SELLER_CONTROLLED_STATUSES.map((s) => (
-                      <button key={s} onClick={() => onUpdateStatus(o.id, s)}
-                        className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${status === s ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/50"}`}>
-                        {ORDER_STATUS_CONFIG[s].label}
-                      </button>
-                    ))}
+                    {SELLER_CONTROLLED_STATUSES.map((s, i) => {
+                      const currentIndex = SELLER_CONTROLLED_STATUSES.indexOf(status);
+                      const isDone = currentIndex >= 0 && i <= currentIndex;
+                      const isNext = i === currentIndex + 1 || (status === "pending" && i === 0);
+                      const clickable = isNext;
+                      return (
+                        <button
+                          key={s}
+                          disabled={!clickable}
+                          onClick={() => clickable && onUpdateStatus(o.id, s)}
+                          className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${
+                            isDone
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : clickable
+                                ? "border-primary text-primary hover:bg-primary/5"
+                                : "border-border text-muted-foreground/40 cursor-not-allowed"
+                          }`}>
+                          {isDone ? "✓ " : ""}{ORDER_STATUS_CONFIG[s].label}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1168,4 +1183,4 @@ function SellerSettingsSection({ user }: any) {
       </div>
     </div>
   );
-   }
+    }
