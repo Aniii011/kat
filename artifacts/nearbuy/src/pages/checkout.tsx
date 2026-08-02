@@ -87,9 +87,14 @@ export default function Checkout() {
 
   const total = subtotal + delivery - discount;
 
+  const phoneDigits = phone.trim().replace(/\D/g, "");
+  // Nigerian numbers: 11 digits starting with 0 (e.g. 08012345678),
+  // or 13 digits with country code (e.g. 2348012345678).
+  const isValidPhone = /^0\d{10}$/.test(phoneDigits) || /^234\d{10}$/.test(phoneDigits);
+
   const canPlaceOrder =
     fullName.trim().length > 0 &&
-    phone.trim().length > 0 &&
+    isValidPhone &&
     address.trim().length > 0 &&
     !!state &&
     !!city;
@@ -327,6 +332,9 @@ export default function Checkout() {
           </p>
           <Input placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} className="rounded-xl h-11" />
           <Input placeholder="Phone number" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl h-11" type="tel" />
+          {phone.trim().length > 0 && !isValidPhone && (
+            <p className="text-xs text-destructive -mt-2">Enter a valid Nigerian number (e.g. 08012345678)</p>
+          )}
           <Input placeholder="Delivery address" value={address} onChange={(e) => setAddress(e.target.value)} className="rounded-xl h-11" />
 
           <select
@@ -472,4 +480,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-        }
+    }
