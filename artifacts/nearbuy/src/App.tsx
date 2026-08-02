@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -53,6 +53,26 @@ function Router() {
   );
 }
 
+// Routes that manage their own navigation and shouldn't show the
+// buyer-facing bottom nav — it's confusing clutter on dashboard-style pages.
+const HIDE_BOTTOM_NAV_PREFIXES = ["/seller", "/admin", "/checkout"];
+
+function AppShell() {
+  const [location] = useLocation();
+  const hideBottomNav = HIDE_BOTTOM_NAV_PREFIXES.some((prefix) => location.startsWith(prefix));
+
+  return (
+    <>
+      {!hideBottomNav && <BottomNav />}
+      <main className="min-h-screen">
+        <Router />
+      </main>
+      <AiAssistant />
+      <Toaster />
+    </>
+  );
+}
+
 function App() {
   return (
     <ThemeProvider>
@@ -60,13 +80,7 @@ function App() {
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <WouterRouter>
-              <BottomNav />
-              <main className="min-h-screen">
-                <Router />
-              </main>
-              <AiAssistant />
-              
-              <Toaster />
+              <AppShell />
             </WouterRouter>
           </TooltipProvider>
         </QueryClientProvider>
