@@ -1150,9 +1150,11 @@ function SellerSettingsSection({ user }: any) {
   const [storeDescription, setStoreDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
-    supabase.from("profiles").select("store_name, store_description").eq("id", user.id).single().then(({ data }) => {
+    supabase.from("profiles").select("store_name, store_description").eq("id", user.id).single().then(({ data, error }) => {
+      if (error) { console.error("STORE SETTINGS LOAD FAILED:", error); return; }
       if (data) {
         setStoreName(data.store_name || "");
         setStoreDescription(data.store_description || "");
@@ -1162,8 +1164,14 @@ function SellerSettingsSection({ user }: any) {
 
   const saveSettings = async () => {
     setSaving(true);
-    await supabase.from("profiles").update({ store_name: storeName, store_description: storeDescription }).eq("id", user.id);
+    setSaveError("");
+    const { error } = await supabase.from("profiles").update({ store_name: storeName, store_description: storeDescription }).eq("id", user.id);
     setSaving(false);
+    if (error) {
+      console.error("STORE SETTINGS SAVE FAILED:", error);
+      setSaveError("Failed to save: " + error.message);
+      return;
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -1180,7 +1188,8 @@ function SellerSettingsSection({ user }: any) {
         <Button className="rounded-full w-full" onClick={saveSettings} disabled={saving}>
           {saved ? "✓ Saved!" : saving ? "Saving..." : "Save Settings"}
         </Button>
+        {saveError && <p className="text-xs text-destructive font-medium">{saveError}</p>}
       </div>
     </div>
   );
-    }
+                               }
