@@ -48,8 +48,7 @@ Respond ONLY in this exact JSON format, no markdown, no code fences, no extra te
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: 500,
-            thinkingConfig: { thinkingBudget: 0 },
+            maxOutputTokens: 800,
           },
         }),
       }
@@ -93,4 +92,4 @@ Respond ONLY in this exact JSON format, no markdown, no code fences, no extra te
     console.error(error);
     return res.status(500).json({ error: error.message || "AI generation failed" });
   }
-}
+      }
