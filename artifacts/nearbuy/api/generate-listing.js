@@ -40,7 +40,7 @@ Respond ONLY in this exact JSON format, no markdown, no code fences, no extra te
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -92,4 +92,4 @@ Respond ONLY in this exact JSON format, no markdown, no code fences, no extra te
     console.error(error);
     return res.status(500).json({ error: error.message || "AI generation failed" });
   }
-      }
+}
