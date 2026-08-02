@@ -27,6 +27,12 @@ const COLORS = ["Black", "White", "Red", "Blue", "Green", "Yellow", "Pink", "Pur
 
 const CLOTHING_SIZES = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL"];
 
+const AUDIENCES = ["Women", "Men", "Girls", "Boys", "Babies", "Teens", "Unisex"];
+const FITS = ["Slim", "Regular", "Loose", "Oversized"];
+const LENGTHS = ["Short", "Midi", "Long"];
+const MATERIALS = ["Cotton", "Linen", "Denim", "Polyester", "Silk", "Wool", "Leather", "Chiffon", "Ankara", "Lace"];
+const OCCASIONS = ["Casual", "Formal", "Party", "Office", "Sports", "Beach", "Wedding", "Everyday"];
+
 const SHOE_SIZES = ["36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46"];
 
 const THRIFT_CONDITIONS = [
@@ -91,6 +97,13 @@ export default function Seller() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [selectedAesthetics, setSelectedAesthetics] = useState<string[]>([]);
+  const [audience, setAudience] = useState("");
+  const [fit, setFit] = useState("");
+  const [length, setLength] = useState("");
+  const [material, setMaterial] = useState("");
+  const [occasion, setOccasion] = useState("");
+  const [generatingAI, setGeneratingAI] = useState(false);
+  const [aiError, setAiError] = useState("");
   const [isThrift, setIsThrift] = useState(false);
   const [thriftCondition, setThriftCondition] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
@@ -175,6 +188,7 @@ export default function Seller() {
     setEditingProductId(null); setTitle(""); setBasePrice(""); setDescription("");
     setCategory(""); setSelectedAesthetics([]); setIsThrift(false); setThriftCondition("");
     setDepositAmount(""); setPackageSize(""); setSellerNote(""); setStockCount("");
+    setAudience(""); setFit(""); setLength(""); setMaterial(""); setOccasion(""); setAiError("");
     setImageFiles([]); setImagePreviews([]); setExistingImages([]);
     setVideoFile(null); setVideoPreview(""); setExistingVideoUrl("");
     setVariants([]); setSelectedColors([]); setSelectedSizes([]); setSelectedShoeSizes([]);
@@ -187,6 +201,8 @@ export default function Seller() {
     setEditingProductId(p.id);
     setTitle(p.title || ""); setBasePrice(String(p.seller_price ?? p.price ?? "")); setDescription(p.description || "");
     setCategory(p.category || ""); setSelectedAesthetics(p.aesthetics || []);
+    setAudience(p.audience || ""); setFit(p.fit || ""); setLength(p.length || "");
+    setMaterial(p.material || ""); setOccasion(p.occasion || "");
     setIsThrift(Boolean(p.is_thrift)); setThriftCondition(p.thrift_condition || "");
     setDepositAmount(String(p.deposit_amount ?? "")); setPackageSize(p.package_size || "");
     setSellerNote(p.seller_note || ""); setStockCount(String(p.stock_count ?? ""));
@@ -277,6 +293,35 @@ export default function Seller() {
     setVariants((prev) => prev.map((v) => v.id === id ? { ...v, [field]: value } : v));
   };
 
+  const generateWithAI = async () => {
+    if (!title.trim()) { setAiError("Type a rough product name first (e.g. \"black dress\")."); return; }
+    setGeneratingAI(true);
+    setAiError("");
+    try {
+      const res = await fetch("/api/generate-listing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roughName: title,
+          category, audience, fit, length, material, occasion,
+          colors: selectedColors,
+          aesthetics: selectedAesthetics,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAiError(data.error || "AI generation failed, please try again.");
+        setGeneratingAI(false);
+        return;
+      }
+      setTitle(data.title);
+      setDescription(data.description);
+    } catch (err: any) {
+      setAiError(err.message || "AI generation failed, please try again.");
+    }
+    setGeneratingAI(false);
+  };
+
   const saveProduct = async () => {
     if (!title.trim() || !basePrice) { setUploadError("Please fill in title and price."); return; }
     if (existingImages.length + imageFiles.length === 0) { setUploadError("Please add at least one image."); return; }
@@ -293,6 +338,11 @@ export default function Seller() {
     const payload = {
       title, description, category,
       aesthetics: selectedAesthetics.length > 0 ? selectedAesthetics : null,
+      audience: audience || null,
+      fit: fit || null,
+      length: length || null,
+      material: material || null,
+      occasion: occasion || null,
       seller_price: Number(basePrice),
       price: Math.round(Number(basePrice) * 1.095),
       image_url: allImages[0] || "",
@@ -363,7 +413,14 @@ export default function Seller() {
           {/* Basic info */}
           <div className="space-y-3">
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Basic Info</p>
-            <Input placeholder="Product title *" value={title} onChange={(e) => setTitle(e.target.value)} className="rounded-xl h-11" />
+            <div>
+              <Input placeholder="Rough product name (e.g. black dress) *" value={title} onChange={(e) => setTitle(e.target.value)} className="rounded-xl h-11" />
+              <Button type="button" variant="outline" size="sm" className="w-full rounded-xl mt-2 text-xs gap-1.5" onClick={generateWithAI} disabled={generatingAI}>
+                ✨ {generatingAI ? "Generating..." : "Generate Title & Description with AI"}
+              </Button>
+              {aiError && <p className="text-[10px] text-destructive mt-1">{aiError}</p>}
+              <p className="text-[10px] text-muted-foreground mt-1">Fill in the details below first for a more accurate result, then tap generate. You can still edit the result after.</p>
+            </div>
             <div>
               <Input placeholder="Your price — what you want to earn (₦) *" type="number" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} className="rounded-xl h-11" />
               {basePrice && Number(basePrice) > 0 && (
@@ -386,6 +443,71 @@ export default function Seller() {
                 <button key={cat} type="button" onClick={() => { setCategory(cat); if (cat === "Thrift") setIsThrift(true); }}
                   className={`text-xs px-2 py-2 rounded-xl border-2 font-medium transition-all ${category === cat ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/50"}`}>
                   {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Audience */}
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">👤 Audience</p>
+            <div className="flex flex-wrap gap-1.5">
+              {AUDIENCES.map((a) => (
+                <button key={a} type="button" onClick={() => setAudience(audience === a ? "" : a)}
+                  className={`text-xs px-3 py-1.5 rounded-full border-2 font-medium transition-all ${audience === a ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/50"}`}>
+                  {a}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Fit */}
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">👕 Fit</p>
+            <div className="flex flex-wrap gap-1.5">
+              {FITS.map((f) => (
+                <button key={f} type="button" onClick={() => setFit(fit === f ? "" : f)}
+                  className={`text-xs px-3 py-1.5 rounded-full border-2 font-medium transition-all ${fit === f ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/50"}`}>
+                  {f}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Length */}
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">📏 Length</p>
+            <div className="flex flex-wrap gap-1.5">
+              {LENGTHS.map((l) => (
+                <button key={l} type="button" onClick={() => setLength(length === l ? "" : l)}
+                  className={`text-xs px-3 py-1.5 rounded-full border-2 font-medium transition-all ${length === l ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/50"}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Material */}
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">🧵 Material</p>
+            <div className="flex flex-wrap gap-1.5">
+              {MATERIALS.map((m) => (
+                <button key={m} type="button" onClick={() => setMaterial(material === m ? "" : m)}
+                  className={`text-xs px-3 py-1.5 rounded-full border-2 font-medium transition-all ${material === m ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/50"}`}>
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Occasion */}
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">🌞 Occasion</p>
+            <div className="flex flex-wrap gap-1.5">
+              {OCCASIONS.map((o) => (
+                <button key={o} type="button" onClick={() => setOccasion(occasion === o ? "" : o)}
+                  className={`text-xs px-3 py-1.5 rounded-full border-2 font-medium transition-all ${occasion === o ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/50"}`}>
+                  {o}
                 </button>
               ))}
             </div>
@@ -1046,4 +1168,4 @@ function SellerSettingsSection({ user }: any) {
       </div>
     </div>
   );
-    }
+   }
