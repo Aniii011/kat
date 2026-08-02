@@ -847,7 +847,7 @@ export default function Seller() {
 
           {section === "products" && <SellerProductsSection products={products} onEdit={openEdit} onDelete={deleteProduct} onAdd={() => { resetForm(); setShowUpload(true); }} />}
 
-          {section === "orders" && <SellerOrdersSection orders={orders} onUpdateStatus={updateOrderStatus} />}
+          {section === "orders" && <SellerOrdersSection orders={orders} products={products} onUpdateStatus={updateOrderStatus} />}
 
           {section === "promotions" && (
             <div className="text-center py-20">
@@ -1023,7 +1023,7 @@ function SellerProductsSection({ products, onEdit, onDelete, onAdd }: any) {
 }
 
 // ── ORDERS SECTION ──
-function SellerOrdersSection({ orders, onUpdateStatus }: any) {
+function SellerOrdersSection({ orders, products, onUpdateStatus }: any) {
   const [filter, setFilter] = useState("all");
 
   const filtered = orders.filter((o: any) => {
@@ -1064,8 +1064,39 @@ function SellerOrdersSection({ orders, onUpdateStatus }: any) {
             const status = o.admin_status || "pending";
             const cfg = ORDER_STATUS_CONFIG[status] || ORDER_STATUS_CONFIG.pending;
             const handedOff = !SELLER_CONTROLLED_STATUSES.includes(status) && status !== "pending";
+            const product = products.find((p: any) => p.id === o.product_id);
+            const orderedColor = o.variant?.color;
+            const orderedSize = o.variant?.size;
+            // Show the image matching the exact ordered color if the seller uploaded
+            // per-color photos — otherwise fall back to the main product image.
+            const pickImage = (orderedColor && product?.color_images?.[orderedColor]) || product?.image_url;
+
             return (
               <div key={o.id} className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
+
+                {/* Pick card — what to grab off the shelf */}
+                <div className="flex gap-3 bg-primary/5 border border-primary/20 rounded-xl p-3">
+                  {pickImage ? (
+                    <img src={pickImage} alt={product?.title} className="w-20 h-20 rounded-xl object-cover shrink-0" />
+                  ) : (
+                    <div className="w-20 h-20 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                      <Package className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold truncate">{product?.title || "Product"}</p>
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {orderedColor && (
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-primary text-primary-foreground">Color: {orderedColor}</span>
+                      )}
+                      {orderedSize && (
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-primary text-primary-foreground">Size: {orderedSize}</span>
+                      )}
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-muted">Qty: {o.quantity || 1}</span>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-bold text-sm">Order #{o.id.slice(0, 8)}</p>
@@ -1192,4 +1223,4 @@ function SellerSettingsSection({ user }: any) {
       </div>
     </div>
   );
-                               }
+      }
