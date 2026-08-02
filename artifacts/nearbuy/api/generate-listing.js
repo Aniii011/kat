@@ -59,7 +59,14 @@ Respond ONLY in this exact JSON format, no markdown, no code fences, no extra te
     }
 
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    const cleaned = rawText.replace(/```json|```/g, "").trim();
+    console.log("Gemini raw response:", rawText);
+
+    let cleaned = rawText.replace(/```json|```/g, "").trim();
+
+    // Gemini sometimes adds a sentence before/after the JSON despite instructions —
+    // pull out just the {...} block instead of assuming the whole string is JSON.
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) cleaned = jsonMatch[0];
 
     let parsed;
     try {
@@ -82,4 +89,4 @@ Respond ONLY in this exact JSON format, no markdown, no code fences, no extra te
     console.error(error);
     return res.status(500).json({ error: error.message || "AI generation failed" });
   }
-}
+      }
