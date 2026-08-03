@@ -18,10 +18,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Search, ShoppingBag, Star, BadgeCheck, Flame, Sparkles,
-  ChevronRight, Bookmark, Heart, LogIn, CheckCircle2, Share2,
-} from "lucide-react";
 
 function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
 
@@ -104,48 +100,33 @@ function ProductCard({
                 -{listing.discount}%
               </span>
             )}
-            <button
-  onClick={async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (navigator.share) {
-      await navigator.share({
-        title: listing.title,
-        text: `Check out ${listing.title} on KAT!`,
-        url: `${window.location.origin}/listing/${listing.id}`,
-      });
-    } else {
-      await navigator.clipboard.writeText(`${window.location.origin}/listing/${listing.id}`);
-    }
-  }}
-  className="absolute top-2 left-2 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow transition-all hover:bg-white z-10"
->
-  <Share2 className="w-3.5 h-3.5 text-gray-700" />
-</button>
-            <motion.button
-              onClick={(e) => onSave(e, listing)}
-              whileTap={{ scale: 0.8 }}
-              className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center shadow transition-all ${
-                saved ? "bg-primary shadow-primary/30" : "bg-white/90 hover:bg-white"
-              }`}
-            >
-              <Heart className={`w-3.5 h-3.5 ${saved ? "fill-white text-white" : "text-gray-700"}`} />
-            </motion.button>
-            <motion.button
-              onClick={handleAddToCart}
-              whileTap={{ scale: 0.85 }}
-              className={`absolute bottom-2 right-2 w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all ${
-                addedToCart
-                  ? "bg-emerald-500 opacity-100"
-                  : "bg-primary opacity-0 group-hover:opacity-100 sm:opacity-100"
-              }`}
-            >
-              {addedToCart ? (
-                <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-              ) : (
-                <ShoppingBag className="w-3.5 h-3.5 text-primary-foreground" />
-              )}
-            </motion.button>
+
+            {/* Heart and Cart stacked together in the top-right corner */}
+            <div className="absolute top-2 right-2 flex flex-col gap-1.5">
+              <motion.button
+                onClick={(e) => onSave(e, listing)}
+                whileTap={{ scale: 0.8 }}
+                className={`w-8 h-8 rounded-full flex items-center justify-center shadow transition-all ${
+                  saved ? "bg-primary shadow-primary/30" : "bg-white/90 hover:bg-white"
+                }`}
+              >
+                <Heart className={`w-3.5 h-3.5 ${saved ? "fill-white text-white" : "text-gray-700"}`} />
+              </motion.button>
+
+              <motion.button
+                onClick={handleAddToCart}
+                whileTap={{ scale: 0.85 }}
+                className={`w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all ${
+                  addedToCart ? "bg-emerald-500" : "bg-primary"
+                }`}
+              >
+                {addedToCart ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                ) : (
+                  <ShoppingBag className="w-3.5 h-3.5 text-primary-foreground" />
+                )}
+              </motion.button>
+            </div>
           </div>
           <div className="p-2.5 space-y-1">
             <div className="flex items-center gap-1">
@@ -573,4 +554,4 @@ export default function Home() {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
     </div>
   );
-    }
+                                                                }
