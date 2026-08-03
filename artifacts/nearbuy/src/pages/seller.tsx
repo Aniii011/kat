@@ -91,6 +91,7 @@ export default function Seller() {
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [showAddStore, setShowAddStore] = useState(false);
   const [newStoreName, setNewStoreName] = useState("");
+  const [storePendingCounts, setStorePendingCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [newOrderAlert, setNewOrderAlert] = useState(false);
@@ -153,6 +154,18 @@ export default function Seller() {
           setSelectedStoreId(remembered);
         }
       }
+
+      // Pending order count per store — shown as a small badge on each picker card.
+      const { data: pendingOrdersData } = await supabase
+        .from("orders")
+        .select("store_id")
+        .eq("seller_id", user.id)
+        .eq("admin_status", "pending");
+      const counts: Record<string, number> = {};
+      (pendingOrdersData || []).forEach((o: any) => {
+        if (o.store_id) counts[o.store_id] = (counts[o.store_id] || 0) + 1;
+      });
+      setStorePendingCounts(counts);
     }
 
     const activeStoreId = multiStore ? selectedStoreId : null;
@@ -245,21 +258,29 @@ export default function Seller() {
           <p className="text-sm text-muted-foreground">Select which store you want to manage</p>
         </div>
         <div className="max-w-sm w-full space-y-3">
-          {stores.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => selectStore(s.id)}
-              className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 border-border bg-card hover:border-primary transition-all text-left"
-            >
-              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <span className="text-sm font-black text-primary">{s.name.slice(0, 2).toUpperCase()}</span>
-              </div>
-              <div className="min-w-0">
-                <p className="font-bold text-sm truncate">{s.name}</p>
-                {s.description && <p className="text-xs text-muted-foreground truncate">{s.description}</p>}
-              </div>
-            </button>
-          ))}
+          {stores.map((s) => {
+            const pendingCount = storePendingCounts[s.id] || 0;
+            return (
+              <button
+                key={s.id}
+                onClick={() => selectStore(s.id)}
+                className="relative w-full flex items-center gap-3 p-4 rounded-2xl border-2 border-border bg-card hover:border-primary transition-all text-left"
+              >
+                {pendingCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow">
+                    {pendingCount > 99 ? "99+" : pendingCount}
+                  </span>
+                )}
+                <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <span className="text-sm font-black text-primary">{s.name.slice(0, 2).toUpperCase()}</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="font-bold text-sm truncate">{s.name}</p>
+                  {s.description && <p className="text-xs text-muted-foreground truncate">{s.description}</p>}
+                </div>
+              </button>
+            );
+          })}
 
           {showAddStore ? (
             <div className="p-4 rounded-2xl border-2 border-dashed border-primary/40 space-y-2">
