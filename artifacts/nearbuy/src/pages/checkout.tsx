@@ -186,7 +186,7 @@ export default function Checkout() {
       for (const item of items) {
         const { data: product } = await supabase
           .from("products")
-          .select("seller_id")
+          .select("seller_id, store_id")
           .eq("id", item.listingId)
           .single();
 
@@ -211,6 +211,7 @@ export default function Checkout() {
             seller_status: "pending",
             admin_status: "pending",
             seller_id: product?.seller_id || null,
+            store_id: product?.store_id || null,
             payment_ref: response.reference,
           })
           .select()
@@ -480,4 +481,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-    }
+          }
