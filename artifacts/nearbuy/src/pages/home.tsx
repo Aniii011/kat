@@ -13,7 +13,7 @@ import ThemeSwitcher from "@/components/theme-switcher";
 import SaveToBoardModal from "@/components/save-to-board-modal";
 import AuthModal from "@/components/auth-modal";
 import {
-  Search, ShoppingBag, Star, BadgeCheck, Flame, Sparkles,
+  Search, ShoppingBag, ShoppingBasket, Plus, Star, BadgeCheck, Flame, Sparkles,
   ChevronRight, Bookmark, Heart, LogIn, CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -101,32 +101,16 @@ function ProductCard({
               </span>
             )}
 
-            {/* Heart and Cart stacked together in the top-right corner */}
-            <div className="absolute top-2 right-2 flex flex-col gap-1.5">
-              <motion.button
-                onClick={(e) => onSave(e, listing)}
-                whileTap={{ scale: 0.8 }}
-                className={`w-8 h-8 rounded-full flex items-center justify-center shadow transition-all ${
-                  saved ? "bg-primary shadow-primary/30" : "bg-white/90 hover:bg-white"
-                }`}
-              >
-                <Heart className={`w-3.5 h-3.5 ${saved ? "fill-white text-white" : "text-gray-700"}`} />
-              </motion.button>
-
-              <motion.button
-                onClick={handleAddToCart}
-                whileTap={{ scale: 0.85 }}
-                className={`w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all ${
-                  addedToCart ? "bg-emerald-500" : "bg-primary"
-                }`}
-              >
-                {addedToCart ? (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-                ) : (
-                  <ShoppingBag className="w-3.5 h-3.5 text-primary-foreground" />
-                )}
-              </motion.button>
-            </div>
+            {/* Heart stays on the image */}
+            <motion.button
+              onClick={(e) => onSave(e, listing)}
+              whileTap={{ scale: 0.8 }}
+              className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center shadow transition-all ${
+                saved ? "bg-primary shadow-primary/30" : "bg-white/90 hover:bg-white"
+              }`}
+            >
+              <Heart className={`w-3.5 h-3.5 ${saved ? "fill-white text-white" : "text-gray-700"}`} />
+            </motion.button>
           </div>
           <div className="p-2.5 space-y-1">
             <div className="flex items-center gap-1">
@@ -156,11 +140,29 @@ function ProductCard({
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-0.5 shrink-0">
-                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                <span className="text-[10px] font-medium text-muted-foreground">
-                  {listing.rating || "New"}
-                </span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-0.5">
+                  <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                  <span className="text-[10px] font-medium text-muted-foreground">
+                    {listing.rating || "New"}
+                  </span>
+                </div>
+                <motion.button
+                  onClick={handleAddToCart}
+                  whileTap={{ scale: 0.85 }}
+                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                    addedToCart ? "border-emerald-500 bg-emerald-500" : "border-primary bg-transparent"
+                  }`}
+                >
+                  {addedToCart ? (
+                    <CheckCircle2 className="w-3 h-3 text-white" />
+                  ) : (
+                    <div className="relative">
+                      <ShoppingBasket className="w-3 h-3 text-primary" />
+                      <Plus className="w-1.5 h-1.5 text-primary-foreground absolute -top-0.5 -right-0.5 bg-primary rounded-full" strokeWidth={4} />
+                    </div>
+                  )}
+                </motion.button>
               </div>
             </div>
             {listing.isThrift && listing.depositAmount && (
@@ -554,4 +556,4 @@ export default function Home() {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
     </div>
   );
-                                                                }
+  }
