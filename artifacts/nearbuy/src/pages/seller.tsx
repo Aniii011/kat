@@ -86,6 +86,11 @@ export default function Seller() {
   const [section, setSection] = useState<SellerSection>("home");
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
+  const [stores, setStores] = useState<any[]>([]);
+  const [isMultiStore, setIsMultiStore] = useState(false);
+  const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
+  const [showAddStore, setShowAddStore] = useState(false);
+  const [newStoreName, setNewStoreName] = useState("");
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [newOrderAlert, setNewOrderAlert] = useState(false);
@@ -132,9 +137,42 @@ export default function Seller() {
   const fetchAll = async () => {
     if (!user) return;
     setLoading(true);
-    const { data: productsData } = await supabase.from("products").select("*").eq("seller_id", user.id).order("created_at", { ascending: false });
+
+    const { data: profileData } = await supabase.from("profiles").select("is_multi_store").eq("id", user.id).single();
+    const multiStore = Boolean(profileData?.is_multi_store);
+    setIsMultiStore(multiStore);
+
+    let storesData: any[] = [];
+    if (multiStore) {
+      const { data } = await supabase.from("stores").select("*").eq("owner_id", user.id).order("created_at");
+      storesData = data || [];
+      setStores(storesData);
+      if (!selectedStoreId) {
+        const remembered = localStorage.getItem("kat_active_store");
+        if (remembered && storesData.some((s) => s.id === remembered)) {
+          setSelectedStoreId(remembered);
+        }
+      }
+    }
+
+    const activeStoreId = multiStore ? selectedStoreId : null;
+    // Multi-store accounts with no store selected yet just show the picker —
+    // skip fetching products/orders until a store is actually chosen.
+    if (multiStore && !activeStoreId) {
+      setLoading(false);
+      return;
+    }
+
+    let productsQuery = supabase.from("products").select("*").eq("seller_id", user.id).order("created_at", { ascending: false });
+    let ordersQuery = supabase.from("orders").select("*").eq("seller_id", user.id).order("created_at", { ascending: false });
+    if (multiStore && activeStoreId) {
+      productsQuery = productsQuery.eq("store_id", activeStoreId);
+      ordersQuery = ordersQuery.eq("store_id", activeStoreId);
+    }
+
+    const { data: productsData } = await productsQuery;
     if (productsData) setProducts(productsData);
-    const { data: ordersData } = await supabase.from("orders").select("*").eq("seller_id", user.id).order("created_at", { ascending: false });
+    const { data: ordersData } = await ordersQuery;
     if (ordersData) setOrders(ordersData);
     setLoading(false);
   };
@@ -154,6 +192,26 @@ export default function Seller() {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
+
+  useEffect(() => {
+    if (isMultiStore && selectedStoreId) fetchAll();
+  }, [selectedStoreId]);
+
+  const selectStore = (id: string) => {
+    localStorage.setItem("kat_active_store", id);
+    setSelectedStoreId(id);
+  };
+
+  const createStore = async () => {
+    if (!newStoreName.trim() || !user) return;
+    const { data, error } = await supabase.from("stores").insert({ owner_id: user.id, name: newStoreName.trim() }).select().single();
+    if (!error && data) {
+      setStores((prev) => [...prev, data]);
+      selectStore(data.id);
+      setNewStoreName("");
+      setShowAddStore(false);
+    }
+  };
 
   if (!user) {
     return (
@@ -175,6 +233,51 @@ export default function Seller() {
           Contact <span className="text-primary font-semibold">sellers@kat.com</span> to apply.
         </p>
         <Link href="/"><Button variant="outline" className="rounded-full mt-2">Go Home</Button></Link>
+      </div>
+    );
+  }
+
+  if (isMultiStore && !selectedStoreId && !loading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+        <div className="max-w-sm w-full text-center mb-8">
+          <h1 className="text-xl font-black mb-1">Choose a Store</h1>
+          <p className="text-sm text-muted-foreground">Select which store you want to manage</p>
+        </div>
+        <div className="max-w-sm w-full space-y-3">
+          {stores.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => selectStore(s.id)}
+              className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 border-border bg-card hover:border-primary transition-all text-left"
+            >
+              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <span className="text-sm font-black text-primary">{s.name.slice(0, 2).toUpperCase()}</span>
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold text-sm truncate">{s.name}</p>
+                {s.description && <p className="text-xs text-muted-foreground truncate">{s.description}</p>}
+              </div>
+            </button>
+          ))}
+
+          {showAddStore ? (
+            <div className="p-4 rounded-2xl border-2 border-dashed border-primary/40 space-y-2">
+              <Input placeholder="New store name" value={newStoreName} onChange={(e) => setNewStoreName(e.target.value)} className="rounded-xl h-10 text-sm" />
+              <div className="flex gap-2">
+                <Button size="sm" className="flex-1 rounded-full" onClick={createStore}>Create Store</Button>
+                <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setShowAddStore(false)}>Cancel</Button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowAddStore(true)}
+              className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl border-2 border-dashed border-border hover:border-primary/50 text-muted-foreground hover:text-primary transition-all"
+            >
+              <Plus className="w-4 h-4" /> <span className="text-sm font-semibold">Add New Store</span>
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -361,6 +464,7 @@ export default function Seller() {
       in_stock: true,
       seller_id: user.id,
       seller_name: user.name || user.email,
+      store_id: isMultiStore ? selectedStoreId : null,
     };
 
     if (editingProductId) {
@@ -792,6 +896,21 @@ export default function Seller() {
             </div>
           </div>
         </div>
+
+        {isMultiStore && selectedStoreId && (
+          <div className="p-3 border-b border-border">
+            <button
+              onClick={() => { localStorage.removeItem("kat_active_store"); setSelectedStoreId(null); }}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-muted hover:bg-accent transition-colors"
+            >
+              <div className="min-w-0 text-left">
+                <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Managing</p>
+                <p className="text-xs font-bold truncate">{stores.find((s) => s.id === selectedStoreId)?.name || "Store"}</p>
+              </div>
+              <span className="text-[10px] font-semibold text-primary shrink-0 ml-2">Switch</span>
+            </button>
+          </div>
+        )}
         <nav className="flex-1 p-3 space-y-1">
           {NAV_ITEMS.map((item) => (
             <button key={item.key} onClick={() => setSection(item.key)}
@@ -1223,4 +1342,4 @@ function SellerSettingsSection({ user }: any) {
       </div>
     </div>
   );
-      }
+    }
