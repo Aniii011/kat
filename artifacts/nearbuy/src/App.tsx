@@ -25,6 +25,7 @@ import Checkout from "@/pages/checkout";
 import OrderConfirmation from "@/pages/order-confirmation";
 import WishlistPage from "@/pages/wishlist";
 import WishlistView from "@/pages/wishlist-view";
+import ShopByStore from "@/pages/shop-by-store";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,7 @@ function Router() {
       <Route path="/me" component={Me} />
       <Route path="/seller" component={Seller} />
       <Route path="/store/:sellerId" component={Store} />
+      <Route path="/shop/:storeId" component={ShopByStore} />
       <Route path="/checkout" component={Checkout} />
       <Route path="/order-confirmation" component={OrderConfirmation} />
       <Route path="/wishlists" component={WishlistPage} />
