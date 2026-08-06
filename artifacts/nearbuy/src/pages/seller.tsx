@@ -999,7 +999,7 @@ export default function Seller() {
 
           {section === "statements" && <SellerStatementsSection orders={orders} revenue={revenue} />}
 
-          {section === "settings" && <SellerSettingsSection user={user} />}
+          {section === "settings" && <SellerSettingsSection user={user} isMultiStore={isMultiStore} activeStore={stores.find((s) => s.id === selectedStoreId)} onStoreUpdated={fetchAll} />}
         </div>
       </main>
     </div>
@@ -1316,7 +1316,7 @@ function SellerStatementsSection({ orders, revenue }: any) {
 }
 
 // ── SETTINGS SECTION ──
-function SellerSettingsSection({ user }: any) {
+function SellerSettingsSection({ user, isMultiStore, activeStore, onStoreUpdated }: any) {
   const [storeName, setStoreName] = useState("");
   const [storeDescription, setStoreDescription] = useState("");
   const [saving, setSaving] = useState(false);
@@ -1324,6 +1324,12 @@ function SellerSettingsSection({ user }: any) {
   const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
+    if (isMultiStore) {
+      // Editing the currently active store's own row, not the account-level fields.
+      setStoreName(activeStore?.name || "");
+      setStoreDescription(activeStore?.description || "");
+      return;
+    }
     supabase.from("profiles").select("store_name, store_description").eq("id", user.id).single().then(({ data, error }) => {
       if (error) { console.error("STORE SETTINGS LOAD FAILED:", error); return; }
       if (data) {
@@ -1331,12 +1337,16 @@ function SellerSettingsSection({ user }: any) {
         setStoreDescription(data.store_description || "");
       }
     });
-  }, [user.id]);
+  }, [user.id, isMultiStore, activeStore?.id]);
 
   const saveSettings = async () => {
     setSaving(true);
     setSaveError("");
-    const { error } = await supabase.from("profiles").update({ store_name: storeName, store_description: storeDescription }).eq("id", user.id);
+
+    const { error } = isMultiStore
+      ? await supabase.from("stores").update({ name: storeName, description: storeDescription }).eq("id", activeStore.id)
+      : await supabase.from("profiles").update({ store_name: storeName, store_description: storeDescription }).eq("id", user.id);
+
     setSaving(false);
     if (error) {
       console.error("STORE SETTINGS SAVE FAILED:", error);
@@ -1344,12 +1354,15 @@ function SellerSettingsSection({ user }: any) {
       return;
     }
     setSaved(true);
+    if (isMultiStore && onStoreUpdated) onStoreUpdated();
     setTimeout(() => setSaved(false), 2000);
   };
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-black">Store Settings</h2>
+      <h2 className="text-lg font-black">
+        {isMultiStore ? `${activeStore?.name || "Store"} Settings` : "Store Settings"}
+      </h2>
       <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
         <p className="text-sm font-bold flex items-center gap-2">
           <Store className="w-4 h-4 text-primary" /> Store Info
@@ -1363,4 +1376,4 @@ function SellerSettingsSection({ user }: any) {
       </div>
     </div>
   );
-    }
+  }
