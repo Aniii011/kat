@@ -82,7 +82,7 @@ interface Variant {
 }
 
 export default function Seller() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [section, setSection] = useState<SellerSection>("home");
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
@@ -952,6 +952,12 @@ export default function Seller() {
               <ChevronRight className="w-4 h-4 rotate-180" /> Back to KAT
             </button>
           </Link>
+          <button
+            onClick={() => { if (window.confirm("Sign out of KAT?")) signOut(); }}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-all"
+          >
+            <LogIn className="w-4 h-4 rotate-180" /> Sign Out
+          </button>
         </div>
       </aside>
 
