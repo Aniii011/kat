@@ -124,11 +124,12 @@ export default function OrderConfirmation() {
           <p className="text-sm font-bold">What happens next?</p>
           <div className="space-y-3">
             {[
-              { step: "1", label: "Order confirmed", desc: "We've received your order", done: true },
-              { step: "2", label: "Seller prepares", desc: "Your seller is packing your items", done: false },
-              { step: "3", label: "Out for delivery", desc: "Your order is on its way", done: false },
-              { step: "4", label: "Delivered", desc: "Enjoy your new piece! 🎉", done: false },
-            ].map((s) => (
+  { step: "1", label: "Order placed", desc: "We've received your order", done: true },
+  { step: "2", label: "Order confirmed", desc: "Your seller has confirmed your order", done: false },
+  { step: "3", label: "Order processed", desc: "Your order is being prepared", done: false },
+  { step: "4", label: "Out for delivery", desc: "Your order is on its way", done: false },
+  { step: "5", label: "Delivered", desc: "Enjoy your new piece! 🎉", done: false },
+].map((s) => (
               <div key={s.step} className="flex items-start gap-3">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[10px] font-black ${s.done ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"}`}>
                   {s.done ? "✓" : s.step}
