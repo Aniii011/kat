@@ -14,10 +14,10 @@ function formatNaira(n: number) {
 
 const WORKFLOW = [
   { key: "pending",          label: "Order Placed" },
-  { key: "preparing",        label: "Preparing" },
+  { key: "accepted",         label: "Order Confirmed" },
+  { key: "preparing",        label: "Order Processed" },
   { key: "out_for_delivery", label: "Out for Delivery" },
   { key: "delivered",        label: "Delivered" },
-  { key: "completed",        label: "Completed" },
 ];
 
 type Props = {
@@ -44,7 +44,15 @@ export default function BuyerOrderDialog({ open, order, product, onClose }: Prop
 
   const status = order.admin_status || "pending";
   const isCancelled = status === "cancelled";
-  const currentStepIndex = WORKFLOW.findIndex((w) => w.key === status);
+  const currentStepIndex = (() => {
+    const idx = WORKFLOW.findIndex((w) => w.key === status);
+    if (idx !== -1) return idx;
+    // "completed" and "ready_for_pickup" aren't shown as their own step,
+    // but should still mark everything up to that point as done.
+    if (status === "completed") return WORKFLOW.length - 1;
+    if (status === "ready_for_pickup") return WORKFLOW.findIndex((w) => w.key === "preparing");
+    return 0;
+  })();
   const color = order.variant?.color;
   const size = order.variant?.size;
 
