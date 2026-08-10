@@ -973,6 +973,12 @@ export default function Seller() {
             <button onClick={fetchAll} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
               <RefreshCw className="w-4 h-4" />
             </button>
+            <button
+              onClick={() => { if (window.confirm("Sign out of KAT?")) signOut(); }}
+              className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center"
+            >
+              <LogIn className="w-4 h-4 text-destructive rotate-180" />
+            </button>
           </div>
         </div>
         <div className="flex overflow-x-auto scrollbar-hide px-2 pb-2 gap-1">
@@ -1382,4 +1388,4 @@ function SellerSettingsSection({ user, isMultiStore, activeStore, onStoreUpdated
       </div>
     </div>
   );
-  }
+    }
