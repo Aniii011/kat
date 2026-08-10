@@ -6,7 +6,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Package } from "lucide-react";
+import { Package, Printer } from "lucide-react";
 
 type Props = {
   open: boolean;
@@ -89,6 +89,14 @@ export default function OrderDetailsDialog({
             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${STATUS_COLORS[status] || STATUS_COLORS.pending}`}>
               {STATUS_LABELS[status] || status}
             </span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="ml-auto rounded-full gap-1.5 text-xs no-print"
+              onClick={() => window.print()}
+            >
+              <Printer className="w-3.5 h-3.5" /> Print
+            </Button>
           </DialogTitle>
         </DialogHeader>
 
@@ -165,13 +173,14 @@ export default function OrderDetailsDialog({
             <p>{order.buyer_address}</p>
           </div>
 
-          <div className="rounded-2xl bg-muted p-4">
+          {/* Payment Reference */}
+          <div className="rounded-2xl bg-muted p-4 no-print">
             <p className="text-xs text-muted-foreground">Payment Reference</p>
             <p className="font-mono text-sm break-all">{order.payment_ref}</p>
           </div>
 
           {/* Status actions */}
-          <div>
+          <div className="no-print">
             <p className="text-xs text-muted-foreground mb-2">Tap to update status — the checkmark shows the current one</p>
             <div className="grid grid-cols-2 gap-2">
               {statusButton("accepted", "Accept")}
@@ -190,6 +199,50 @@ export default function OrderDetailsDialog({
               </Button>
             </div>
           </div>
+
+          {/* Printable packing slip — hidden on screen, only shown when printing */}
+          <div id="packing-slip" className="hidden print-only">
+            <div style={{ padding: "24px", fontFamily: "sans-serif" }}>
+              <h1 style={{ fontSize: "20px", fontWeight: 900, marginBottom: "4px" }}>KAT Marketplace</h1>
+              <p style={{ fontSize: "12px", color: "#666", marginBottom: "16px" }}>Packing Slip</p>
+
+              <table style={{ width: "100%", marginBottom: "16px" }}>
+                <tbody>
+                  <tr><td style={{ padding: "2px 0", fontWeight: 700 }}>Order ID:</td><td>#{order.id.slice(0, 8)}</td></tr>
+                  <tr><td style={{ padding: "2px 0", fontWeight: 700 }}>Date:</td><td>{new Date(order.created_at).toLocaleDateString()}</td></tr>
+                </tbody>
+              </table>
+
+              <div style={{ borderTop: "1px solid #ccc", borderBottom: "1px solid #ccc", padding: "12px 0", marginBottom: "16px" }}>
+                <p style={{ fontWeight: 700, marginBottom: "4px" }}>DELIVER TO:</p>
+                <p style={{ fontWeight: 700, fontSize: "16px" }}>{order.buyer_name}</p>
+                <p>{order.buyer_phone}</p>
+                <p>{order.buyer_address}</p>
+                <p>{order.delivery_area}{order.delivery_state ? `, ${order.delivery_state}` : ""}</p>
+              </div>
+
+              <p style={{ fontWeight: 700, marginBottom: "4px" }}>ITEM:</p>
+              <p>{product?.title || "Product"}</p>
+              {(color || size) && (
+                <p>{color ? `Color: ${color}` : ""}{color && size ? " · " : ""}{size ? `Size: ${size}` : ""}</p>
+              )}
+              <p>Qty: {order.quantity}</p>
+              <p style={{ fontWeight: 700, marginTop: "8px" }}>Total: {formatNaira(order.total)}</p>
+
+              <p style={{ marginTop: "24px", fontSize: "11px", color: "#999", textAlign: "center" }}>
+                Thank you for shopping with KAT
+              </p>
+            </div>
+          </div>
+
+          <style>{`
+            @media print {
+              body * { visibility: hidden; }
+              #packing-slip, #packing-slip * { visibility: visible; }
+              #packing-slip { display: block !important; position: absolute; top: 0; left: 0; width: 100%; }
+              .no-print { display: none !important; }
+            }
+          `}</style>
 
         </div>
       </DialogContent>
