@@ -83,6 +83,22 @@ interface Variant {
 
 export default function Seller() {
   const { user, signOut } = useAuth();
+
+  React.useEffect(() => {
+    const handleError = (e: ErrorEvent) => {
+      alert("CRASH: " + e.message + "\n" + (e.error?.stack || "").slice(0, 300));
+    };
+    const handleRejection = (e: PromiseRejectionEvent) => {
+      alert("UNHANDLED PROMISE: " + (e.reason?.message || e.reason));
+    };
+    window.addEventListener("error", handleError);
+    window.addEventListener("unhandledrejection", handleRejection);
+    return () => {
+      window.removeEventListener("error", handleError);
+      window.removeEventListener("unhandledrejection", handleRejection);
+    };
+  }, []);
+
   const [section, setSection] = useState<SellerSection>("home");
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
@@ -1493,4 +1509,4 @@ function SellerSettingsSection({ user, isMultiStore, activeStore, onStoreUpdated
       </div>
     </div>
   );
-    }
+            }
