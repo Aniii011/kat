@@ -7,7 +7,7 @@ import {
   LogIn, Lock, Plus, Bell, ChevronRight, AlertCircle, Star,
   Truck, Clock, CheckCircle2, XCircle, RefreshCw, DollarSign,
   Pencil, Trash2, X, ImagePlus, Video, ChevronDown, ChevronUp,
-  StickyNote, ArrowLeft, BarChart2, Store, BadgeCheck,
+  StickyNote, ArrowLeft, BarChart2, Store, BadgeCheck, Menu,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,6 +92,7 @@ export default function Seller() {
   const [showAddStore, setShowAddStore] = useState(false);
   const [newStoreName, setNewStoreName] = useState("");
   const [storePendingCounts, setStorePendingCounts] = useState<Record<string, number>>({});
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [newOrderAlert, setNewOrderAlert] = useState(false);
@@ -203,6 +204,16 @@ export default function Seller() {
         setOrders((prev) => prev.map((o) => o.id === (payload.new as any).id ? payload.new as any : o));
       })
       .subscribe();
+
+    // Manual override: visiting /seller?store=<id> jumps straight into that
+    // store, bypassing the picker. Useful stopgap while debugging the picker itself.
+    const urlParams = new URLSearchParams(window.location.search);
+    const forcedStoreId = urlParams.get("store");
+    if (forcedStoreId) {
+      localStorage.setItem("kat_active_store", forcedStoreId);
+      setSelectedStoreId(forcedStoreId);
+    }
+
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
@@ -253,6 +264,11 @@ export default function Seller() {
   if (isMultiStore && !selectedStoreId && !loading) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+        {urlDebug && (
+          <div className="fixed top-0 left-0 right-0 bg-black text-white text-[10px] p-2 z-50 font-mono">
+            isMultiStore: {String(isMultiStore)} | stores: {stores.length} | selectedStoreId: {selectedStoreId || "null"}
+          </div>
+        )}
         <div className="max-w-sm w-full text-center mb-8">
           <h1 className="text-xl font-black mb-1">Choose a Store</h1>
           <p className="text-sm text-muted-foreground">Select which store you want to manage</p>
@@ -302,6 +318,8 @@ export default function Seller() {
       </div>
     );
   }
+
+  const urlDebug = new URLSearchParams(window.location.search).get("debug") === "1";
 
   const revenue = orders.reduce((s, o) => s + (o.total || o.amount || 0), 0);
   const pendingOrders = orders.filter((o) => (o.admin_status || "pending") === "pending");
@@ -893,6 +911,12 @@ export default function Seller() {
   return (
     <div className="min-h-screen bg-background flex">
 
+      {urlDebug && (
+        <div className="fixed top-0 left-0 right-0 bg-black text-white text-[10px] p-2 z-50 font-mono">
+          isMultiStore: {String(isMultiStore)} | stores: {stores.length} | selectedStoreId: {selectedStoreId || "null"} | loading: {String(loading)}
+        </div>
+      )}
+
       {/* New order alert */}
       {newOrderAlert && (
         <div className="fixed top-4 right-4 z-50 bg-primary text-primary-foreground text-sm font-bold px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2">
@@ -964,7 +988,12 @@ export default function Seller() {
       {/* Mobile top nav */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b border-border">
         <div className="flex items-center justify-between px-4 h-14">
-          <Link href="/me"><span className="text-lg font-black text-primary">KAT</span></Link>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setMobileMenuOpen(true)} className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
+              <Menu className="w-4 h-4" />
+            </button>
+            <span className="text-lg font-black text-primary">KAT</span>
+          </div>
           <p className="text-xs font-semibold">Seller Center</p>
           <div className="flex gap-1">
             <button onClick={() => { resetForm(); setShowUpload(true); }} className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
@@ -973,26 +1002,89 @@ export default function Seller() {
             <button onClick={fetchAll} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
               <RefreshCw className="w-4 h-4" />
             </button>
-            <button
-              onClick={() => { if (window.confirm("Sign out of KAT?")) signOut(); }}
-              className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center"
-            >
-              <LogIn className="w-4 h-4 text-destructive rotate-180" />
-            </button>
           </div>
-        </div>
-        <div className="flex overflow-x-auto scrollbar-hide px-2 pb-2 gap-1">
-          {NAV_ITEMS.map((item) => (
-            <button key={item.key} onClick={() => setSection(item.key)}
-              className={`shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-semibold transition-all ${section === item.key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-              {item.icon} {item.label}
-            </button>
-          ))}
         </div>
       </div>
 
+      {/* Mobile slide-in drawer — mirrors the desktop sidebar exactly */}
+      {mobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
+          <div className="relative w-72 max-w-[80vw] bg-card h-full flex flex-col shadow-2xl">
+            <div className="p-5 border-b border-border flex items-center justify-between">
+              <div>
+                <span className="text-xl font-black text-primary">KAT</span>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Seller Center</p>
+              </div>
+              <button onClick={() => setMobileMenuOpen(false)} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <span className="text-xs font-black text-primary">{(user.name || user.email || "KA").slice(0, 2).toUpperCase()}</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold truncate">{user.name || "Seller"}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
+                </div>
+              </div>
+            </div>
+
+            {isMultiStore && selectedStoreId && (
+              <div className="p-3 border-b border-border">
+                <button
+                  onClick={() => { setMobileMenuOpen(false); localStorage.removeItem("kat_active_store"); setSelectedStoreId(null); }}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-muted hover:bg-accent transition-colors"
+                >
+                  <div className="min-w-0 text-left">
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Managing</p>
+                    <p className="text-xs font-bold truncate">{stores.find((s) => s.id === selectedStoreId)?.name || "Store"}</p>
+                  </div>
+                  <span className="text-[10px] font-semibold text-primary shrink-0 ml-2">Switch</span>
+                </button>
+              </div>
+            )}
+
+            <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+              {NAV_ITEMS.map((item) => (
+                <button
+                  key={item.key}
+                  onClick={() => { setSection(item.key); setMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${section === item.key ? "bg-primary/10 text-primary font-bold" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                >
+                  {item.icon} {item.label}
+                  {item.key === "orders" && pendingOrders.length > 0 && (
+                    <span className="ml-auto bg-destructive text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{pendingOrders.length}</span>
+                  )}
+                </button>
+              ))}
+            </nav>
+
+            <div className="p-3 border-t border-border space-y-1">
+              <Button size="sm" className="w-full rounded-xl gap-1 text-xs" onClick={() => { resetForm(); setShowUpload(true); setMobileMenuOpen(false); }}>
+                <Plus className="w-3.5 h-3.5" /> Add Product
+              </Button>
+              <Link href="/me">
+                <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:bg-muted transition-all">
+                  <ChevronRight className="w-4 h-4 rotate-180" /> Back to KAT
+                </button>
+              </Link>
+              <button
+                onClick={() => { if (window.confirm("Sign out of KAT?")) signOut(); }}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-all"
+              >
+                <LogIn className="w-4 h-4 rotate-180" /> Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main */}
-      <main className="flex-1 min-w-0 md:pt-0 pt-28 pb-20">
+      <main className="flex-1 min-w-0 md:pt-0 pt-16 pb-20">
         <div className="max-w-5xl mx-auto px-4 py-6">
 
           {section === "home" && <SellerHomeSection user={user} products={products} orders={orders} pendingOrders={pendingOrders} toShip={toShip} incompleteProducts={incompleteProducts} revenue={revenue} onNavigate={setSection} loading={loading} onAddProduct={() => { resetForm(); setShowUpload(true); }} />}
@@ -1388,4 +1480,4 @@ function SellerSettingsSection({ user, isMultiStore, activeStore, onStoreUpdated
       </div>
     </div>
   );
-                    }
+  }
