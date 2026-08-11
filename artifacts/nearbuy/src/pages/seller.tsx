@@ -1388,4 +1388,4 @@ function SellerSettingsSection({ user, isMultiStore, activeStore, onStoreUpdated
       </div>
     </div>
   );
-    }
+                    }
