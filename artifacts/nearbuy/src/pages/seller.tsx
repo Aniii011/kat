@@ -93,6 +93,7 @@ export default function Seller() {
   const [newStoreName, setNewStoreName] = useState("");
   const [storePendingCounts, setStorePendingCounts] = useState<Record<string, number>>({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [newOrderAlert, setNewOrderAlert] = useState(false);
@@ -139,56 +140,66 @@ export default function Seller() {
   const fetchAll = async () => {
     if (!user) return;
     setLoading(true);
+    setFetchError(null);
 
-    const { data: profileData } = await supabase.from("profiles").select("is_multi_store").eq("id", user.id).single();
-    const multiStore = Boolean(profileData?.is_multi_store);
-    setIsMultiStore(multiStore);
+    try {
+      const { data: profileData, error: profileError } = await supabase.from("profiles").select("is_multi_store").eq("id", user.id).single();
+      if (profileError) throw new Error("profile: " + profileError.message);
+      const multiStore = Boolean(profileData?.is_multi_store);
+      setIsMultiStore(multiStore);
 
-    let storesData: any[] = [];
-    if (multiStore) {
-      const { data } = await supabase.from("stores").select("*").eq("owner_id", user.id).order("created_at");
-      storesData = data || [];
-      setStores(storesData);
-      if (!selectedStoreId) {
-        const remembered = localStorage.getItem("kat_active_store");
-        if (remembered && storesData.some((s) => s.id === remembered)) {
-          setSelectedStoreId(remembered);
+      let storesData: any[] = [];
+      if (multiStore) {
+        const { data, error: storesErr } = await supabase.from("stores").select("*").eq("owner_id", user.id).order("created_at");
+        if (storesErr) throw new Error("stores: " + storesErr.message);
+        storesData = data || [];
+        setStores(storesData);
+        if (!selectedStoreId) {
+          const remembered = localStorage.getItem("kat_active_store");
+          if (remembered && storesData.some((s) => s.id === remembered)) {
+            setSelectedStoreId(remembered);
+          }
         }
+
+        const { data: pendingOrdersData, error: pendingErr } = await supabase
+          .from("orders")
+          .select("store_id")
+          .eq("seller_id", user.id)
+          .eq("admin_status", "pending");
+        if (pendingErr) throw new Error("pending orders: " + pendingErr.message);
+        const counts: Record<string, number> = {};
+        (pendingOrdersData || []).forEach((o: any) => {
+          if (o.store_id) counts[o.store_id] = (counts[o.store_id] || 0) + 1;
+        });
+        setStorePendingCounts(counts);
       }
 
-      // Pending order count per store — shown as a small badge on each picker card.
-      const { data: pendingOrdersData } = await supabase
-        .from("orders")
-        .select("store_id")
-        .eq("seller_id", user.id)
-        .eq("admin_status", "pending");
-      const counts: Record<string, number> = {};
-      (pendingOrdersData || []).forEach((o: any) => {
-        if (o.store_id) counts[o.store_id] = (counts[o.store_id] || 0) + 1;
-      });
-      setStorePendingCounts(counts);
-    }
+      const activeStoreId = multiStore ? selectedStoreId : null;
+      if (multiStore && !activeStoreId) {
+        return;
+      }
 
-    const activeStoreId = multiStore ? selectedStoreId : null;
-    // Multi-store accounts with no store selected yet just show the picker —
-    // skip fetching products/orders until a store is actually chosen.
-    if (multiStore && !activeStoreId) {
+      let productsQuery = supabase.from("products").select("*").eq("seller_id", user.id).order("created_at", { ascending: false });
+      let ordersQuery = supabase.from("orders").select("*").eq("seller_id", user.id).order("created_at", { ascending: false });
+      if (multiStore && activeStoreId) {
+        productsQuery = productsQuery.eq("store_id", activeStoreId);
+        ordersQuery = ordersQuery.eq("store_id", activeStoreId);
+      }
+
+      const { data: productsData, error: productsErr } = await productsQuery;
+      if (productsErr) throw new Error("products: " + productsErr.message);
+      if (productsData) setProducts(productsData);
+
+      const { data: ordersData, error: ordersErr } = await ordersQuery;
+      if (ordersErr) throw new Error("orders: " + ordersErr.message);
+      if (ordersData) setOrders(ordersData);
+
+    } catch (err: any) {
+      console.error("FETCH ALL FAILED:", err);
+      setFetchError(err.message || String(err));
+    } finally {
       setLoading(false);
-      return;
     }
-
-    let productsQuery = supabase.from("products").select("*").eq("seller_id", user.id).order("created_at", { ascending: false });
-    let ordersQuery = supabase.from("orders").select("*").eq("seller_id", user.id).order("created_at", { ascending: false });
-    if (multiStore && activeStoreId) {
-      productsQuery = productsQuery.eq("store_id", activeStoreId);
-      ordersQuery = ordersQuery.eq("store_id", activeStoreId);
-    }
-
-    const { data: productsData } = await productsQuery;
-    if (productsData) setProducts(productsData);
-    const { data: ordersData } = await ordersQuery;
-    if (ordersData) setOrders(ordersData);
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -267,6 +278,7 @@ export default function Seller() {
         {urlDebug && (
           <div className="fixed top-0 left-0 right-0 bg-black text-white text-[10px] p-2 z-50 font-mono">
             isMultiStore: {String(isMultiStore)} | stores: {stores.length} | selectedStoreId: {selectedStoreId || "null"}
+            {fetchError && <div className="text-red-400 mt-1">ERROR: {fetchError}</div>}
           </div>
         )}
         <div className="max-w-sm w-full text-center mb-8">
@@ -914,6 +926,7 @@ export default function Seller() {
       {urlDebug && (
         <div className="fixed top-0 left-0 right-0 bg-black text-white text-[10px] p-2 z-50 font-mono">
           isMultiStore: {String(isMultiStore)} | stores: {stores.length} | selectedStoreId: {selectedStoreId || "null"} | loading: {String(loading)}
+          {fetchError && <div className="text-red-400 mt-1">ERROR: {fetchError}</div>}
         </div>
       )}
 
@@ -1480,4 +1493,4 @@ function SellerSettingsSection({ user, isMultiStore, activeStore, onStoreUpdated
       </div>
     </div>
   );
-  }
+    }
