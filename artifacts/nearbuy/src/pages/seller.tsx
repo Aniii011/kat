@@ -7,7 +7,7 @@ import {
   LogIn, Lock, Plus, Bell, ChevronRight, AlertCircle, Star,
   Truck, Clock, CheckCircle2, XCircle, RefreshCw, DollarSign,
   Pencil, Trash2, X, ImagePlus, Video, ChevronDown, ChevronUp,
-  StickyNote, ArrowLeft, BarChart2, Store, BadgeCheck, Menu,
+  ArrowLeft, BarChart2, Store, BadgeCheck, Menu,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,20 +20,15 @@ function formatNaira(n: number) {
 type SellerSection = "home" | "products" | "orders" | "promotions" | "statements" | "settings";
 
 const CATEGORIES = ["Women", "Men", "Kids", "Shoes", "Jewelry & Accessories", "Beauty & Health", "Gym & Outdoor", "Phone & Accessories", "Home", "Thrift"];
-
 const AESTHETICS = ["Y2K", "Streetwear", "Afrocentric", "Minimalist", "Baddie", "Cottagecore", "Techwear", "Boho", "Preppy", "Grunge", "Luxe", "Casual"];
-
 const COLORS = ["Black", "White", "Red", "Blue", "Green", "Yellow", "Pink", "Purple", "Brown", "Grey", "Orange", "Beige"];
-
 const CLOTHING_SIZES = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL"];
-
+const SHOE_SIZES = ["36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46"];
 const AUDIENCES = ["Women", "Men", "Girls", "Boys", "Babies", "Teens", "Unisex"];
 const FITS = ["Slim", "Regular", "Loose", "Oversized"];
 const LENGTHS = ["Short", "Midi", "Long"];
 const MATERIALS = ["Cotton", "Linen", "Denim", "Polyester", "Silk", "Wool", "Leather", "Chiffon", "Ankara", "Lace"];
 const OCCASIONS = ["Casual", "Formal", "Party", "Office", "Sports", "Beach", "Wedding", "Everyday"];
-
-const SHOE_SIZES = ["36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46"];
 
 const THRIFT_CONDITIONS = [
   { value: "new", label: "New", desc: "Never worn, with tags" },
@@ -49,7 +44,7 @@ const PACKAGE_SIZES = [
 ];
 
 // Sellers can only move an order through the steps they actually control.
-// Once it's ready for pickup, admin/logistics takes over (out_for_delivery → delivered → completed).
+// Once it's ready for pickup, admin/logistics takes over.
 const SELLER_CONTROLLED_STATUSES = ["accepted", "preparing", "ready_for_pickup"];
 
 const ORDER_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
@@ -64,12 +59,12 @@ const ORDER_STATUS_CONFIG: Record<string, { label: string; className: string }> 
 };
 
 const NAV_ITEMS: { key: SellerSection; label: string; icon: React.ReactNode }[] = [
-  { key: "home",       label: "Dashboard",          icon: <Home className="w-4 h-4" /> },
-  { key: "products",   label: "Products",           icon: <Package className="w-4 h-4" /> },
-  { key: "orders",     label: "Orders",             icon: <ShoppingCart className="w-4 h-4" /> },
-  { key: "promotions", label: "Promotions",         icon: <Megaphone className="w-4 h-4" /> },
-  { key: "statements", label: "Statements",         icon: <FileText className="w-4 h-4" /> },
-  { key: "settings",   label: "Settings",           icon: <Settings className="w-4 h-4" /> },
+  { key: "home",       label: "Dashboard",  icon: <Home className="w-4 h-4" /> },
+  { key: "products",   label: "Products",   icon: <Package className="w-4 h-4" /> },
+  { key: "orders",     label: "Orders",     icon: <ShoppingCart className="w-4 h-4" /> },
+  { key: "promotions", label: "Promotions", icon: <Megaphone className="w-4 h-4" /> },
+  { key: "statements", label: "Statements", icon: <FileText className="w-4 h-4" /> },
+  { key: "settings",   label: "Settings",   icon: <Settings className="w-4 h-4" /> },
 ];
 
 interface Variant {
@@ -84,7 +79,9 @@ interface Variant {
 export default function Seller() {
   const { user, signOut } = useAuth();
 
-  React.useEffect(() => {
+  // Global crash trap — survives React unmounting, so it works on mobile
+  // without needing devtools attached.
+  useEffect(() => {
     const handleError = (e: ErrorEvent) => {
       alert("CRASH: " + e.message + "\n" + (e.error?.stack || "").slice(0, 300));
     };
@@ -102,17 +99,19 @@ export default function Seller() {
   const [section, setSection] = useState<SellerSection>("home");
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showUpload, setShowUpload] = useState(false);
+  const [newOrderAlert, setNewOrderAlert] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // Multi-store state
   const [stores, setStores] = useState<any[]>([]);
   const [isMultiStore, setIsMultiStore] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [showAddStore, setShowAddStore] = useState(false);
   const [newStoreName, setNewStoreName] = useState("");
   const [storePendingCounts, setStorePendingCounts] = useState<Record<string, number>>({});
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [showUpload, setShowUpload] = useState(false);
-  const [newOrderAlert, setNewOrderAlert] = useState(false);
 
   // Upload form state
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -159,17 +158,21 @@ export default function Seller() {
     setFetchError(null);
 
     try {
-      const { data: profileData, error: profileError } = await supabase.from("profiles").select("is_multi_store").eq("id", user.id).single();
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles").select("is_multi_store").eq("id", user.id).single();
       if (profileError) throw new Error("profile: " + profileError.message);
+
       const multiStore = Boolean(profileData?.is_multi_store);
       setIsMultiStore(multiStore);
 
       let storesData: any[] = [];
       if (multiStore) {
-        const { data, error: storesErr } = await supabase.from("stores").select("*").eq("owner_id", user.id).order("created_at");
+        const { data, error: storesErr } = await supabase
+          .from("stores").select("*").eq("owner_id", user.id).order("created_at");
         if (storesErr) throw new Error("stores: " + storesErr.message);
         storesData = data || [];
         setStores(storesData);
+
         if (!selectedStoreId) {
           const remembered = localStorage.getItem("kat_active_store");
           if (remembered && storesData.some((s) => s.id === remembered)) {
@@ -178,10 +181,7 @@ export default function Seller() {
         }
 
         const { data: pendingOrdersData, error: pendingErr } = await supabase
-          .from("orders")
-          .select("store_id")
-          .eq("seller_id", user.id)
-          .eq("admin_status", "pending");
+          .from("orders").select("store_id").eq("seller_id", user.id).eq("admin_status", "pending");
         if (pendingErr) throw new Error("pending orders: " + pendingErr.message);
         const counts: Record<string, number> = {};
         (pendingOrdersData || []).forEach((o: any) => {
@@ -220,7 +220,7 @@ export default function Seller() {
 
   useEffect(() => {
     fetchAll();
-    // Real-time order updates
+
     const channel = supabase.channel("seller-orders-rt")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders", filter: `seller_id=eq.${user?.id}` }, (payload) => {
         setOrders((prev) => [payload.new as any, ...prev]);
@@ -232,8 +232,7 @@ export default function Seller() {
       })
       .subscribe();
 
-    // Manual override: visiting /seller?store=<id> jumps straight into that
-    // store, bypassing the picker. Useful stopgap while debugging the picker itself.
+    // Manual override: /seller?store=<id> jumps straight into that store.
     const urlParams = new URLSearchParams(window.location.search);
     const forcedStoreId = urlParams.get("store");
     if (forcedStoreId) {
@@ -287,6 +286,8 @@ export default function Seller() {
       </div>
     );
   }
+
+  const urlDebug = new URLSearchParams(window.location.search).get("debug") === "1";
 
   if (isMultiStore && !selectedStoreId && !loading) {
     return (
@@ -346,8 +347,6 @@ export default function Seller() {
       </div>
     );
   }
-
-  const urlDebug = new URLSearchParams(window.location.search).get("debug") === "1";
 
   const revenue = orders.reduce((s, o) => s + (o.total || o.amount || 0), 0);
   const pendingOrders = orders.filter((o) => (o.admin_status || "pending") === "pending");
@@ -584,6 +583,7 @@ export default function Seller() {
           {/* Basic info */}
           <div className="space-y-3">
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Basic Info</p>
+
             <div>
               <Input placeholder="Rough product name (e.g. black dress) *" value={title} onChange={(e) => setTitle(e.target.value)} className="rounded-xl h-11" />
               <Button type="button" variant="outline" size="sm" className="w-full rounded-xl mt-2 text-xs gap-1.5" onClick={generateWithAI} disabled={generatingAI}>
@@ -592,6 +592,7 @@ export default function Seller() {
               {aiError && <p className="text-[10px] text-destructive mt-1">{aiError}</p>}
               <p className="text-[10px] text-muted-foreground mt-1">Fill in the details below first for a more accurate result, then tap generate. You can still edit the result after.</p>
             </div>
+
             <div>
               <Input placeholder="Your price — what you want to earn (₦) *" type="number" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} className="rounded-xl h-11" />
               {basePrice && Number(basePrice) > 0 && (
@@ -602,6 +603,7 @@ export default function Seller() {
               )}
               <p className="text-[10px] text-muted-foreground mt-1">Includes KAT's 9.5% platform fee — you keep exactly what you type above.</p>
             </div>
+
             <Input placeholder="Stock quantity" type="number" value={stockCount} onChange={(e) => setStockCount(e.target.value)} className="rounded-xl h-11" />
             <Textarea placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} className="rounded-xl resize-none" rows={3} />
           </div>
@@ -959,6 +961,7 @@ export default function Seller() {
           <Link href="/"><span className="text-xl font-black text-primary cursor-pointer">KAT</span></Link>
           <p className="text-[10px] text-muted-foreground mt-0.5">Seller Center</p>
         </div>
+
         <div className="p-4 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -985,6 +988,7 @@ export default function Seller() {
             </button>
           </div>
         )}
+
         <nav className="flex-1 p-3 space-y-1">
           {NAV_ITEMS.map((item) => (
             <button key={item.key} onClick={() => setSection(item.key)}
@@ -996,6 +1000,7 @@ export default function Seller() {
             </button>
           ))}
         </nav>
+
         <div className="p-3 border-t border-border space-y-1">
           <Button size="sm" className="w-full rounded-xl gap-1 text-xs" onClick={() => { resetForm(); setShowUpload(true); }}>
             <Plus className="w-3.5 h-3.5" /> Add Product
@@ -1035,7 +1040,7 @@ export default function Seller() {
         </div>
       </div>
 
-      {/* Mobile slide-in drawer — mirrors the desktop sidebar exactly */}
+      {/* Mobile slide-in drawer — mirrors the desktop sidebar */}
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
@@ -1340,8 +1345,6 @@ function SellerOrdersSection({ orders, products, onUpdateStatus }: any) {
             const product = products.find((p: any) => p.id === o.product_id);
             const orderedColor = o.variant?.color;
             const orderedSize = o.variant?.size;
-            // Show the image matching the exact ordered color if the seller uploaded
-            // per-color photos — otherwise fall back to the main product image.
             const pickImage = (orderedColor && product?.color_images?.[orderedColor]) || product?.image_url;
 
             return (
@@ -1380,6 +1383,7 @@ function SellerOrdersSection({ orders, products, onUpdateStatus }: any) {
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cfg.className}`}>{cfg.label}</span>
                   </div>
                 </div>
+
                 {(o.buyer_name || o.buyer_address) && (
                   <div className="bg-muted rounded-xl p-2.5 text-xs space-y-0.5">
                     {o.buyer_name && <p><span className="font-semibold">Buyer:</span> {o.buyer_name}</p>}
@@ -1387,6 +1391,7 @@ function SellerOrdersSection({ orders, products, onUpdateStatus }: any) {
                     {o.buyer_address && <p><span className="font-semibold">Address:</span> {o.buyer_address}</p>}
                   </div>
                 )}
+
                 {handedOff ? (
                   <p className="text-xs text-muted-foreground italic">This order has been picked up — KAT logistics is now handling delivery.</p>
                 ) : (
@@ -1425,8 +1430,7 @@ function SellerOrdersSection({ orders, products, onUpdateStatus }: any) {
 
 // ── STATEMENTS SECTION ──
 function SellerStatementsSection({ orders, revenue }: any) {
-  // revenue = what buyers paid, which already includes the 9.5% markup.
-  // Back out the seller's true share instead of taking another 9.5% off the top.
+  // revenue = what buyers paid, already includes the 9.5% markup.
   const netEarnings = revenue / 1.095;
   const commission = revenue - netEarnings;
   return (
@@ -1458,7 +1462,6 @@ function SellerSettingsSection({ user, isMultiStore, activeStore, onStoreUpdated
 
   useEffect(() => {
     if (isMultiStore) {
-      // Editing the currently active store's own row, not the account-level fields.
       setStoreName(activeStore?.name || "");
       setStoreDescription(activeStore?.description || "");
       return;
@@ -1509,4 +1512,4 @@ function SellerSettingsSection({ user, isMultiStore, activeStore, onStoreUpdated
       </div>
     </div>
   );
-            }
+        }
