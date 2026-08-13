@@ -9,7 +9,7 @@ import {
   Check, X, Trash2, Ban, RefreshCw, Search, ArrowLeft,
   Mail, Calendar, Clock, Truck, Send, CheckCircle,
   XCircle, TrendingUp, Eye, Flag, ChevronDown, ChevronUp,
-  Phone, MapPin, LogIn,
+  Phone, MapPin, LogIn, Menu,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,7 +54,7 @@ const ORDER_STATUS: Record<string, { label: string; color: string }> = {
 };
 
 export default function Admin() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [section, setSection] = useState<AdminSection>("home");
   const [sellers, setSellers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -67,6 +67,7 @@ export default function Admin() {
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [orderFilter, setOrderFilter] = useState("all");
   const [sellerFilter, setSellerFilter] = useState("all");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isAdmin = user?.isAdmin;
 
@@ -102,7 +103,6 @@ export default function Admin() {
     );
   }
 
-  // Stats
   const totalRevenue = orders.reduce((s, o) => s + (o.total || o.amount || 0), 0);
   const today = new Date().toDateString();
 
@@ -127,8 +127,6 @@ export default function Admin() {
   const totalBuyers = users.filter((u) => !u.is_seller && !u.is_admin).length;
   const cancelledOrders = orders.filter((o) => o.admin_status === "cancelled").length;
 
-  // Average delivery time: for each order, find its "pending" and "delivered" events
-  // and average the gap between them across all orders that reached delivered.
   const eventsByOrder: Record<string, any[]> = {};
   orderEvents.forEach((e) => {
     if (!eventsByOrder[e.order_id]) eventsByOrder[e.order_id] = [];
@@ -152,7 +150,6 @@ export default function Admin() {
       ? `${(avgDeliveryMs / (60 * 60 * 1000)).toFixed(1)} hrs`
       : `${(avgDeliveryMs / (24 * 60 * 60 * 1000)).toFixed(1)} days`;
 
-  // Top delivery area: most frequent delivery_area among orders that have one set.
   const areaCounts: Record<string, number> = {};
   orders.forEach((o) => {
     if (o.delivery_area) areaCounts[o.delivery_area] = (areaCounts[o.delivery_area] || 0) + 1;
@@ -160,7 +157,6 @@ export default function Admin() {
   const topAreaEntry = Object.entries(areaCounts).sort((a, b) => b[1] - a[1])[0];
   const topAreaLabel = topAreaEntry ? `${topAreaEntry[0]} (${topAreaEntry[1]})` : "No data yet";
 
-  // Actions
   const approveSeller = async (id: string) => {
     setActionLoading(id);
     await supabase.from("profiles").update({ seller_verified: true, is_seller: true }).eq("id", id);
@@ -205,7 +201,6 @@ export default function Admin() {
     setActionLoading(null);
   };
 
-  // Chart data
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
@@ -251,6 +246,27 @@ export default function Admin() {
     !search || [u.full_name, u.email].some((f) => f?.toLowerCase().includes(search.toLowerCase()))
   );
 
+  const sidebarNav = (closeAfterClick: boolean) => (
+    <>
+      {NAV_ITEMS.map((item) => (
+        <button
+          key={item.key}
+          onClick={() => { setSection(item.key); setSearch(""); if (closeAfterClick) setMobileMenuOpen(false); }}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+            section === item.key ? "bg-primary/10 text-primary font-bold" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          }`}>
+          {item.icon} {item.label}
+          {item.key === "orders" && pendingOrders > 0 && (
+            <span className="ml-auto bg-destructive text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{pendingOrders}</span>
+          )}
+          {item.key === "sellers" && pendingSellers > 0 && (
+            <span className="ml-auto bg-amber-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{pendingSellers}</span>
+          )}
+        </button>
+      ))}
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-background flex">
 
@@ -265,53 +281,82 @@ export default function Admin() {
           <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
         </div>
         <nav className="flex-1 p-3 space-y-1">
-          {NAV_ITEMS.map((item) => (
-            <button key={item.key} onClick={() => { setSection(item.key); setSearch(""); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                section === item.key ? "bg-primary/10 text-primary font-bold" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              }`}>
-              {item.icon} {item.label}
-              {item.key === "orders" && pendingOrders > 0 && (
-                <span className="ml-auto bg-destructive text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{pendingOrders}</span>
-              )}
-              {item.key === "sellers" && pendingSellers > 0 && (
-                <span className="ml-auto bg-amber-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{pendingSellers}</span>
-              )}
-            </button>
-          ))}
+          {sidebarNav(false)}
         </nav>
-        <div className="p-3 border-t border-border">
+        <div className="p-3 border-t border-border space-y-1">
           <Link href="/me">
             <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:bg-muted transition-all">
               <ArrowLeft className="w-4 h-4" /> Back to KAT
             </button>
           </Link>
+          <button
+            onClick={() => { if (window.confirm("Sign out of KAT?")) signOut(); }}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-all"
+          >
+            <LogIn className="w-4 h-4 rotate-180" /> Sign Out
+          </button>
         </div>
       </aside>
 
       {/* Mobile top nav */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b border-border">
         <div className="flex items-center justify-between px-4 h-14">
-          <Link href="/"><span className="text-lg font-black text-primary">KAT</span></Link>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setMobileMenuOpen(true)} className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
+              <Menu className="w-4 h-4" />
+            </button>
+            <span className="text-lg font-black text-primary">KAT</span>
+          </div>
           <p className="text-xs font-semibold">Admin</p>
-          <button onClick={fetchAll} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+          <button onClick={fetchAll} className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
             <RefreshCw className="w-4 h-4" />
           </button>
         </div>
-        <div className="flex overflow-x-auto scrollbar-hide px-2 pb-2 gap-1">
-          {NAV_ITEMS.map((item) => (
-            <button key={item.key} onClick={() => { setSection(item.key); setSearch(""); }}
-              className={`shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-semibold transition-all ${
-                section === item.key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-              }`}>
-              {item.icon} {item.label}
-            </button>
-          ))}
-        </div>
       </div>
 
+      {/* Mobile slide-in drawer */}
+      {mobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
+          <div className="relative w-72 max-w-[80vw] bg-card h-full flex flex-col shadow-2xl">
+            <div className="p-5 border-b border-border flex items-center justify-between">
+              <div>
+                <span className="text-xl font-black text-primary">KAT</span>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Admin Center</p>
+              </div>
+              <button onClick={() => setMobileMenuOpen(false)} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 border-b border-border">
+              <p className="text-sm font-bold truncate">{user.name || "Admin"}</p>
+              <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
+            </div>
+
+            <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+              {sidebarNav(true)}
+            </nav>
+
+            <div className="p-3 border-t border-border space-y-1">
+              <Link href="/me">
+                <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:bg-muted transition-all">
+                  <ArrowLeft className="w-4 h-4" /> Back to KAT
+                </button>
+              </Link>
+              <button
+                onClick={() => { if (window.confirm("Sign out of KAT?")) signOut(); }}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-all"
+              >
+                <LogIn className="w-4 h-4 rotate-180" /> Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main */}
-      <main className="flex-1 min-w-0 md:pt-0 pt-28 pb-20">
+      <main className="flex-1 min-w-0 md:pt-0 pt-16 pb-20">
         <div className="max-w-5xl mx-auto px-4 py-6 space-y-5">
 
           {/* ── HOME ── */}
@@ -346,7 +391,6 @@ export default function Admin() {
                 </div>
               </div>
 
-              {/* KPI cards */}
               <AdminStats
                 revenueToday={revenueToday}
                 ordersToday={ordersToday.length}
@@ -363,7 +407,6 @@ export default function Admin() {
                 setSection={setSection}
               />
 
-              {/* Marketplace health */}
               <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
                 <p className="font-bold text-sm">Marketplace Health</p>
                 <div className="space-y-2">
@@ -419,7 +462,6 @@ export default function Admin() {
                 </div>
               </div>
 
-              {/* Revenue chart */}
               <div className="bg-card border border-card-border rounded-2xl p-4">
                 <p className="font-bold text-sm mb-4">Revenue — Last 7 Days</p>
                 {totalRevenue === 0 ? (
@@ -437,7 +479,6 @@ export default function Admin() {
                 )}
               </div>
 
-              {/* Recent orders */}
               <div className="bg-card border border-card-border rounded-2xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <p className="font-bold text-sm">Recent Orders</p>
@@ -743,7 +784,7 @@ export default function Admin() {
                 <p className="text-sm font-bold">Platform Info</p>
                 {[
                   { label: "Platform Name", value: "KAT Marketplace" },
-                  { label: "Commission Rate", value: "5%" },
+                  { label: "Commission Rate", value: "9.5%" },
                   { label: "Support Contact", value: "support@kat.ng" },
                   { label: "Version", value: "MVP 1.0" },
                 ].map((s) => (
@@ -769,4 +810,4 @@ export default function Admin() {
       />
     </div>
   );
-                     }
+    }
