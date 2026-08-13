@@ -552,7 +552,7 @@ const handleAddToCart = () => {
               <Truck className="w-4 h-4 text-primary shrink-0" />
               <div>
                 <p className="text-xs font-semibold">
-                  {listing.freeShipping ? "Free Delivery" : "Delivery ₦1,500"}
+                  {listing.freeShipping ? "Free Delivery" : "Delivery fee calculated at checkout"}
                 </p>
                 <p className="text-[11px] text-muted-foreground">Estimated arrival: {deliveryEstimate}</p>
               </div>
@@ -726,8 +726,11 @@ const handleAddToCart = () => {
                 <div className="flex items-start gap-3">
                   <Truck className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-semibold">{listing.freeShipping ? "Free Delivery" : "Standard Delivery — ₦1,500"}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Estimated delivery: {deliveryEstimate}</p>
+                    <p className="font-semibold">{listing.freeShipping ? "Free Delivery" : "Standard Delivery"}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {listing.freeShipping ? "" : "Delivery fee is calculated at checkout based on your area. "}
+                      Estimated delivery: {deliveryEstimate}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
