@@ -67,9 +67,11 @@ export default function Search() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [featured, setFeatured] = useState<any[]>([]);
+  const [popularSearches, setPopularSearches] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [imageSearchLoading, setImageSearchLoading] = useState(false);
   const [imageSearchTags, setImageSearchTags] = useState<string[]>([]);
+  const [imageSearchError, setImageSearchError] = useState("");
   const [addedId, setAddedId] = useState<string | null>(null);
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -82,16 +84,34 @@ export default function Search() {
   const cameraRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loggedTermRef = useRef<string>("");
   const { addItem } = useCart();
 
   useEffect(() => {
     inputRef.current?.focus();
     fetchFeatured();
+    fetchPopularSearches();
   }, []);
 
   const fetchFeatured = async () => {
     const { data } = await supabase.from("products").select("*").eq("is_thrift", false).order("created_at", { ascending: false }).limit(20);
     if (data) setFeatured(data);
+  };
+
+  const fetchPopularSearches = async () => {
+    const { data } = await supabase
+      .from("search_queries")
+      .select("term")
+      .order("search_count", { ascending: false })
+      .limit(10);
+    if (data && data.length > 0) setPopularSearches(data.map((d) => d.term));
+  };
+
+  const logSearch = async (term: string) => {
+    const cleaned = term.trim().toLowerCase();
+    if (cleaned.length < 2 || cleaned === loggedTermRef.current) return;
+    loggedTermRef.current = cleaned;
+    await supabase.rpc("increment_search", { search_term: cleaned });
   };
 
   const searchProducts = useCallback(async (q: string) => {
@@ -112,6 +132,11 @@ export default function Search() {
     const { data } = await queryBuilder.limit(50);
     setResults(data || []);
     setLoading(false);
+
+    if (q.trim()) {
+      logSearch(q);
+      fetchPopularSearches();
+    }
   }, [selectedCategory, priceRange, sortBy]);
 
   useEffect(() => {
@@ -127,9 +152,9 @@ export default function Search() {
   const handleImageSearch = async (file: File) => {
     setImageSearchLoading(true);
     setImageSearchTags([]);
+    setImageSearchError("");
 
     try {
-      // Convert to base64
       const base64 = await new Promise<string>((res, rej) => {
         const reader = new FileReader();
         reader.onload = () => res((reader.result as string).split(",")[1]);
@@ -137,43 +162,27 @@ export default function Search() {
         reader.readAsDataURL(file);
       });
 
-      // Call Claude Vision
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch("/api/image-search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1000,
-          messages: [{
-            role: "user",
-            content: [
-              {
-                type: "image",
-                source: { type: "base64", media_type: file.type as "image/jpeg" | "image/png" | "image/webp", data: base64 },
-              },
-              {
-                type: "text",
-                text: `Analyze this fashion/product image and extract search tags for a Nigerian fashion marketplace. Return ONLY a JSON array of strings (no markdown, no explanation) with: category (Women/Men/Kids/Shoes/Jewelry & Accessories/Beauty & Health/Gym & Outdoor/Home), colors, styles, aesthetics (Y2K/Streetwear/Afrocentric/Minimalist/Baddie/Cottagecore/Boho/Preppy/Luxe/Casual), and key descriptive words. Example: ["Women","Pink","Dress","Bodycon","Baddie","Casual"]`,
-              },
-            ],
-          }],
-        }),
+        body: JSON.stringify({ imageBase64: base64, mimeType: file.type }),
       });
 
       const data = await response.json();
-      const text = data.content?.[0]?.text || "[]";
-      const clean = text.replace(/```json|```/g, "").trim();
-      const tags: string[] = JSON.parse(clean);
 
-      setImageSearchTags(tags);
+      if (!response.ok) {
+        setImageSearchError(data.error || "Image search failed, please try again.");
+        setImageSearchLoading(false);
+        return;
+      }
 
-      // Search using extracted tags
-      const searchQuery = tags.join(" ");
+      setImageSearchTags(data.tags);
+      const searchQuery = data.tags.join(" ");
       setQuery(searchQuery);
       await searchProducts(searchQuery);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Image search failed:", err);
-      setImageSearchTags([]);
+      setImageSearchError(err.message || "Image search failed, please try again.");
     }
 
     setImageSearchLoading(false);
@@ -325,6 +334,13 @@ export default function Search() {
           </div>
         )}
 
+        {/* Image search error */}
+        {!imageSearchLoading && imageSearchError && (
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-2xl">
+            <p className="text-xs text-destructive font-medium">{imageSearchError}</p>
+          </div>
+        )}
+
         {/* Image search tags */}
         {!imageSearchLoading && imageSearchTags.length > 0 && (
           <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-2xl">
@@ -337,14 +353,14 @@ export default function Search() {
           </div>
         )}
 
-        {/* Popular searches when idle */}
-        {!query && !imageSearchLoading && !isSearching && (
+        {/* Popular searches when idle — real data from search_queries table */}
+        {!query && !imageSearchLoading && !isSearching && popularSearches.length > 0 && (
           <div className="mb-5">
             <p className="text-sm font-bold mb-3">🔥 Popular searches</p>
             <div className="flex flex-wrap gap-2">
-              {["ankara dress", "gym set", "wig", "sneakers", "blazer", "bodycon", "bikini", "jewellery", "hoodie", "kente"].map((term) => (
+              {popularSearches.map((term) => (
                 <button key={term} onClick={() => setQuery(term)}
-                  className="text-xs px-3 py-1.5 rounded-full bg-muted hover:bg-accent border border-border hover:border-primary transition-all font-medium">
+                  className="text-xs px-3 py-1.5 rounded-full bg-muted hover:bg-accent border border-border hover:border-primary transition-all font-medium capitalize">
                   {term}
                 </button>
               ))}
@@ -403,4 +419,4 @@ export default function Search() {
       </main>
     </div>
   );
-          }
+    }
