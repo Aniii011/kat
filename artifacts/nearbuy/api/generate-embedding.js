@@ -9,10 +9,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Provide either imageUrl or imageBase64" });
   }
 
-  // Build the Jina input object — url and bytes are mutually exclusive per Jina's API
+  // Jina's API expects the image under the "image" key — either a plain URL
+  // or a base64 data URL (data:<mime>;base64,<data>), not raw base64 bytes.
   const imageInput = imageUrl
-    ? { url: imageUrl }
-    : { bytes: imageBase64 };
+    ? { image: imageUrl }
+    : { image: `data:${mimeType || "image/jpeg"};base64,${imageBase64}` };
 
   try {
     const response = await fetch("https://api.jina.ai/v1/embeddings", {
