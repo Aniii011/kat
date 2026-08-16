@@ -504,6 +504,28 @@ export default function Seller() {
     if (videoFile) videoUrl = await uploadVideo();
     const colorImages = await uploadColorImages();
 
+    // Generate a visual search embedding from the main product image.
+    // Non-fatal on failure — a product can still be published without one;
+    // it just won't be visually searchable until re-saved.
+    let imageEmbedding = null;
+    if (allImages[0]) {
+      try {
+        const embedRes = await fetch("/api/generate-embedding", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageUrl: allImages[0] }),
+        });
+        const embedData = await embedRes.json();
+        if (embedRes.ok && Array.isArray(embedData.embedding)) {
+          imageEmbedding = embedData.embedding;
+        } else {
+          console.error("Embedding generation failed:", embedData.error);
+        }
+      } catch (err) {
+        console.error("Embedding request failed:", err);
+      }
+    }
+    
     const payload = {
       title, description, category,
       aesthetics: selectedAesthetics.length > 0 ? selectedAesthetics : null,
@@ -515,6 +537,7 @@ export default function Seller() {
       seller_price: Number(basePrice),
       price: Math.round(Number(basePrice) * 1.095),
       image_url: allImages[0] || "",
+      image_embedding: imageEmbedding,
       images: allImages,
       video_url: videoUrl || null,
       variants: variants.length > 0 ? variants : null,
