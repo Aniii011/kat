@@ -15,13 +15,6 @@ export default async function handler(req, res) {
     ? { image: imageUrl }
     : { image: `data:${mimeType || "image/jpeg"};base64,${imageBase64}` };
 
-  console.log("Jina request debug:", {
-    hasImageUrl: Boolean(imageUrl),
-    hasBase64: Boolean(imageBase64),
-    base64Length: imageBase64 ? imageBase64.length : 0,
-    mimeType,
-    imageInputPreview: imageUrl ? imageInput.image : imageInput.image.slice(0, 60) + "...",
-  });
   
   try {
     const response = await fetch("https://api.jina.ai/v1/embeddings", {
