@@ -66,11 +66,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { imageBase64, mimeType } = req.body;
+  const body = req.body || {};
 
-  if (!imageBase64) {
-    return res.status(400).json({ error: "Missing image data" });
-  }
+const { imageBase64, mimeType } = body;
+
+if (!imageBase64) {
+  return res.status(400).json({ error: "Missing image data" });
+}
 
   const [tagsResult, productsResult] = await Promise.allSettled([
     getGeminiTags(imageBase64, mimeType),
