@@ -83,7 +83,7 @@ if (!imageBase64) {
     console.error("Visual search failed:", productsResult.reason);
     return res.status(500).json({ error: productsResult.reason.message || "Image search failed" });
   }
-
+console.log("Image search result:", { tagCount: (tagsResult.value || []).length, productCount: (productsResult.value || []).length });
   return res.status(200).json({
     tags: tagsResult.status === "fulfilled" ? tagsResult.value : [],
     products: productsResult.value,
