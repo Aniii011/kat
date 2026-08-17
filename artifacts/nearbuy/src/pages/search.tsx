@@ -71,6 +71,7 @@ export default function Search() {
   const [loading, setLoading] = useState(false);
   const [imageSearchLoading, setImageSearchLoading] = useState(false);
   const [imageSearchTags, setImageSearchTags] = useState<string[]>([]);
+  const [isImageSearch, setIsImageSearch] = useState(false);
   const [imageSearchError, setImageSearchError] = useState("");
   const [addedId, setAddedId] = useState<string | null>(null);
 
@@ -178,6 +179,7 @@ export default function Search() {
 
       setImageSearchTags(data.tags || []);
       setResults(data.products || []);
+      setIsImageSearch(true);
     } catch (err: any) {
       console.error("Image search failed:", err);
       setImageSearchError(err.message || "Image search failed, please try again.");
@@ -204,9 +206,8 @@ export default function Search() {
   const activeFilters = (selectedCategory ? 1 : 0) + selectedSizes.length + selectedColors.length + (priceRange[0] > 0 || priceRange[1] < 100000 ? 1 : 0);
   const clearAll = () => { setSelectedCategory(null); setSelectedSizes([]); setSelectedColors([]); setPriceRange([0, 100000]); };
 
-  const displayProducts = query || selectedCategory || activeFilters > 0 ? results : featured;
-  const isSearching = query || selectedCategory || activeFilters > 0;
-
+  const displayProducts = query || selectedCategory || activeFilters > 0 || isImageSearch ? results : featured;
+  const isSearching = query || selectedCategory || activeFilters > 0 || isImageSearch;
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
@@ -227,8 +228,7 @@ export default function Search() {
               className="w-full h-10 pl-9 pr-10 rounded-full bg-muted border border-transparent focus:border-primary outline-none text-sm focus:ring-1 focus:ring-primary transition-all"
             />
             {query && (
-              <button onClick={() => { setQuery(""); setResults([]); setImageSearchTags([]); }} className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-muted-foreground/20 flex items-center justify-center">
-                <X className="w-3 h-3" />
+              <button onClick={() => { setQuery(""); setResults([]); setImageSearchTags([]); setIsImageSearch(false); }} className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-muted-foreground/20 flex items-center justify-center">  <X className="w-3 h-3" />
               </button>
             )}
           </div>
