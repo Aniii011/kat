@@ -176,10 +176,8 @@ export default function Search() {
         return;
       }
 
-      setImageSearchTags(data.tags);
-      const searchQuery = data.tags.join(" ");
-      setQuery(searchQuery);
-      await searchProducts(searchQuery);
+      setImageSearchTags(data.tags || []);
+      setResults(data.products || []);
     } catch (err: any) {
       console.error("Image search failed:", err);
       setImageSearchError(err.message || "Image search failed, please try again.");
