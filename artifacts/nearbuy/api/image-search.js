@@ -72,8 +72,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing image data" });
   }
 
-  // Tags (for UI display) and visual search (for actual results) run
-  // independently — tags never affect which products are returned.
   const [tagsResult, productsResult] = await Promise.allSettled([
     getGeminiTags(imageBase64, mimeType),
     getVisualMatches(imageBase64, mimeType, req),
