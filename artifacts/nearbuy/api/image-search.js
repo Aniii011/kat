@@ -66,13 +66,30 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const body = req.body || {};
+  const ip = (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket?.remoteAddress || "unknown";
+  const limit = parseInt(process.env.IMAGE_SEARCH_RATE_LIMIT || "10", 10);
+  const windowSeconds = parseInt(process.env.IMAGE_SEARCH_RATE_WINDOW_SECONDS || "60", 10);
 
-const { imageBase64, mimeType } = body;
+  const { data: rateData, error: rateError } = await supabase.rpc("check_rate_limit", {
+    p_key: `image-search:${ip}`,
+    p_window_seconds: windowSeconds,
+    p_limit: limit,
+  });
 
-if (!imageBase64) {
-  return res.status(400).json({ error: "Missing image data" });
-}
+  if (rateError) {
+    // Fail open: if the rate limiter itself is broken, don't block real users —
+    // log it and continue, rather than turning a rate-limit bug into an outage.
+    console.error("Rate limit check failed:", rateError);
+  } else if (rateData?.[0]?.is_limited) {
+    res.setHeader("Retry-After", String(rateData[0].retry_after_seconds));
+    return res.status(429).json({ error: "Too many image searches, please try again shortly." });
+  }
+
+  const { imageBase64, mimeType } = req.body;
+
+  if (!imageBase64) {
+    return res.status(400).json({ error: "Missing image data" });
+  }
 
   const [tagsResult, productsResult] = await Promise.allSettled([
     getGeminiTags(imageBase64, mimeType),
