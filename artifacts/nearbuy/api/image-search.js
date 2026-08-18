@@ -43,6 +43,41 @@ Respond ONLY in this exact JSON format, no markdown, no code fences, no extra te
 
 async function getVisualMatches(imageBase64, mimeType, req) {
   const origin = `https://${req.headers.host}`;
+function computeAttributeScore(candidateProduct, imageTags) {
+  const tagsLower = imageTags.map((t) => String(t).toLowerCase());
+
+  const productColors = (candidateProduct.colors || []).map((c) => String(c).toLowerCase());
+  const productAesthetics = (candidateProduct.aesthetics || []).map((a) => String(a).toLowerCase());
+  const productCategory = (candidateProduct.category || "").toLowerCase();
+  const productAudience = (candidateProduct.audience || "").toLowerCase();
+
+  const textBlob = [candidateProduct.title, candidateProduct.description, candidateProduct.material]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  let score = 0;
+  let maxScore = 0;
+
+  for (const tag of tagsLower) {
+    maxScore += 3; // category/audience — HIGH
+    if (productCategory === tag || productAudience === tag) score += 3;
+
+    maxScore += 3; // color — HIGH
+    if (productColors.includes(tag)) score += 3;
+
+    maxScore += 2; // aesthetic/style — MEDIUM
+    if (productAesthetics.includes(tag)) score += 2;
+
+    maxScore += 1; // generic text fallback — LOW
+    if (textBlob.includes(tag)) score += 1;
+  }
+
+  return maxScore > 0 ? score / maxScore : 0;
+}
+
+async function getVisualMatches(imageBase64, mimeType, req, imageTags) {
+  const origin = `https://${req.headers.host}`;
   const embedRes = await fetch(`${origin}/api/generate-embedding`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -55,10 +90,22 @@ async function getVisualMatches(imageBase64, mimeType, req) {
 
   const { data, error } = await supabase.rpc("match_products_by_image", {
     query_embedding: embedData.embedding,
-    match_count: 20,
+    match_count: 50,
   });
   if (error) throw new Error(error.message);
-  return data || [];
+
+  const candidates = data || [];
+
+  const reranked = candidates
+    .map((product) => {
+      const attributeScore = computeAttributeScore(product, imageTags);
+      const finalScore = product.similarity * 0.70 + attributeScore * 0.30;
+      return { ...product, finalScore };
+    })
+    .sort((a, b) => b.finalScore - a.finalScore)
+    .slice(0, 20);
+
+  return reranked;
 }
 
 export default async function handler(req, res) {
@@ -91,10 +138,12 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing image data" });
   }
 
-  const [tagsResult, productsResult] = await Promise.allSettled([
-    getGeminiTags(imageBase64, mimeType),
-    getVisualMatches(imageBase64, mimeType, req),
-  ]);
+    const tagsResult = await Promise.allSettled([getGeminiTags(imageBase64, mimeType)]).then((r) => r[0]);
+  const imageTags = tagsResult.status === "fulfilled" ? tagsResult.value : [];
+
+  const productsResult = await Promise.allSettled([
+    getVisualMatches(imageBase64, mimeType, req, imageTags),
+  ]).then((r) => r[0]);
 
   if (productsResult.status === "rejected") {
     console.error("Visual search failed:", productsResult.reason);
