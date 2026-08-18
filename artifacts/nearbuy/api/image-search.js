@@ -67,7 +67,7 @@ export default async function handler(req, res) {
   }
 
   const ip = (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket?.remoteAddress || "unknown";
-  const limit = parseInt(process.env.IMAGE_SEARCH_RATE_LIMIT || "10", 10);
+    const limit = parseInt(process.env.IMAGE_SEARCH_RATE_LIMIT || "5", 10);
   const windowSeconds = parseInt(process.env.IMAGE_SEARCH_RATE_WINDOW_SECONDS || "60", 10);
 
   const { data: rateData, error: rateError } = await supabase.rpc("check_rate_limit", {
