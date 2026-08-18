@@ -73,6 +73,7 @@ export default function Search() {
   const [imageSearchTags, setImageSearchTags] = useState<string[]>([]);
   const [isImageSearch, setIsImageSearch] = useState(false);
   const [imageSearchError, setImageSearchError] = useState("");
+  const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
   const [addedId, setAddedId] = useState<string | null>(null);
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -233,25 +234,18 @@ export default function Search() {
             )}
           </div>
 
-          {/* Image search buttons */}
+          {/* Image search button — opens picker modal */}
           <button
-            onClick={() => cameraRef.current?.click()}
+            onClick={() => setIsImagePickerOpen(true)}
             className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0"
-            title="Search by camera"
+            title="Search with an image"
           >
             <Camera className="w-4 h-4 text-muted-foreground" />
           </button>
-          <button
-            onClick={() => imageRef.current?.click()}
-            className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0"
-            title="Search by image"
-          >
-            <Image className="w-4 h-4 text-muted-foreground" />
-          </button>
 
           {/* Hidden file inputs */}
-          <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageSearch(f); }} />
-          <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageSearch(f); }} />
+          <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { setIsImagePickerOpen(false); handleImageSearch(f); } }} />
+          <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { setIsImagePickerOpen(false); handleImageSearch(f); } }} />
 
           {/* Filter */}
           <Sheet>
@@ -320,6 +314,70 @@ export default function Search() {
           </Sheet>
         </div>
       </header>
+
+      {/* Image search picker modal */}
+      <AnimatePresence>
+        {isImagePickerOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm"
+            onClick={() => setIsImagePickerOpen(false)}
+          >
+            <motion.div
+              initial={{ y: "100%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="w-full sm:w-96 sm:mx-4 bg-background rounded-t-[2rem] sm:rounded-2xl p-6 pb-8 sm:pb-6 shadow-xl relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setIsImagePickerOpen(false)}
+                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="flex flex-col items-center text-center mt-2 mb-6">
+                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                  <SearchIcon className="w-6 h-6 text-primary" />
+                </div>
+                <h2 className="text-base font-black">Search with an image</h2>
+                <p className="text-xs text-muted-foreground mt-1">Find products similar to a photo</p>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => cameraRef.current?.click()}
+                  className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+                >
+                  <Camera className="w-4 h-4" /> Take a photo
+                </button>
+
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="text-[10px] text-muted-foreground font-medium">OR</span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+
+                <button
+                  onClick={() => imageRef.current?.click()}
+                  className="w-full h-12 rounded-2xl border border-border bg-muted font-semibold text-sm flex items-center justify-center gap-2 hover:bg-accent transition-colors"
+                >
+                  <Image className="w-4 h-4" /> Choose from gallery
+                </button>
+              </div>
+
+              <p className="text-[11px] text-muted-foreground text-center mt-5">
+                KAT will find visually similar products for you ✨
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <main className="max-w-5xl mx-auto px-3 py-4 pb-24">
 
@@ -417,4 +475,4 @@ export default function Search() {
       </main>
     </div>
   );
-    }
+                                             }
