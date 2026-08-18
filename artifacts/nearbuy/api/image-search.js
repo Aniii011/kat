@@ -105,7 +105,7 @@ async function getVisualMatches(imageBase64, mimeType, req, imageTags) {
     .map(({ similarity, attributeScore, finalScore, ...product }) => product);
 
   return reranked;
-
+}
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
