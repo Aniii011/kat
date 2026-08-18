@@ -94,17 +94,17 @@ async function getVisualMatches(imageBase64, mimeType, req, imageTags) {
 
   const candidates = data || [];
 
-  const reranked = candidates
+    const reranked = candidates
     .map((product) => {
       const attributeScore = computeAttributeScore(product, imageTags);
       const finalScore = product.similarity * 0.70 + attributeScore * 0.30;
-      return { ...product, finalScore };
+      return { ...product, attributeScore, finalScore };
     })
     .sort((a, b) => b.finalScore - a.finalScore)
-    .slice(0, 20);
+    .slice(0, 20)
+    .map(({ similarity, attributeScore, finalScore, ...product }) => product);
 
   return reranked;
-}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
