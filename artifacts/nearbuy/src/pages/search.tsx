@@ -73,6 +73,7 @@ export default function Search() {
   const [imageSearchTags, setImageSearchTags] = useState<string[]>([]);
   const [isImageSearch, setIsImageSearch] = useState(false);
   const [imageSearchError, setImageSearchError] = useState("");
+  const [imageSearchPreview, setImageSearchPreview] = useState<string | null>(null);
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
   const [addedId, setAddedId] = useState<string | null>(null);
 
@@ -143,18 +144,22 @@ export default function Search() {
 
   useEffect(() => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    if (isImageSearch) return; // visual search results stay active; filters don't trigger keyword search
     if (!query.trim() && !selectedCategory && priceRange[0] === 0 && priceRange[1] === 100000) {
       setResults([]);
       setLoading(false);
       return;
     }
     searchTimeout.current = setTimeout(() => searchProducts(query), 300);
-  }, [query, selectedCategory, priceRange, sortBy]);
+  }, [query, selectedCategory, priceRange, sortBy, isImageSearch]);
 
   const handleImageSearch = async (file: File) => {
     setImageSearchLoading(true);
     setImageSearchTags([]);
     setImageSearchError("");
+
+    if (imageSearchPreview) URL.revokeObjectURL(imageSearchPreview);
+    setImageSearchPreview(URL.createObjectURL(file));
 
     try {
       const base64 = await new Promise<string>((res, rej) => {
@@ -173,7 +178,8 @@ export default function Search() {
       const data = await response.json();
 
       if (!response.ok) {
-        setImageSearchError(data.error || "Image search failed, please try again.");
+        console.error("Image search failed:", data.error);
+        setImageSearchError("Couldn't search this image. Something went wrong while finding similar products.");
         setImageSearchLoading(false);
         return;
       }
@@ -183,10 +189,19 @@ export default function Search() {
       setIsImageSearch(true);
     } catch (err: any) {
       console.error("Image search failed:", err);
-      setImageSearchError(err.message || "Image search failed, please try again.");
+      setImageSearchError("Couldn't search this image. Something went wrong while finding similar products.");
     }
 
     setImageSearchLoading(false);
+  };
+
+  const clearImageSearch = () => {
+    setIsImageSearch(false);
+    setImageSearchTags([]);
+    setImageSearchError("");
+    if (imageSearchPreview) URL.revokeObjectURL(imageSearchPreview);
+    setImageSearchPreview(null);
+    setResults([]);
   };
 
   const handleAddToCart = (product: any) => {
@@ -229,7 +244,7 @@ export default function Search() {
               className="w-full h-10 pl-9 pr-10 rounded-full bg-muted border border-transparent focus:border-primary outline-none text-sm focus:ring-1 focus:ring-primary transition-all"
             />
             {query && (
-              <button onClick={() => { setQuery(""); setResults([]); setImageSearchTags([]); setIsImageSearch(false); }} className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-muted-foreground/20 flex items-center justify-center">  <X className="w-3 h-3" />
+              <button onClick={() => { setQuery(""); clearImageSearch(); }} className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-muted-foreground/20 flex items-center justify-center">  <X className="w-3 h-3" />
               </button>
             )}
           </div>
@@ -383,29 +398,69 @@ export default function Search() {
 
         {/* Image search loading */}
         {imageSearchLoading && (
-          <div className="flex flex-col items-center justify-center py-12 gap-3">
-            <Loader2 className="w-8 h-8 text-primary animate-spin" />
-            <p className="text-sm font-semibold">Analyzing image...</p>
-            <p className="text-xs text-muted-foreground">Finding similar products on KAT</p>
+          <div className="flex flex-col items-center justify-center py-14 gap-3">
+            <div className="relative">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <Camera className="w-7 h-7 text-primary" />
+              </div>
+              <Loader2 className="w-5 h-5 text-primary animate-spin absolute -bottom-1 -right-1 bg-background rounded-full p-0.5" />
+            </div>
+            <p className="text-sm font-bold mt-1">Finding similar products</p>
+            <p className="text-xs text-muted-foreground text-center max-w-[220px]">Analyzing your photo and matching it with KAT products...</p>
           </div>
         )}
 
         {/* Image search error */}
         {!imageSearchLoading && imageSearchError && (
-          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-2xl">
-            <p className="text-xs text-destructive font-medium">{imageSearchError}</p>
+          <div className="mb-4 p-5 bg-card border border-card-border rounded-2xl flex flex-col items-center text-center gap-2">
+            <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+              <X className="w-4 h-4 text-destructive" />
+            </div>
+            <p className="text-sm font-bold">Couldn't search this image</p>
+            <p className="text-xs text-muted-foreground max-w-[240px]">Something went wrong while finding similar products.</p>
+            <Button size="sm" className="rounded-full mt-1" onClick={() => { setImageSearchError(""); setIsImagePickerOpen(true); }}>
+              Try again
+            </Button>
           </div>
         )}
 
-        {/* Image search tags */}
-        {!imageSearchLoading && imageSearchTags.length > 0 && (
-          <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-2xl">
-            <p className="text-xs font-bold text-primary mb-2">🔍 Searching by image tags:</p>
-            <div className="flex flex-wrap gap-1.5">
-              {imageSearchTags.map((tag) => (
-                <span key={tag} className="text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-medium">{tag}</span>
-              ))}
+        {/* Visual search summary + style tags */}
+        {!imageSearchLoading && isImageSearch && !imageSearchError && (
+          <div className="mb-4 space-y-3">
+            <div className="flex items-center gap-3 bg-card border border-card-border rounded-2xl p-3">
+              {imageSearchPreview ? (
+                <img src={imageSearchPreview} alt="Searched" className="w-12 h-12 rounded-xl object-cover shrink-0 border border-border" />
+              ) : (
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <Camera className="w-5 h-5 text-primary" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold text-primary flex items-center gap-1">✨ Visual search</p>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  {loading ? "Matching products..." : `${results.length} similar product${results.length !== 1 ? "s" : ""} found`}
+                </p>
+              </div>
+              <button
+                onClick={clearImageSearch}
+                className="text-[11px] text-muted-foreground hover:text-destructive font-medium shrink-0 px-2 py-1 rounded-full hover:bg-destructive/10 transition-colors"
+              >
+                ✕ Clear
+              </button>
             </div>
+
+            {imageSearchTags.length > 0 && (
+              <div>
+                <p className="text-xs font-bold mb-1.5">✨ We found these styles</p>
+                <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1">
+                  {imageSearchTags.map((tag) => (
+                    <span key={tag} className="shrink-0 text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-medium whitespace-nowrap">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -424,11 +479,22 @@ export default function Search() {
           </div>
         )}
 
-        {/* Result count */}
+        {/* Result title */}
         {!imageSearchLoading && isSearching && (
-          <p className="text-sm text-muted-foreground mb-3">
-            {loading ? "Searching..." : `${results.length} result${results.length !== 1 ? "s" : ""}${query ? ` for "${query}"` : ""}`}
-          </p>
+          isImageSearch ? (
+            !imageSearchError && results.length > 0 && (
+              <div className="mb-3">
+                <p className="text-sm font-black">Similar finds ✨</p>
+                <p className="text-xs text-muted-foreground">
+                  Based on your photo · {results.length} similar product{results.length !== 1 ? "s" : ""}
+                </p>
+              </div>
+            )
+          ) : (
+            <p className="text-sm text-muted-foreground mb-3">
+              {loading ? "Searching..." : `${results.length} result${results.length !== 1 ? "s" : ""}${query ? ` for "${query}"` : ""}`}
+            </p>
+          )
         )}
 
         {/* Loading skeleton */}
@@ -449,12 +515,25 @@ export default function Search() {
 
         {/* No results */}
         {!loading && !imageSearchLoading && isSearching && results.length === 0 && (
-          <div className="text-center py-16">
-            <p className="text-4xl mb-3">🔍</p>
-            <p className="font-semibold">No results found</p>
-            <p className="text-sm text-muted-foreground mt-1">Try a different search term or remove filters</p>
-            <button onClick={clearAll} className="mt-3 text-xs text-primary font-semibold">Clear filters</button>
-          </div>
+          isImageSearch ? (
+            <div className="text-center py-16">
+              <p className="text-4xl mb-3">📷</p>
+              <p className="font-semibold">No close matches yet</p>
+              <p className="text-sm text-muted-foreground mt-1 max-w-[260px] mx-auto">
+                We couldn't find products that look very similar to this photo.
+              </p>
+              <Button size="sm" className="rounded-full mt-4" onClick={() => { clearImageSearch(); setIsImagePickerOpen(true); }}>
+                Try another photo
+              </Button>
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <p className="text-4xl mb-3">🔍</p>
+              <p className="font-semibold">No results found</p>
+              <p className="text-sm text-muted-foreground mt-1">Try a different search term or remove filters</p>
+              <button onClick={clearAll} className="mt-3 text-xs text-primary font-semibold">Clear filters</button>
+            </div>
+          )
         )}
 
         {/* Results grid */}
@@ -475,4 +554,4 @@ export default function Search() {
       </main>
     </div>
   );
-                                             }
+    }
