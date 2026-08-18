@@ -41,8 +41,6 @@ Respond ONLY in this exact JSON format, no markdown, no code fences, no extra te
   return parsed.tags;
 }
 
-async function getVisualMatches(imageBase64, mimeType, req) {
-  const origin = `https://${req.headers.host}`;
 function computeAttributeScore(candidateProduct, imageTags) {
   const tagsLower = imageTags.map((t) => String(t).toLowerCase());
 
@@ -114,7 +112,7 @@ export default async function handler(req, res) {
   }
 
   const ip = (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket?.remoteAddress || "unknown";
-    const limit = parseInt(process.env.IMAGE_SEARCH_RATE_LIMIT || "5", 10);
+  const limit = parseInt(process.env.IMAGE_SEARCH_RATE_LIMIT || "5", 10);
   const windowSeconds = parseInt(process.env.IMAGE_SEARCH_RATE_WINDOW_SECONDS || "60", 10);
 
   const { data: rateData, error: rateError } = await supabase.rpc("check_rate_limit", {
@@ -124,8 +122,6 @@ export default async function handler(req, res) {
   });
 
   if (rateError) {
-    // Fail open: if the rate limiter itself is broken, don't block real users —
-    // log it and continue, rather than turning a rate-limit bug into an outage.
     console.error("Rate limit check failed:", rateError);
   } else if (rateData?.[0]?.is_limited) {
     res.setHeader("Retry-After", String(rateData[0].retry_after_seconds));
@@ -138,7 +134,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing image data" });
   }
 
-    const tagsResult = await Promise.allSettled([getGeminiTags(imageBase64, mimeType)]).then((r) => r[0]);
+  const tagsResult = await Promise.allSettled([getGeminiTags(imageBase64, mimeType)]).then((r) => r[0]);
   const imageTags = tagsResult.status === "fulfilled" ? tagsResult.value : [];
 
   const productsResult = await Promise.allSettled([
@@ -149,6 +145,7 @@ export default async function handler(req, res) {
     console.error("Visual search failed:", productsResult.reason);
     return res.status(500).json({ error: productsResult.reason.message || "Image search failed" });
   }
+
   return res.status(200).json({
     tags: tagsResult.status === "fulfilled" ? tagsResult.value : [],
     products: productsResult.value,
