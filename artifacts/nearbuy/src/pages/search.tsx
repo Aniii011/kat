@@ -19,11 +19,68 @@ const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL", "36", "37", "38", "39", 
 const COLOR_OPTIONS = ["Black", "White", "Red", "Blue", "Pink", "Green", "Beige", "Brown", "Gold", "Silver"];
 const TOP_CATEGORIES = ["Women", "Men", "Kids", "Shoes", "Jewelry & Accessories", "Beauty & Health", "Gym & Outdoor", "Home"];
 
-function ProductCard({ product, onAddToCart, addedId }: { product: any; onAddToCart: (p: any) => void; addedId: string | null }) {
+// ── Local storage helpers for recent searches / recently viewed ──
+const RECENT_SEARCHES_KEY = "kat_recent_searches";
+const RECENTLY_VIEWED_KEY = "kat_recently_viewed";
+
+function loadRecentSearches(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_SEARCHES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+function saveRecentSearches(list: string[]) {
+  try { localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(list)); } catch {}
+}
+function loadRecentlyViewed(): any[] {
+  try {
+    const raw = localStorage.getItem(RECENTLY_VIEWED_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+function saveRecentlyViewed(list: any[]) {
+  try { localStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(list)); } catch {}
+}
+
+// ── Display-only normalization for popular-search labels ──
+// Doesn't touch the underlying query string used for actual search.
+const CATEGORY_KEYWORDS = [
+  "dress", "dresses", "sneaker", "sneakers", "bag", "bags", "heel", "heels",
+  "jean", "jeans", "jewelry", "shoe", "shoes", "top", "tops", "skirt", "skirts",
+  "bodycon", "jumpsuit", "jumpsuits", "short", "shorts", "bra", "bras", "wig",
+  "wigs", "lash", "lashes", "nail", "nails", "ring", "rings", "earring",
+  "earrings", "necklace", "necklaces", "watch", "watches", "perfume", "perfumes",
+  "sandal", "sandals", "boot", "boots", "hoodie", "hoodies", "jacket", "jackets",
+];
+
+function shortenSearchLabel(term: string): string {
+  const words = term.toLowerCase().split(/\s+/).filter(Boolean);
+  for (let i = words.length - 1; i >= 0; i--) {
+    const w = words[i].replace(/[^a-z]/g, "");
+    if (CATEGORY_KEYWORDS.includes(w)) {
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    }
+  }
+  const fallback = words.slice(-2).join(" ");
+  return fallback.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function ProductCard({
+  product, onAddToCart, addedId, onView,
+}: {
+  product: any; onAddToCart: (p: any) => void; addedId: string | null; onView?: (p: any) => void;
+}) {
   const added = addedId === product.id;
   return (
     <Link href={`/listing/${product.id}`}>
-      <div className="group bg-card border border-card-border rounded-2xl overflow-hidden hover:shadow-md transition-all duration-300 cursor-pointer">
+      <div
+        onClick={() => onView && onView(product)}
+        className="group bg-card border border-card-border rounded-2xl overflow-hidden hover:shadow-md transition-all duration-300 cursor-pointer"
+      >
         <div className="relative aspect-[3/4] overflow-hidden bg-muted">
           {product.image_url ? (
             <img src={product.image_url} alt={product.title} className="w-full h-full object-contain transition-transform duration-400 group-hover:scale-105" loading="lazy" />
@@ -68,6 +125,8 @@ export default function Search() {
   const [results, setResults] = useState<any[]>([]);
   const [featured, setFeatured] = useState<any[]>([]);
   const [popularSearches, setPopularSearches] = useState<string[]>([]);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [recentlyViewed, setRecentlyViewed] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [imageSearchLoading, setImageSearchLoading] = useState(false);
   const [imageSearchTags, setImageSearchTags] = useState<string[]>([]);
@@ -94,6 +153,8 @@ export default function Search() {
     inputRef.current?.focus();
     fetchFeatured();
     fetchPopularSearches();
+    setRecentSearches(loadRecentSearches());
+    setRecentlyViewed(loadRecentlyViewed());
   }, []);
 
   const fetchFeatured = async () => {
@@ -117,6 +178,31 @@ export default function Search() {
     await supabase.rpc("increment_search", { search_term: cleaned });
   };
 
+  const addRecentSearch = (term: string) => {
+    const cleaned = term.trim();
+    if (cleaned.length < 2) return;
+    setRecentSearches((prev) => {
+      const next = [cleaned, ...prev.filter((t) => t.toLowerCase() !== cleaned.toLowerCase())].slice(0, 8);
+      saveRecentSearches(next);
+      return next;
+    });
+  };
+
+  const clearRecentSearches = () => {
+    setRecentSearches([]);
+    saveRecentSearches([]);
+  };
+
+  const addRecentlyViewed = (product: any) => {
+    if (!product?.id) return;
+    setRecentlyViewed((prev) => {
+      const entry = { id: product.id, title: product.title, image_url: product.image_url, price: product.price };
+      const next = [entry, ...prev.filter((p) => p.id !== product.id)].slice(0, 20);
+      saveRecentlyViewed(next);
+      return next;
+    });
+  };
+
   const searchProducts = useCallback(async (q: string) => {
     setLoading(true);
     let queryBuilder = supabase.from("products").select("*");
@@ -138,6 +224,7 @@ export default function Search() {
 
     if (q.trim()) {
       logSearch(q);
+      addRecentSearch(q);
       fetchPopularSearches();
     }
   }, [selectedCategory, priceRange, sortBy]);
@@ -224,6 +311,8 @@ export default function Search() {
 
   const displayProducts = query || selectedCategory || activeFilters > 0 || isImageSearch ? results : featured;
   const isSearching = query || selectedCategory || activeFilters > 0 || isImageSearch;
+  const showIdleDiscovery = !query && !imageSearchLoading && !isSearching;
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
@@ -464,18 +553,68 @@ export default function Search() {
           </div>
         )}
 
-        {/* Popular searches when idle — real data from search_queries table */}
-        {!query && !imageSearchLoading && !isSearching && popularSearches.length > 0 && (
-          <div className="mb-5">
-            <p className="text-sm font-bold mb-3">🔥 Popular searches</p>
-            <div className="flex flex-wrap gap-2">
-              {popularSearches.map((term) => (
-                <button key={term} onClick={() => setQuery(term)}
-                  className="text-xs px-3 py-1.5 rounded-full bg-muted hover:bg-accent border border-border hover:border-primary transition-all font-medium capitalize">
-                  {term}
-                </button>
-              ))}
-            </div>
+        {/* Idle landing state — recent searches, popular searches, recently viewed */}
+        {showIdleDiscovery && (
+          <div className="space-y-6 mb-2">
+            {recentSearches.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-bold">Recent searches</p>
+                  <button onClick={clearRecentSearches} className="text-[11px] text-muted-foreground font-medium hover:text-destructive transition-colors">
+                    Clear
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {recentSearches.map((term) => (
+                    <button key={term} onClick={() => setQuery(term)}
+                      className="text-xs px-3 py-1.5 rounded-full bg-muted hover:bg-accent border border-border hover:border-primary transition-all font-medium">
+                      {term}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {popularSearches.length > 0 && (
+              <div>
+                <p className="text-sm font-bold mb-3">🔥 Popular searches</p>
+                <div className="flex flex-wrap gap-2">
+                  {popularSearches.map((term) => (
+                    <button key={term} onClick={() => setQuery(term)}
+                      className="text-xs px-3 py-1.5 rounded-full bg-muted hover:bg-accent border border-border hover:border-primary transition-all font-medium">
+                      {shortenSearchLabel(term)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {recentlyViewed.length > 0 && (
+              <div>
+                <p className="text-sm font-bold mb-3">Recently viewed</p>
+                <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
+                  {recentlyViewed.map((p) => (
+                    <Link key={p.id} href={`/listing/${p.id}`}>
+                      <div onClick={() => addRecentlyViewed(p)} className="shrink-0 w-28 cursor-pointer">
+                        <div className="w-28 h-28 rounded-2xl overflow-hidden bg-muted border border-card-border">
+                          {p.image_url ? (
+                            <img src={p.image_url} alt={p.title} className="w-full h-full object-cover" loading="lazy" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <ShoppingBag className="w-6 h-6 text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-[11px] font-medium mt-1 line-clamp-1">{p.title}</p>
+                        {typeof p.price === "number" && (
+                          <p className="text-[11px] font-bold text-primary">{formatNaira(p.price)}</p>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -545,7 +684,7 @@ export default function Search() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {displayProducts.map((product, i) => (
                 <motion.div key={product.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }}>
-                  <ProductCard product={product} onAddToCart={handleAddToCart} addedId={addedId} />
+                  <ProductCard product={product} onAddToCart={handleAddToCart} addedId={addedId} onView={addRecentlyViewed} />
                 </motion.div>
               ))}
             </div>
