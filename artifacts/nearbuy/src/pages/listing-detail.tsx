@@ -115,6 +115,19 @@ export default function ListingDetail() {
   }, [id]);
 
   useEffect(() => {
+  if (!listing) return;
+  try {
+    const raw = localStorage.getItem("kat_recently_viewed");
+    const prev = raw ? JSON.parse(raw) : [];
+    const entry = { id: listing.id, title: listing.title, image_url: listing.imageUrl, price: listing.price };
+    const next = [entry, ...prev.filter((p: any) => p.id !== listing.id)].slice(0, 20);
+    localStorage.setItem("kat_recently_viewed", JSON.stringify(next));
+  } catch {
+    // localStorage unavailable — fail silently, doesn't affect page functionality
+  }
+}, [listing?.id]);
+  
+  useEffect(() => {
     if (!listing) return;
     if (selectedColor && listing.colorImages?.[selectedColor]) {
       const baseImages = listing.images.length > 0 ? listing.images : [listing.imageUrl];
