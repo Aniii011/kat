@@ -39,6 +39,8 @@ function rowToListing(row: Record<string, unknown>): Listing {
     tags: (row.tags as string[]) ?? undefined,
     colorImages: (row.color_images as Record<string, string>) ?? undefined,
     customSizeNote: (row.custom_size_note as string) ?? undefined,
+        attributes: (row.attributes as Record<string, unknown>) ?? {},
+    variants: (row.variants as any[]) ?? undefined,
   };
 }
 
