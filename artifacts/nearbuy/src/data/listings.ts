@@ -55,6 +55,8 @@ export interface Listing {
   tags?: string[];
   colorImages?: Record<string, string>;
 customSizeNote?: string;
+    attributes?: Record<string, unknown>;
+  variants?: Array<{ id: string; attributes: Record<string, string>; sku?: string; price?: number; stock?: number }>;
 }
 
 export const TOP_CATEGORIES = [
