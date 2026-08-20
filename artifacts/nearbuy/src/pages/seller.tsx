@@ -965,3 +965,579 @@ export default function Seller() {
       </div>
     );
    }
+
+  // ── MAIN DASHBOARD ──
+  return (
+    <div className="min-h-screen bg-background flex">
+
+      {urlDebug && (
+        <div className="fixed top-0 left-0 right-0 bg-black text-white text-[10px] p-2 z-50 font-mono">
+          isMultiStore: {String(isMultiStore)} | stores: {stores.length} | selectedStoreId: {selectedStoreId || "null"} | loading: {String(loading)}
+          {fetchError && <div className="text-red-400 mt-1">ERROR: {fetchError}</div>}
+        </div>
+      )}
+
+      {/* New order alert */}
+      {newOrderAlert && (
+        <div className="fixed top-4 right-4 z-50 bg-primary text-primary-foreground text-sm font-bold px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2">
+          <Bell className="w-4 h-4" /> New order received! 🎉
+        </div>
+      )}
+
+      {/* Sidebar — desktop */}
+      <aside className="w-60 shrink-0 bg-card border-r border-border min-h-screen sticky top-0 hidden md:flex flex-col">
+        <div className="p-5 border-b border-border">
+          <Link href="/"><span className="text-xl font-black text-primary cursor-pointer">KAT</span></Link>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Seller Center</p>
+        </div>
+
+        <div className="p-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <span className="text-xs font-black text-primary">{(user.name || user.email || "KA").slice(0, 2).toUpperCase()}</span>
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold truncate">{user.name || "Seller"}</p>
+              <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
+            </div>
+          </div>
+        </div>
+
+        {isMultiStore && selectedStoreId && (
+          <div className="p-3 border-b border-border">
+            <button
+              onClick={() => { localStorage.removeItem("kat_active_store"); setSelectedStoreId(null); }}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-muted hover:bg-accent transition-colors"
+            >
+              <div className="min-w-0 text-left">
+                <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Managing</p>
+                <p className="text-xs font-bold truncate">{stores.find((s) => s.id === selectedStoreId)?.name || "Store"}</p>
+              </div>
+              <span className="text-[10px] font-semibold text-primary shrink-0 ml-2">Switch</span>
+            </button>
+          </div>
+        )}
+
+        <nav className="flex-1 p-3 space-y-1">
+          {NAV_ITEMS.map((item) => (
+            <button key={item.key} onClick={() => setSection(item.key)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${section === item.key ? "bg-primary/10 text-primary font-bold" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+              {item.icon} {item.label}
+              {item.key === "orders" && pendingOrders.length > 0 && (
+                <span className="ml-auto bg-destructive text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{pendingOrders.length}</span>
+              )}
+            </button>
+          ))}
+        </nav>
+
+        <div className="p-3 border-t border-border space-y-1">
+          <Button size="sm" className="w-full rounded-xl gap-1 text-xs" onClick={() => { resetForm(); setShowUpload(true); }}>
+            <Plus className="w-3.5 h-3.5" /> Add Product
+          </Button>
+          <Link href="/me">
+            <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:bg-muted transition-all">
+              <ChevronRight className="w-4 h-4 rotate-180" /> Back to KAT
+            </button>
+          </Link>
+          <button
+            onClick={() => { if (window.confirm("Sign out of KAT?")) signOut(); }}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-all"
+          >
+            <LogIn className="w-4 h-4 rotate-180" /> Sign Out
+          </button>
+        </div>
+      </aside>
+
+      {/* Mobile top nav */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b border-border">
+        <div className="flex items-center justify-between px-4 h-14">
+          <div className="flex items-center gap-2">
+            <button onClick={() => setMobileMenuOpen(true)} className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
+              <Menu className="w-4 h-4" />
+            </button>
+            <span className="text-lg font-black text-primary">KAT</span>
+          </div>
+          <p className="text-xs font-semibold">Seller Center</p>
+          <div className="flex gap-1">
+            <button onClick={() => { resetForm(); setShowUpload(true); }} className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+              <Plus className="w-4 h-4 text-primary-foreground" />
+            </button>
+            <button onClick={fetchAll} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile slide-in drawer — mirrors the desktop sidebar */}
+      {mobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
+          <div className="relative w-72 max-w-[80vw] bg-card h-full flex flex-col shadow-2xl">
+            <div className="p-5 border-b border-border flex items-center justify-between">
+              <div>
+                <span className="text-xl font-black text-primary">KAT</span>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Seller Center</p>
+              </div>
+              <button onClick={() => setMobileMenuOpen(false)} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <span className="text-xs font-black text-primary">{(user.name || user.email || "KA").slice(0, 2).toUpperCase()}</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold truncate">{user.name || "Seller"}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
+                </div>
+              </div>
+            </div>
+
+            {isMultiStore && selectedStoreId && (
+              <div className="p-3 border-b border-border">
+                <button
+                  onClick={() => { setMobileMenuOpen(false); localStorage.removeItem("kat_active_store"); setSelectedStoreId(null); }}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-muted hover:bg-accent transition-colors"
+                >
+                  <div className="min-w-0 text-left">
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Managing</p>
+                    <p className="text-xs font-bold truncate">{stores.find((s) => s.id === selectedStoreId)?.name || "Store"}</p>
+                  </div>
+                  <span className="text-[10px] font-semibold text-primary shrink-0 ml-2">Switch</span>
+                </button>
+              </div>
+            )}
+
+            <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+              {NAV_ITEMS.map((item) => (
+                <button
+                  key={item.key}
+                  onClick={() => { setSection(item.key); setMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${section === item.key ? "bg-primary/10 text-primary font-bold" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                >
+                  {item.icon} {item.label}
+                  {item.key === "orders" && pendingOrders.length > 0 && (
+                    <span className="ml-auto bg-destructive text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{pendingOrders.length}</span>
+                  )}
+                </button>
+              ))}
+            </nav>
+
+            <div className="p-3 border-t border-border space-y-1">
+              <Button size="sm" className="w-full rounded-xl gap-1 text-xs" onClick={() => { resetForm(); setShowUpload(true); setMobileMenuOpen(false); }}>
+                <Plus className="w-3.5 h-3.5" /> Add Product
+              </Button>
+              <Link href="/me">
+                <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:bg-muted transition-all">
+                  <ChevronRight className="w-4 h-4 rotate-180" /> Back to KAT
+                </button>
+              </Link>
+              <button
+                onClick={() => { if (window.confirm("Sign out of KAT?")) signOut(); }}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-all"
+              >
+                <LogIn className="w-4 h-4 rotate-180" /> Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main */}
+      <main className="flex-1 min-w-0 md:pt-0 pt-16 pb-20">
+        <div className="max-w-5xl mx-auto px-4 py-6">
+
+          {section === "home" && <SellerHomeSection user={user} products={products} orders={orders} pendingOrders={pendingOrders} toShip={toShip} incompleteProducts={incompleteProducts} revenue={revenue} onNavigate={setSection} loading={loading} onAddProduct={() => { resetForm(); setShowUpload(true); }} />}
+
+          {section === "products" && <SellerProductsSection products={products} onEdit={openEdit} onDelete={deleteProduct} onAdd={() => { resetForm(); setShowUpload(true); }} />}
+
+          {section === "orders" && <SellerOrdersSection orders={orders} products={products} onUpdateStatus={updateOrderStatus} />}
+
+          {section === "promotions" && (
+            <div className="text-center py-20">
+              <Megaphone className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+              <p className="font-bold text-sm">No active promotions</p>
+              <p className="text-xs text-muted-foreground mt-1">Coupon and discount tools coming soon.</p>
+            </div>
+          )}
+
+          {section === "statements" && <SellerStatementsSection orders={orders} revenue={revenue} />}
+
+          {section === "settings" && <SellerSettingsSection user={user} isMultiStore={isMultiStore} activeStore={stores.find((s) => s.id === selectedStoreId)} onStoreUpdated={fetchAll} />}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// ── HOME SECTION ──
+function SellerHomeSection({ user, products, orders, pendingOrders, toShip, incompleteProducts, revenue, onNavigate, loading, onAddProduct }: any) {
+  return (
+    <div className="space-y-6">
+      <h1 className="text-xl font-black">Hey {user.name || "there"} 👋</h1>
+
+      <div>
+        <p className="text-sm font-bold mb-3">Yours to do</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {products.length === 0 && (
+            <div className="bg-card border border-card-border rounded-2xl p-4">
+              <p className="text-sm font-bold mb-1">No products yet</p>
+              <p className="text-xs text-muted-foreground mb-3">List products to start selling on KAT</p>
+              <Button size="sm" className="rounded-full text-xs" onClick={onAddProduct}>Add First Product</Button>
+            </div>
+          )}
+          {incompleteProducts.length > 0 && (
+            <div className="bg-card border border-card-border rounded-2xl p-4">
+              <p className="text-sm font-bold mb-1">Incomplete listings ({incompleteProducts.length})</p>
+              <p className="text-xs text-muted-foreground mb-3">Finish setting these up so buyers can find them</p>
+              <Button size="sm" variant="outline" className="rounded-full text-xs" onClick={() => onNavigate("products")}>Review Listings</Button>
+            </div>
+          )}
+          {pendingOrders.length > 0 && (
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl p-4">
+              <p className="text-sm font-bold mb-1 text-amber-700 dark:text-amber-400">Pending orders ({pendingOrders.length})</p>
+              <p className="text-xs text-muted-foreground mb-3">These orders need to be processed</p>
+              <Button size="sm" className="rounded-full text-xs" onClick={() => onNavigate("orders")}>Process Orders</Button>
+            </div>
+          )}
+          {toShip.length > 0 && (
+            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-2xl p-4">
+              <p className="text-sm font-bold mb-1 text-blue-700 dark:text-blue-400">In progress ({toShip.length})</p>
+              <p className="text-xs text-muted-foreground mb-3">Mark these ready for pickup once packed</p>
+              <Button size="sm" className="rounded-full text-xs" onClick={() => onNavigate("orders")}>View Orders</Button>
+            </div>
+          )}
+          {products.length > 0 && pendingOrders.length === 0 && toShip.length === 0 && incompleteProducts.length === 0 && (
+            <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-4 sm:col-span-2">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">You're all caught up!</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-sm font-bold mb-3">Business Metrics</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "Revenue", value: formatNaira(revenue), icon: <DollarSign className="w-4 h-4 text-primary" /> },
+            { label: "Orders", value: orders.length, icon: <ShoppingCart className="w-4 h-4 text-primary" /> },
+            { label: "Products", value: products.length, icon: <Package className="w-4 h-4 text-primary" /> },
+            { label: "Avg Rating", value: "—", icon: <Star className="w-4 h-4 text-primary" /> },
+          ].map((m) => (
+            <div key={m.label} className="bg-card border border-card-border rounded-2xl p-4">
+              {m.icon}
+              <p className="text-lg font-black mt-1">{m.value}</p>
+              <p className="text-xs text-muted-foreground">{m.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── PRODUCTS TABLE SECTION ──
+function SellerProductsSection({ products, onEdit, onDelete, onAdd }: any) {
+  const [activeTab, setActiveTab] = useState("all");
+
+  const filtered = products.filter((p: any) => {
+    if (activeTab === "active") return p.in_stock !== false && !p.is_thrift;
+    if (activeTab === "thrift") return p.is_thrift;
+    if (activeTab === "out") return p.in_stock === false;
+    return true;
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-black">Products</h2>
+        <Button size="sm" className="rounded-full gap-1 text-xs" onClick={onAdd}>
+          <Plus className="w-3.5 h-3.5" /> Add Product
+        </Button>
+      </div>
+
+      <div className="flex gap-1 overflow-x-auto scrollbar-hide">
+        {[
+          { key: "all", label: `All (${products.length})` },
+          { key: "active", label: "Active" },
+          { key: "thrift", label: "Thrift" },
+          { key: "out", label: "Out of Stock" },
+        ].map((tab) => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            className={`shrink-0 text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${activeTab === tab.key ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/50"}`}>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-12 bg-card border border-card-border rounded-2xl">
+          <Package className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+          <p className="font-semibold text-sm">No products here</p>
+          <Button size="sm" className="rounded-full mt-3 text-xs" onClick={onAdd}>
+            <Plus className="w-3.5 h-3.5 mr-1" /> Add Product
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((p: any) => (
+            <div key={p.id} className="bg-card border border-card-border rounded-2xl p-3 flex gap-3 items-center">
+              {p.image_url ? (
+                <img src={p.image_url} alt={p.title} className="w-16 h-16 object-cover rounded-xl shrink-0 bg-muted" />
+              ) : (
+                <div className="w-16 h-16 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                  <Package className="w-6 h-6 text-muted-foreground" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm truncate">{p.title}</p>
+                <p className="text-xs text-primary font-bold mt-0.5">{formatNaira(p.price)}</p>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  {p.category && <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">{p.category}</span>}
+                  {p.is_thrift && <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">Thrift</span>}
+                  {p.thrift_condition && <span className="text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full capitalize">{p.thrift_condition.replace("_", " ")}</span>}
+                  {p.in_stock === false && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-semibold">Out of stock</span>}
+                  {p.stock_count > 0 && <span className="text-[10px] text-muted-foreground">{p.stock_count} in stock</span>}
+                </div>
+                {p.aesthetics && p.aesthetics.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {p.aesthetics.slice(0, 3).map((a: string) => (
+                      <span key={a} className="text-[9px] bg-accent text-accent-foreground px-1.5 py-0.5 rounded-full">{a}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-1.5 shrink-0">
+                <button onClick={() => onEdit(p)} className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors">
+                  <Pencil className="w-3.5 h-3.5 text-primary" />
+                </button>
+                <button onClick={() => onDelete(p.id)} className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center hover:bg-destructive/20 transition-colors">
+                  <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── ORDERS SECTION ──
+function SellerOrdersSection({ orders, products, onUpdateStatus }: any) {
+  const [filter, setFilter] = useState("all");
+
+  const filtered = orders.filter((o: any) => {
+    if (filter === "all") return true;
+    return (o.admin_status || "pending") === filter;
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-black">Orders</h2>
+        <span className="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full font-semibold flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live
+        </span>
+      </div>
+
+      <div className="flex gap-1 overflow-x-auto scrollbar-hide">
+        {["all", "pending", "accepted", "preparing", "ready_for_pickup", "out_for_delivery", "delivered", "completed", "cancelled"].map((s) => {
+          const count = s === "all" ? orders.length : orders.filter((o: any) => (o.admin_status || "pending") === s).length;
+          const label = s === "all" ? "All" : (ORDER_STATUS_CONFIG[s]?.label || s);
+          return (
+            <button key={s} onClick={() => setFilter(s)}
+              className={`shrink-0 text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${filter === s ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/50"}`}>
+              {label} ({count})
+            </button>
+          );
+        })}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-12 bg-card border border-card-border rounded-2xl">
+          <ShoppingCart className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+          <p className="font-semibold text-sm">No orders here</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((o: any) => {
+            const status = o.admin_status || "pending";
+            const cfg = ORDER_STATUS_CONFIG[status] || ORDER_STATUS_CONFIG.pending;
+            const handedOff = !SELLER_CONTROLLED_STATUSES.includes(status) && status !== "pending";
+            const product = products.find((p: any) => p.id === o.product_id);
+            const orderedColor = o.variant?.color;
+            const orderedSize = o.variant?.size;
+            const pickImage = (orderedColor && product?.color_images?.[orderedColor]) || product?.image_url;
+
+            return (
+              <div key={o.id} className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
+
+                {/* Pick card — what to grab off the shelf */}
+                <div className="flex gap-3 bg-primary/5 border border-primary/20 rounded-xl p-3">
+                  {pickImage ? (
+                    <img src={pickImage} alt={product?.title} className="w-20 h-20 rounded-xl object-cover shrink-0" />
+                  ) : (
+                    <div className="w-20 h-20 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                      <Package className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold truncate">{product?.title || "Product"}</p>
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {orderedColor && (
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-primary text-primary-foreground">Color: {orderedColor}</span>
+                      )}
+                      {orderedSize && (
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-primary text-primary-foreground">Size: {orderedSize}</span>
+                      )}
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-muted">Qty: {o.quantity || 1}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-sm">Order #{o.id.slice(0, 8)}</p>
+                    <p className="text-[11px] text-muted-foreground">{new Date(o.created_at).toLocaleString()}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-black text-primary">{formatNaira(o.total || o.amount)}</p>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cfg.className}`}>{cfg.label}</span>
+                  </div>
+                </div>
+
+                {(o.buyer_name || o.buyer_address) && (
+                  <div className="bg-muted rounded-xl p-2.5 text-xs space-y-0.5">
+                    {o.buyer_name && <p><span className="font-semibold">Buyer:</span> {o.buyer_name}</p>}
+                    {o.buyer_phone && <p><span className="font-semibold">Phone:</span> {o.buyer_phone}</p>}
+                    {o.buyer_address && <p><span className="font-semibold">Address:</span> {o.buyer_address}</p>}
+                  </div>
+                )}
+
+                {handedOff ? (
+                  <p className="text-xs text-muted-foreground italic">This order has been picked up — KAT logistics is now handling delivery.</p>
+                ) : (
+                  <div className="flex gap-1.5 flex-wrap">
+                    {SELLER_CONTROLLED_STATUSES.map((s, i) => {
+                      const currentIndex = SELLER_CONTROLLED_STATUSES.indexOf(status);
+                      const isDone = currentIndex >= 0 && i <= currentIndex;
+                      const isNext = i === currentIndex + 1 || (status === "pending" && i === 0);
+                      const clickable = isNext;
+                      return (
+                        <button
+                          key={s}
+                          disabled={!clickable}
+                          onClick={() => clickable && onUpdateStatus(o.id, s)}
+                          className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${
+                            isDone
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : clickable
+                                ? "border-primary text-primary hover:bg-primary/5"
+                                : "border-border text-muted-foreground/40 cursor-not-allowed"
+                          }`}>
+                          {isDone ? "✓ " : ""}{ORDER_STATUS_CONFIG[s].label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── STATEMENTS SECTION ──
+function SellerStatementsSection({ orders, revenue }: any) {
+  const netEarnings = revenue / 1.095;
+  const commission = revenue - netEarnings;
+  return (
+    <div className="space-y-4">
+      <h2 className="text-lg font-black">Account Statements</h2>
+      <div className="bg-card border border-card-border rounded-2xl p-5 space-y-3">
+        {[
+          { label: "Gross Revenue", value: formatNaira(revenue) },
+          { label: "KAT Commission (9.5%)", value: `-${formatNaira(commission)}`, negative: true },
+          { label: "Net Earnings", value: formatNaira(netEarnings), bold: true },
+        ].map((row) => (
+          <div key={row.label} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+            <p className="text-sm text-muted-foreground">{row.label}</p>
+            <p className={`text-sm font-bold ${row.negative ? "text-destructive" : ""} ${row.bold ? "text-primary text-base" : ""}`}>{row.value}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── SETTINGS SECTION ──
+function SellerSettingsSection({ user, isMultiStore, activeStore, onStoreUpdated }: any) {
+  const [storeName, setStoreName] = useState("");
+  const [storeDescription, setStoreDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  useEffect(() => {
+    if (isMultiStore) {
+      setStoreName(activeStore?.name || "");
+      setStoreDescription(activeStore?.description || "");
+      return;
+    }
+    supabase.from("profiles").select("store_name, store_description").eq("id", user.id).single().then(({ data, error }) => {
+      if (error) { console.error("STORE SETTINGS LOAD FAILED:", error); return; }
+      if (data) {
+        setStoreName(data.store_name || "");
+        setStoreDescription(data.store_description || "");
+      }
+    });
+  }, [user.id, isMultiStore, activeStore?.id]);
+
+  const saveSettings = async () => {
+    setSaving(true);
+    setSaveError("");
+
+    const { error } = isMultiStore
+      ? await supabase.from("stores").update({ name: storeName, description: storeDescription }).eq("id", activeStore.id)
+      : await supabase.from("profiles").update({ store_name: storeName, store_description: storeDescription }).eq("id", user.id);
+
+    setSaving(false);
+    if (error) {
+      console.error("STORE SETTINGS SAVE FAILED:", error);
+      setSaveError("Failed to save: " + error.message);
+      return;
+    }
+    setSaved(true);
+    if (isMultiStore && onStoreUpdated) onStoreUpdated();
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-lg font-black">
+        {isMultiStore ? `${activeStore?.name || "Store"} Settings` : "Store Settings"}
+      </h2>
+      <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
+        <p className="text-sm font-bold flex items-center gap-2">
+          <Store className="w-4 h-4 text-primary" /> Store Info
+        </p>
+        <Input placeholder="Store name" value={storeName} onChange={(e) => setStoreName(e.target.value)} className="rounded-xl h-11" />
+        <Textarea placeholder="Store description (visible to buyers on your store page)" value={storeDescription} onChange={(e) => setStoreDescription(e.target.value)} className="rounded-xl resize-none" rows={3} />
+        <Button className="rounded-full w-full" onClick={saveSettings} disabled={saving}>
+          {saved ? "✓ Saved!" : saving ? "Saving..." : "Save Settings"}
+        </Button>
+        {saveError && <p className="text-xs text-destructive font-medium">{saveError}</p>}
+      </div>
+    </div>
+  );
+            }
