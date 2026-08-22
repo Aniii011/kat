@@ -183,6 +183,9 @@ function OrdersSection({ userId }: { userId: string }) {
 export default function Me() {
   const { theme, setBase, setAccent } = useTheme();
   const { user, signOut } = useAuth();
+  if (typeof window !== "undefined") {
+  (window as any).__debugUser = user;
+  }
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
 
@@ -271,6 +274,9 @@ export default function Me() {
         <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
           <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
             <div className="flex-1"><h1 className="text-base font-black">My Account</h1></div>
+            <pre className="text-[10px] text-white bg-black p-2 overflow-auto">
+  {JSON.stringify(user, null, 2)}
+</pre>
             <ThemeSwitcher />
           </div>
         </header>
