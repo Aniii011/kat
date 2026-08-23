@@ -31,7 +31,6 @@ const ACCENT_OPTIONS = [
   { value: "blue" as const, label: "Blue", color: "#3b82f6" },
 ];
 
-// These keys must match what Admin's OrderDetailsDialog writes to admin_status.
 const ORDER_STATUS: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
   pending:          { label: "Pending",          className: "bg-amber-100 text-amber-700",    icon: <Clock className="w-3 h-3" /> },
   accepted:         { label: "Accepted",         className: "bg-sky-100 text-sky-700",         icon: <Package className="w-3 h-3" /> },
@@ -183,9 +182,6 @@ function OrdersSection({ userId }: { userId: string }) {
 export default function Me() {
   const { theme, setBase, setAccent } = useTheme();
   const { user, signOut } = useAuth();
-  if (typeof window !== "undefined") {
-  (window as any).__debugUser = user;
-  }
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
 
@@ -274,9 +270,6 @@ export default function Me() {
         <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
           <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
             <div className="flex-1"><h1 className="text-base font-black">My Account</h1></div>
-            <pre className="text-[10px] text-white bg-black p-2 overflow-auto">
-  {JSON.stringify(user, null, 2)}
-</pre>
             <ThemeSwitcher />
           </div>
         </header>
@@ -344,15 +337,15 @@ export default function Me() {
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">Need help? We're here for you!</p>
                 <a href="mailto:support@kat.ng" className="flex items-center gap-3 p-3 rounded-xl bg-muted hover:bg-accent transition-colors">
-  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-    <MessageCircle className="w-4 h-4 text-primary" />
-  </div>
-  <div>
-    <p className="text-sm font-semibold">Email Support</p>
-    <p className="text-xs text-muted-foreground">support@kat.ng</p>
-  </div>
-  <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
-</a>
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                    <MessageCircle className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Email Support</p>
+                    <p className="text-xs text-muted-foreground">support@kat.ng</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
+                </a>
               </div>
             </motion.div>
           </motion.div>
@@ -394,6 +387,10 @@ export default function Me() {
           <ThemeSwitcher />
         </div>
       </header>
+
+      <pre className="text-[10px] text-white bg-black p-2 overflow-auto whitespace-pre-wrap">
+        {JSON.stringify(user, null, 2)}
+      </pre>
 
       <main className="max-w-2xl mx-auto px-4 py-4 pb-24 space-y-4">
 
@@ -485,7 +482,7 @@ export default function Me() {
           ))}
         </div>
 
-        {/* Orders tab — now shows real orders */}
+        {/* Orders tab */}
         {activeTab === "orders" && <OrdersSection userId={user.id} />}
 
         {activeTab === "addresses" && (
@@ -585,14 +582,14 @@ export default function Me() {
           ))}
         </div>
         <div className="bg-card border border-card-border rounded-2xl overflow-hidden">
-  <Link href="/wishlists">
-    <button className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted transition-colors text-sm">
-      <span className="text-primary"><Heart className="w-4 h-4" /></span>
-      <span className="flex-1 text-left font-medium">My Wishlists</span>
-      <ChevronRight className="w-4 h-4 text-muted-foreground" />
-    </button>
-  </Link>
-</div>
+          <Link href="/wishlists">
+            <button className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted transition-colors text-sm">
+              <span className="text-primary"><Heart className="w-4 h-4" /></span>
+              <span className="flex-1 text-left font-medium">My Wishlists</span>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </Link>
+        </div>
 
         {(user?.isAdmin || user?.sellerVerified) && (
           <div className="bg-card border border-card-border rounded-2xl overflow-hidden">
@@ -624,4 +621,4 @@ export default function Me() {
       </main>
     </div>
   );
-    }
+  }
