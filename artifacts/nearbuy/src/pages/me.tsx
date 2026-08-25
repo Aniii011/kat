@@ -390,8 +390,8 @@ export default function Me() {
 
       <pre className="text-[9px] text-white bg-black p-2 overflow-auto whitespace-pre-wrap break-all">
   {JSON.stringify(user, null, 2)}
-  {"\n\n--- raw session ---\n"}
-  {typeof window !== "undefined" ? localStorage.getItem("kat-auth-token")?.slice(0, 800) : ""}
+  {"\n\n--- raw profile query ---\n"}
+  {typeof window !== "undefined" ? JSON.stringify((window as any).__debugProfileQuery, null, 2) : ""}
 </pre>
 
       <main className="max-w-2xl mx-auto px-4 py-4 pb-24 space-y-4">
