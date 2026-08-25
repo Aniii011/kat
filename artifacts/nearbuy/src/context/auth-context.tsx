@@ -57,7 +57,9 @@ const buildUser = async (u: any): Promise<KatUser | null> => {
     .single();
 
   console.log("DEBUG profile query for id:", u.id, "→", profile, error);
-
+  if (typeof window !== "undefined") {
+    (window as any).__debugProfileQuery = { forId: u.id, profile, error };
+}
   if (error) {
     console.error("auth-context: failed to load profile for role check:", error.message);
   }
