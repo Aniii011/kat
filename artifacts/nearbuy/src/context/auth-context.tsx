@@ -44,20 +44,23 @@ const AuthContext = createContext<AuthContextType>({
 const buildUser = async (u: any): Promise<KatUser | null> => {
   if (!u) return null;
 
+  console.log("DEBUG raw auth user:", u.id, u.email, u.user_metadata);
+
   const email = u.email ?? "";
   const fallbackName =
     u.user_metadata?.name ?? u.user_metadata?.full_name ?? email.split("@")[0] ?? "User";
 
-  const { data: profile, error } = await supabase
+    const { data: profile, error } = await supabase
     .from("profiles")
     .select("full_name, is_admin, is_seller, seller_verified")
     .eq("id", u.id)
     .single();
 
+  console.log("DEBUG profile query for id:", u.id, "→", profile, error);
+
   if (error) {
     console.error("auth-context: failed to load profile for role check:", error.message);
   }
-
   return {
     id: u.id,
     email,
