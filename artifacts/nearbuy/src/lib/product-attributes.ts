@@ -70,3 +70,8 @@ export const GYM_COLOR_OPTIONS = COLORS;
 // products) but the new composer never writes to it. Flagging this so it's
 // understood as deliberate, not an oversight.
 export const NATIVE_ATTRIBUTE_COLUMNS = new Set(["audience", "fit", "material", "occasion"]);
+export function getAttributeFieldsForSubcategory(
+  _subcategory: string
+): AttributeField[] {
+  return [];
+}
