@@ -23,6 +23,28 @@ function formatNaira(n: number) {
   return "₦" + Number(n || 0).toLocaleString("en-NG");
 }
 
+// Translates raw Postgres/Supabase error messages into seller-friendly text.
+// Sellers should never see raw database error strings (constraint names,
+// column names, SQL internals) — this is the single place that decides what
+// gets shown instead.
+function friendlyError(error: any, fallback = "Something went wrong. Please try again."): string {
+  const msg = (error?.message || "").toLowerCase();
+  if (!msg) return fallback;
+  if (msg.includes("not-null constraint") || msg.includes("null value in column")) {
+    return "Something required is still missing — please check the highlighted fields and try again.";
+  }
+  if (msg.includes("duplicate key")) {
+    return "This looks like it's already been saved. Try refreshing the page.";
+  }
+  if (msg.includes("permission denied") || msg.includes("row-level security")) {
+    return "You don't have permission to do that. Please try signing out and back in.";
+  }
+  if (msg.includes("network") || msg.includes("fetch")) {
+    return "Network issue — please check your connection and try again.";
+  }
+  return fallback;
+}
+
 type SellerSection = "home" | "products" | "orders" | "promotions" | "statements" | "settings";
 
 const SELLER_CONTROLLED_STATUSES = ["accepted", "preparing", "ready_for_pickup"];
@@ -80,6 +102,7 @@ export default function Seller() {
   const [showAddStore, setShowAddStore] = useState(false);
   const [newStoreName, setNewStoreName] = useState("");
   const [storePendingCounts, setStorePendingCounts] = useState<Record<string, number>>({});
+  const [addStoreError, setAddStoreError] = useState<string | null>(null);
 
   const [profileSellerCategory, setProfileSellerCategory] = useState<SellerCategoryId | null | undefined>(undefined);
   const [savingSellerCategory, setSavingSellerCategory] = useState(false);
@@ -194,7 +217,7 @@ export default function Seller() {
 
     } catch (err: any) {
       console.error("FETCH ALL FAILED:", err);
-      setFetchError(err.message || String(err));
+      setFetchError(friendlyError(err, "Couldn't load your seller data. Please try refreshing the page."));
     } finally {
       setLoading(false);
     }
@@ -235,12 +258,15 @@ export default function Seller() {
 
   const createStore = async () => {
     if (!newStoreName.trim() || !user) return;
+    setAddStoreError(null);
     const { data, error } = await supabase.from("stores").insert({ owner_id: user.id, name: newStoreName.trim() }).select().single();
     if (!error && data) {
       setStores((prev) => [...prev, data]);
       selectStore(data.id);
       setNewStoreName("");
       setShowAddStore(false);
+    } else {
+      setAddStoreError(friendlyError(error, "Couldn't create the store. Please try again."));
     }
   };
 
@@ -311,9 +337,10 @@ export default function Seller() {
           {showAddStore ? (
             <div className="p-4 rounded-2xl border-2 border-dashed border-primary/40 space-y-2">
               <Input placeholder="New store name" value={newStoreName} onChange={(e) => setNewStoreName(e.target.value)} className="rounded-xl h-10 text-sm" />
+              {addStoreError && <p className="text-xs text-destructive font-medium">{addStoreError}</p>}
               <div className="flex gap-2">
                 <Button size="sm" className="flex-1 rounded-full" onClick={createStore}>Create Store</Button>
-                <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setShowAddStore(false)}>Cancel</Button>
+                <Button size="sm" variant="ghost" className="rounded-full" onClick={() => { setShowAddStore(false); setAddStoreError(null); }}>Cancel</Button>
               </div>
             </div>
           ) : (
@@ -519,7 +546,7 @@ export default function Seller() {
       setTitle(data.title);
       setDescription(data.description);
     } catch (err: any) {
-      setAiError(err.message || "AI generation failed, please try again.");
+      setAiError("AI generation failed, please try again.");
     }
     setGeneratingAI(false);
   };
@@ -582,6 +609,10 @@ export default function Seller() {
 
     const isNewThrift = sellerCategory === "Thrift";
 
+    // NOTE: products.price is NOT NULL in the schema — even a draft with no
+    // price entered yet must send a numeric value, never null, or the insert/
+    // update throws a raw Postgres "not-null constraint" error straight to
+    // the seller. Defaulting to 0 keeps drafts saveable without a price.
     const payload: Record<string, any> = {
       title, description,
       audience: audience || null,
@@ -589,7 +620,7 @@ export default function Seller() {
       material: material || null,
       occasion: occasion || null,
       seller_price: Number(basePrice) || null,
-      price: basePrice ? Math.round(Number(basePrice) * 1.095) : null,
+      price: basePrice ? Math.round(Number(basePrice) * 1.095) : 0,
       image_url: allImages[0] || "",
       image_embedding: imageEmbedding,
       images: allImages,
@@ -624,18 +655,29 @@ export default function Seller() {
       const { data, error } = await supabase.from("products").update(payload).eq("id", editingProductId).select().single();
       setUploading(false);
       if (!error && data) { setProducts((prev) => prev.map((p) => p.id === editingProductId ? data : p)); setShowUpload(false); resetForm(); }
-      else { setUploadError(error?.message || "Failed to update."); }
+      else {
+        console.error("PRODUCT UPDATE FAILED:", error);
+        setUploadError(friendlyError(error, "Couldn't save your changes. Please try again."));
+      }
     } else {
       const { data, error } = await supabase.from("products").insert(payload).select().single();
       setUploading(false);
       if (!error && data) { setProducts((prev) => [data, ...prev]); setShowUpload(false); resetForm(); }
-      else { setUploadError(error?.message || "Failed to save."); }
+      else {
+        console.error("PRODUCT INSERT FAILED:", error);
+        setUploadError(friendlyError(error, "Couldn't save this product. Please try again."));
+      }
     }
   };
 
   const deleteProduct = async (id: string) => {
     if (!window.confirm("Delete this product? This cannot be undone.")) return;
-    await supabase.from("products").delete().eq("id", id);
+    const { error } = await supabase.from("products").delete().eq("id", id);
+    if (error) {
+      console.error("PRODUCT DELETE FAILED:", error);
+      alert(friendlyError(error, "Couldn't delete this product. Please try again."));
+      return;
+    }
     setProducts((prev) => prev.filter((p) => p.id !== id));
   };
 
@@ -643,7 +685,7 @@ export default function Seller() {
     const { error } = await supabase.from("orders").update({ admin_status: status, updated_at: new Date().toISOString() }).eq("id", orderId);
     if (error) {
       console.error("SELLER STATUS UPDATE FAILED:", error);
-      alert("Couldn't update order status: " + error.message);
+      alert(friendlyError(error, "Couldn't update this order's status. Please try again."));
       return;
     }
     await supabase.from("order_events").insert({ order_id: orderId, status });
@@ -1258,7 +1300,7 @@ function SellerSettingsSection({ user, isMultiStore, activeStore, onStoreUpdated
     setSaving(false);
     if (error) {
       console.error("STORE SETTINGS SAVE FAILED:", error);
-      setSaveError("Failed to save: " + error.message);
+      setSaveError(friendlyError(error, "Couldn't save your store settings. Please try again."));
       return;
     }
     setSaved(true);
