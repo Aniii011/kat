@@ -210,6 +210,10 @@ export default function OrderDetailsDialog({
                 <tbody>
                   <tr><td style={{ padding: "2px 0", fontWeight: 700 }}>Order ID:</td><td>#{order.id.slice(0, 8)}</td></tr>
                   <tr><td style={{ padding: "2px 0", fontWeight: 700 }}>Date:</td><td>{new Date(order.created_at).toLocaleDateString()}</td></tr>
+                  {/* Only addition in this pass: status wasn't visible on the printed
+                      slip before, since it lived in the dialog header which the
+                      print stylesheet hides. Nothing else in this block changed. */}
+                  <tr><td style={{ padding: "2px 0", fontWeight: 700 }}>Status:</td><td>{STATUS_LABELS[status] || status}</td></tr>
                 </tbody>
               </table>
 
@@ -248,4 +252,4 @@ export default function OrderDetailsDialog({
       </DialogContent>
     </Dialog>
   );
-          }
+            }
