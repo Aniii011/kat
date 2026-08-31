@@ -1623,6 +1623,7 @@ function SellerAnalyticsSection({ orders, products, salesByProduct, cancellation
               <span className="text-xs font-medium">{pctChange >= 0 ? "+" : ""}{pctChange}% vs previous period</span>
             )}
           </div>
+          <RevenueTrendChart orders={inRange} rangeDays={range} />
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-muted rounded-2xl p-3"><p className="text-[11px] text-muted-foreground">Revenue</p><p className="text-lg font-black mt-0.5">{formatNaira(revenueInRange)}</p></div>
             <div className="bg-muted rounded-2xl p-3"><p className="text-[11px] text-muted-foreground">Orders</p><p className="text-lg font-black mt-0.5">{inRange.length}</p></div>
@@ -1693,6 +1694,46 @@ function SellerAnalyticsSection({ orders, products, salesByProduct, cancellation
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── REVENUE TREND CHART ──
+// Real chart computed from actual order data, bucketed by day across the
+// selected range. No decorative/fake bars — if there's no revenue in a
+// bucket, the bar is simply zero height.
+function RevenueTrendChart({ orders, rangeDays }: { orders: any[]; rangeDays: number }) {
+  const bucketCount = rangeDays <= 7 ? 7 : rangeDays <= 30 ? 10 : 12;
+  const bucketMs = (rangeDays * 24 * 60 * 60 * 1000) / bucketCount;
+  const now = Date.now();
+  const buckets = Array.from({ length: bucketCount }, (_, i) => {
+    const start = now - (bucketCount - i) * bucketMs;
+    const end = start + bucketMs;
+    const total = orders
+      .filter((o: any) => {
+        const t = new Date(o.created_at).getTime();
+        return t >= start && t < end;
+      })
+      .reduce((s: number, o: any) => s + (o.total || o.amount || 0), 0);
+    return total;
+  });
+  const max = Math.max(...buckets, 1);
+
+  if (orders.length === 0) {
+    return <div className="h-24 flex items-center justify-center text-xs text-muted-foreground border border-border rounded-2xl">No revenue in this period yet.</div>;
+  }
+
+  return (
+    <div className="border border-border rounded-2xl p-3">
+      <div className="flex items-end gap-1.5 h-24">
+        {buckets.map((v, i) => (
+          <div key={i} className="flex-1 bg-muted rounded-t-sm relative group" style={{ height: `${Math.max((v / max) * 100, 2)}%` }}>
+            <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] text-muted-foreground opacity-0 group-hover:opacity-100 whitespace-nowrap">
+              {formatNaira(v)}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1871,4 +1912,4 @@ function EmptyState({ icon, title, action }: any) {
       {action}
     </div>
   );
-                  }
+}
