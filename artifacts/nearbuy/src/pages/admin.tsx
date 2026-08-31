@@ -85,6 +85,7 @@ export default function Admin() {
   const [userRoleFilter, setUserRoleFilter] = useState<"all" | "buyers" | "sellers" | "admins">("all");
   const [productFilter, setProductFilter] = useState("all");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [analyticsRange, setAnalyticsRange] = useState<7 | 30 | 90>(30);
 
   const isAdmin = user?.isAdmin;
@@ -393,39 +394,76 @@ export default function Admin() {
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b border-border">
         <div className="flex items-center justify-between px-4 h-14">
           <div className="flex items-center gap-2">
-            <button onClick={() => setMobileMenuOpen(true)} className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
+            <button onClick={() => setMobileMenuOpen(true)} className="w-9 h-9 rounded-full bg-muted flex items-center justify-center" aria-label="Open menu">
               <Menu className="w-4 h-4" />
             </button>
             <span className="text-lg font-black text-primary">KAT</span>
           </div>
           <p className="text-xs font-semibold">Admin</p>
-          <button onClick={fetchAll} className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
-            <RefreshCw className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <div className="relative">
+              <button onClick={() => setNotifOpen((v) => !v)} className="w-9 h-9 rounded-full bg-muted flex items-center justify-center relative" aria-label="Notifications">
+                <Bell className="w-4 h-4" />
+                {(pendingSellers > 0 || agingOrders.length > 0) && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-foreground" />}
+              </button>
+              {notifOpen && (
+                <div className="absolute top-11 right-0 w-64 bg-card border border-border rounded-2xl shadow-xl z-50 p-2">
+                  <div className="flex items-center justify-between px-2 py-1">
+                    <p className="text-xs font-bold text-muted-foreground">Notifications</p>
+                    <button onClick={() => setNotifOpen(false)}><X className="w-3.5 h-3.5" /></button>
+                  </div>
+                  {pendingSellers === 0 && agingOrders.length === 0 ? (
+                    <p className="text-xs text-muted-foreground px-2 py-4 text-center">You're all caught up.</p>
+                  ) : (
+                    <div className="space-y-0.5 mt-1">
+                      {pendingSellers > 0 && (
+                        <button onClick={() => { setSection("sellers"); setNotifOpen(false); setMobileMenuOpen(false); }} className="w-full text-left px-2 py-2 rounded-xl hover:bg-muted text-xs">
+                          {pendingSellers} seller{pendingSellers !== 1 ? "s" : ""} awaiting verification
+                        </button>
+                      )}
+                      {agingOrders.length > 0 && (
+                        <button onClick={() => { setSection("orders"); setNotifOpen(false); setMobileMenuOpen(false); }} className="w-full text-left px-2 py-2 rounded-xl hover:bg-muted text-xs">
+                          {agingOrders.length} order{agingOrders.length !== 1 ? "s" : ""} pending 48h+
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <button onClick={fetchAll} className="w-9 h-9 rounded-full bg-muted flex items-center justify-center" aria-label="Refresh">
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 
+      {/* Mobile hamburger drawer — reuses the exact same NAV_ITEMS list, `section`
+          state, and setSection setter as the desktop sidebar via sidebarNav().
+          No separate nav data or duplicated routing logic. */}
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
           <div className="relative w-72 max-w-[80vw] bg-card h-full flex flex-col shadow-2xl">
-            <div className="p-5 border-b border-border flex items-center justify-between">
+            <div className="p-5 border-b border-border flex items-center justify-between shrink-0">
               <div>
                 <span className="text-xl font-black text-primary">KAT</span>
                 <p className="text-[10px] text-muted-foreground mt-0.5">Admin Center</p>
               </div>
-              <button onClick={() => setMobileMenuOpen(false)} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+              <button onClick={() => setMobileMenuOpen(false)} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center" aria-label="Close menu">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-4 border-b border-border">
+            <div className="p-4 border-b border-border shrink-0">
               <p className="text-sm font-bold truncate">{user.name || "Admin"}</p>
               <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
             </div>
-            <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+            {/* min-h-0 + overflow-y-auto ensures this scrolls independently and
+                never gets clipped by the fixed header/footer above/below it */}
+            <nav className="flex-1 min-h-0 p-3 space-y-1 overflow-y-auto overscroll-contain">
               {sidebarNav(true)}
             </nav>
-            <div className="p-3 border-t border-border space-y-1">
+            <div className="p-3 border-t border-border space-y-1 shrink-0" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
               <Link href="/me">
                 <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:bg-muted transition-all">
                   <ArrowLeft className="w-4 h-4" /> Back to KAT
@@ -1041,4 +1079,4 @@ function TrendChart({ orders, rangeDays, metric, commissionRate }: { orders: any
       </div>
     </div>
   );
-  }
+                                      }
