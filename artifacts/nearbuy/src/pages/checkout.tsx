@@ -151,6 +151,21 @@ export default function Checkout() {
     setCouponError("");
   };
 
+  // Builds the buyer-facing confirmation payload from a set of already-persisted
+  // order rows. Shared by both the normal success path and the duplicate-callback
+  // recovery path below, so the confirmation screen behaves identically either way.
+  const buildConfirmationPayload = (orderIds: string[], reference: string) => ({
+    orderIds,
+    items,
+    total,
+    delivery,
+    fullName: fullName.trim(),
+    phone: phone.trim(),
+    address: `${address.trim()}, ${city.trim()}`,
+    paymentRef: reference,
+    createdAt: new Date().toISOString(),
+  });
+
   const handleSuccessfulPayment = async (response: any) => {
     try {
       const verify = await fetch("/api/verify-payment", {
@@ -171,59 +186,87 @@ export default function Checkout() {
         return;
       }
 
-      const orderIds: string[] = [];
-
-      const { data: existingOrder } = await supabase
+      // ── Idempotency guard ──
+      // If this callback has already been processed (Paystack can fire onSuccess
+      // more than once for the same transaction), don't create a second set of
+      // orders. FIX: the old version just `return`ed here, leaving the button
+      // stuck on "Placing order..." forever with no navigation and no cart
+      // clear, even though the order actually exists. Now it recovers properly:
+      // look up the orders that already exist for this reference and route the
+      // buyer to confirmation exactly as if this were the first successful call.
+      const { data: existingOrders } = await supabase
         .from("orders")
         .select("id")
-        .eq("payment_ref", response.reference)
-        .single();
+        .eq("payment_ref", response.reference);
 
-      if (existingOrder) {
+      if (existingOrders && existingOrders.length > 0) {
+        const orderIds = existingOrders.map((o) => o.id);
+        sessionStorage.setItem(
+          "kat_order_confirmed",
+          JSON.stringify(buildConfirmationPayload(orderIds, response.reference))
+        );
+        sessionStorage.removeItem("kat_checkout_items");
+        clearCart();
+        setPlacing(false);
+        navigate("/order-confirmation");
         return;
       }
 
-      for (const item of items) {
-        const { data: product } = await supabase
-          .from("products")
-          .select("seller_id, store_id")
-          .eq("id", item.listingId)
-          .single();
+      // ── Order creation ──
+      // FIX: previously this looped over `items` doing one INSERT per item, with
+      // `if (error) throw` breaking the loop on first failure. That meant a cart
+      // of 3 items could end up with item #1 charged-and-inserted, then items
+      // #2-#3 never created if the 2nd insert failed for any reason — the buyer
+      // is charged for 3 items but only 1 gets an order. A single batched
+      // `.insert([...])` call is one Postgres statement: either every line item
+      // is created, or none are (a genuine insert-level failure rolls back the
+      // whole statement rather than leaving a partial set of rows behind).
+      const productLookups = await Promise.all(
+        items.map((item) =>
+          supabase.from("products").select("seller_id, store_id").eq("id", item.listingId).single()
+        )
+      );
 
-        const { data, error } = await supabase
-          .from("orders")
-          .insert({
-            product_id: item.listingId,
-            buyer_id: user?.id || null,
-            buyer_name: fullName.trim(),
-            buyer_phone: phone.trim(),
-            buyer_address: address.trim(),
-            delivery_state: state,
-            delivery_area: city,
-            delivery_fee: delivery,
-            amount: item.price,
-            quantity: item.quantity,
-            total: item.price * item.quantity,
-            variant: { color: item.selectedColor || null, size: item.selectedSize || null },
-            coupon_code: appliedCoupon?.code || null,
-            discount_amount: discount,
-            status: "pending",
-            seller_status: "pending",
-            admin_status: "pending",
-            seller_id: product?.seller_id || null,
-            store_id: product?.store_id || null,
-            payment_ref: response.reference,
-          })
-          .select()
-          .single();
+      const rows = items.map((item, i) => ({
+        product_id: item.listingId,
+        buyer_id: user?.id || null,
+        buyer_name: fullName.trim(),
+        buyer_phone: phone.trim(),
+        buyer_address: address.trim(),
+        delivery_state: state,
+        delivery_area: city,
+        delivery_fee: delivery,
+        amount: item.price,
+        quantity: item.quantity,
+        total: item.price * item.quantity,
+        variant: { color: item.selectedColor || null, size: item.selectedSize || null },
+        coupon_code: appliedCoupon?.code || null,
+        discount_amount: discount,
+        status: "pending",
+        seller_status: "pending",
+        admin_status: "pending",
+        seller_id: productLookups[i].data?.seller_id || null,
+        store_id: productLookups[i].data?.store_id || null,
+        payment_ref: response.reference,
+      }));
 
-        if (error) throw error;
+      const { data: insertedOrders, error: insertError } = await supabase
+        .from("orders")
+        .insert(rows)
+        .select();
 
-        if (data) {
-          orderIds.push(data.id);
-          await supabase.from("order_events").insert({ order_id: data.id, status: "pending" });
-        }
+      if (insertError) throw insertError;
+      if (!insertedOrders || insertedOrders.length !== items.length) {
+        // Defensive check: if the insert reports success but didn't return the
+        // expected number of rows, don't silently proceed as if everything is
+        // fine — surface it rather than confirming an order that may be short.
+        throw new Error("Order creation returned an unexpected number of rows. Please contact support before retrying payment.");
       }
+
+      const orderIds = insertedOrders.map((o) => o.id);
+      await supabase.from("order_events").insert(
+        insertedOrders.map((o) => ({ order_id: o.id, status: "pending" }))
+      );
 
       if (appliedCoupon) {
         await supabase
@@ -234,17 +277,7 @@ export default function Checkout() {
 
       sessionStorage.setItem(
         "kat_order_confirmed",
-        JSON.stringify({
-          orderIds,
-          items,
-          total,
-          delivery,
-          fullName: fullName.trim(),
-          phone: phone.trim(),
-          address: `${address.trim()}, ${city.trim()}`,
-          paymentRef: response.reference,
-          createdAt: new Date().toISOString(),
-        })
+        JSON.stringify(buildConfirmationPayload(orderIds, response.reference))
       );
 
       sessionStorage.removeItem("kat_checkout_items");
@@ -255,6 +288,16 @@ export default function Checkout() {
 
     } catch (err: any) {
       console.error("ORDER ERROR:", err);
+      // NOTE: if this fires AFTER a successful Paystack charge (verify.verified
+      // was true) but the order insert itself failed, the buyer has been
+      // charged with no order on file. That combination is now structurally
+      // prevented by the batched insert above for the "some rows fail" case,
+      // but a total insert failure (e.g. network drop after payment) can still
+      // occur. This is the one remaining gap that genuinely needs either a
+      // server-side reconciliation job (matching Paystack transactions against
+      // `orders.payment_ref` and alerting on orphans) or a webhook-based
+      // fallback order-creation path — both are backend work outside what a
+      // client-side fix can guarantee.
       setError(err.message);
       setPlacing(false);
     }
@@ -481,4 +524,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-          }
+    }
