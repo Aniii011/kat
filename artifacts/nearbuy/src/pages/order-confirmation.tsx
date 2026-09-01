@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { CheckCircle2, ShoppingBag, MapPin, Package, Home, MessageCircle } from "lucide-react";
+import { CheckCircle2, ShoppingBag, MapPin, Package, Home, MessageCircle, Copy, Check, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
@@ -9,16 +9,50 @@ function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
 export default function OrderConfirmation() {
   const [, navigate] = useLocation();
   const [order, setOrder] = useState<any>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const stored = sessionStorage.getItem("kat_order_confirmed");
     if (stored) {
       try { setOrder(JSON.parse(stored)); }
-      catch { navigate("/"); }
+      catch { setNotFound(true); }
     } else {
-      navigate("/");
+      setNotFound(true);
     }
   }, []);
+
+  const copyOrderNumber = () => {
+    if (!order?.paymentRef) return;
+    navigator.clipboard.writeText(order.paymentRef).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+
+  if (notFound) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <div className="text-center max-w-xs">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-7 h-7 text-muted-foreground" />
+          </div>
+          <p className="font-bold text-lg">We couldn't load this order confirmation</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            This can happen after a refresh. If your payment went through, you'll find the order in your order history.
+          </p>
+          <div className="mt-6 space-y-2">
+            <Link href="/me">
+              <Button className="w-full rounded-full font-bold">View my orders</Button>
+            </Link>
+            <Link href="/">
+              <Button variant="outline" className="w-full rounded-full font-bold">Continue shopping</Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!order) {
     return (
@@ -52,6 +86,18 @@ export default function OrderConfirmation() {
           <p className="text-sm text-muted-foreground mt-2 max-w-xs mx-auto">
             Thank you {order.fullName.split(" ")[0]}! Your order has been received and is being processed.
           </p>
+
+          {order.paymentRef && (
+            <button
+              onClick={copyOrderNumber}
+              className="mt-4 inline-flex items-center gap-2 bg-muted hover:bg-muted/70 transition-colors rounded-full px-4 py-2 mx-auto"
+              aria-label="Copy order number"
+            >
+              <span className="text-xs text-muted-foreground">Order #</span>
+              <span className="text-xs font-bold font-mono">{order.paymentRef}</span>
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}
+            </button>
+          )}
         </motion.div>
 
         {/* Order details */}
@@ -153,7 +199,8 @@ export default function OrderConfirmation() {
           <MessageCircle className="w-5 h-5 text-primary shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold">Need help with your order?</p>
-            <p className="text-xs text-muted-foreground">Contact us on WhatsApp</p>
+            <p className="text-xs text-muted-foreground">
+              Contact us on WhatsApp{order.paymentRef ? ` with order #${order.paymentRef}` : ""}</p>
           </div>
           <a href="https://wa.me/2348000000000" target="_blank" rel="noopener noreferrer">
             <Button size="sm" variant="outline" className="rounded-full text-xs shrink-0">Chat</Button>
@@ -184,4 +231,4 @@ export default function OrderConfirmation() {
       </main>
     </div>
   );
-          }
+  }
