@@ -137,7 +137,7 @@ export default function AdminOrders() {
     const status: AdminStatus = (o.admin_status || "pending") as AdminStatus;
     const matchStatus = filter === "all" || status === filter;
     const buyer = buyers[o.buyer_id];
-    const matchSearch = !search || [o.id, buyer?.full_name, buyer?.email, o.buyer_address]
+    const matchSearch = !search || [o.id, o.payment_ref, buyer?.full_name, buyer?.email, o.buyer_address]
       .some((f) => f?.toLowerCase().includes(search.toLowerCase()));
     return matchStatus && matchSearch;
   });
@@ -204,7 +204,7 @@ export default function AdminOrders() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by buyer name, email, address..."
+            placeholder="Search by order #, buyer name, email, address..."
             className="rounded-xl pl-9 h-9 text-sm"
           />
         </div>
@@ -247,7 +247,7 @@ export default function AdminOrders() {
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                        <p className="font-mono text-[11px] text-muted-foreground">{order.id.slice(0, 8)}</p>
+                        <p className="font-mono text-[11px] text-muted-foreground">{order.payment_ref || order.id.slice(0, 8)}</p>
                         <span className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${cfg.color}`}>
                           {cfg.icon} {cfg.label}
                         </span>
