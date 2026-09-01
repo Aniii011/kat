@@ -168,6 +168,8 @@ export default function Checkout() {
 
   const handleSuccessfulPayment = async (response: any) => {
     try {
+      const expectedAmountKobo = total * 100;
+
       const verify = await fetch("/api/verify-payment", {
         method: "POST",
         headers: {
@@ -175,32 +177,46 @@ export default function Checkout() {
         },
         body: JSON.stringify({
           reference: response.reference,
+          // FIX: server-side verification now independently confirms the
+          // amount Paystack actually collected matches what Checkout
+          // expected — without this, verification only proved "a successful
+          // charge exists for this reference," not "for the right amount."
+          expectedAmount: expectedAmountKobo,
         }),
       });
 
       const result = await verify.json();
 
       if (!result.verified) {
-        setError("Payment verification failed");
+        setError(result.reason || "Payment verification failed");
         setPlacing(false);
         return;
       }
 
-      // ── Idempotency guard ──
-      // If this callback has already been processed (Paystack can fire onSuccess
-      // more than once for the same transaction), don't create a second set of
-      // orders. FIX: the old version just `return`ed here, leaving the button
-      // stuck on "Placing order..." forever with no navigation and no cart
-      // clear, even though the order actually exists. Now it recovers properly:
-      // look up the orders that already exist for this reference and route the
-      // buyer to confirmation exactly as if this were the first successful call.
-      const { data: existingOrders } = await supabase
-        .from("orders")
-        .select("id")
-        .eq("payment_ref", response.reference);
+      // ── Idempotency claim ──
+      // FIX: previously this did a SELECT to check for an existing order,
+      // then an INSERT — two separate round-trips with a real race window
+      // between them. A `processed_payments` table with payment_ref as its
+      // PRIMARY KEY makes this atomic: only one caller can ever successfully
+      // claim a given reference, so two near-simultaneous callback firings
+      // (or a client callback racing the server-side reconciliation webhook)
+      // cannot both proceed to create orders.
+      const { error: claimError } = await supabase
+        .from("processed_payments")
+        .insert({ payment_ref: response.reference });
 
-      if (existingOrders && existingOrders.length > 0) {
-        const orderIds = existingOrders.map((o) => o.id);
+      if (claimError) {
+        // Someone else already claimed this reference — either a duplicate
+        // callback on this same client, or the reconciliation webhook beat
+        // us to it. Either way, orders already exist (or are being created)
+        // for this payment. Look them up and route to confirmation instead
+        // of silently stopping, so the buyer never gets stuck.
+        const { data: existingOrders } = await supabase
+          .from("orders")
+          .select("id")
+          .eq("payment_ref", response.reference);
+
+        const orderIds = (existingOrders || []).map((o) => o.id);
         sessionStorage.setItem(
           "kat_order_confirmed",
           JSON.stringify(buildConfirmationPayload(orderIds, response.reference))
@@ -327,6 +343,28 @@ export default function Checkout() {
         amount: total * 100,
         currency: "NGN",
         reference: `KAT-${Date.now()}`,
+        // FIX: attach the full order intent as Paystack metadata. Paystack
+        // echoes metadata back on both the client success callback AND the
+        // server-side webhook event. If the browser tab closes, loses
+        // network, or the client-side insert fails entirely right after a
+        // successful charge, the webhook (paystack-webhook.js) can still
+        // reconstruct the exact same orders from this metadata — a
+        // successful payment can no longer permanently disappear just
+        // because the client never made it back to finish the job.
+        metadata: {
+          orderIntent: {
+            items,
+            fullName: fullName.trim(),
+            phone: phone.trim(),
+            address: address.trim(),
+            state,
+            city,
+            deliveryFee: delivery,
+            couponCode: appliedCoupon?.code || null,
+            discount,
+            buyerId: user?.id || null,
+          },
+        },
         onSuccess: (response: any) => {
           handleSuccessfulPayment(response);
         },
@@ -524,4 +562,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-    }
+      }
