@@ -60,7 +60,7 @@ export default function BuyerOrderDialog({ open, order, product, onClose }: Prop
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-xl rounded-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Order #{order.id.slice(0, 8)}</DialogTitle>
+          <DialogTitle className="font-mono">Order #{order.payment_ref || order.id.slice(0, 8)}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -131,4 +131,4 @@ export default function BuyerOrderDialog({ open, order, product, onClose }: Prop
       </DialogContent>
     </Dialog>
   );
-                }
+}
