@@ -4,14 +4,35 @@ import { useAuth } from "@/context/auth-context";
 import { useCart } from "@/hooks/use-cart";
 import { supabase } from "@/lib/supabase";
 import {
-  ArrowLeft, MapPin, ShoppingBag,
+  ArrowLeft, MapPin, ShoppingBag, Lock, Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { NIGERIAN_STATES } from "@/lib/nigeriaStates";
 
 function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
+
+const FREE_DELIVERY_THRESHOLD = 25000;
+
+// Turns whatever a failed order-creation / verification attempt throws into
+// language a buyer can actually act on. Never shown: Postgres/Supabase error
+// text, JS stack messages, or raw Paystack payloads.
+function friendlyOrderError(err: any): string {
+  const raw = String(err?.message || err || "").toLowerCase();
+  if (raw.includes("failed to fetch") || raw.includes("network")) {
+    return "Something went wrong while processing your order. Please check your connection and try again.";
+  }
+  if (raw.includes("unexpected number of rows")) {
+    return "We couldn't confirm your full order. Please contact support with your payment reference before trying again.";
+  }
+  return "Something went wrong while placing your order. Please try again, or contact support if you were charged.";
+}
+
+function friendlyPaystackError(err: any): string {
+  return "Your payment wasn't completed. Please try again.";
+}
 
 interface CheckoutItem {
   listingId: string;
@@ -78,6 +99,9 @@ export default function Checkout() {
   const citySelected = !!city;
   // Don't claim delivery is "Free" before we actually know the fee for the chosen area.
   const delivery = citySelected ? (subtotal >= 25000 ? 0 : deliveryFee) : 0;
+
+  const amountToFreeDelivery = Math.max(0, FREE_DELIVERY_THRESHOLD - subtotal);
+  const freeDeliveryUnlocked = subtotal >= FREE_DELIVERY_THRESHOLD;
 
   const discount = appliedCoupon
     ? appliedCoupon.discount_type === "percent"
@@ -188,7 +212,7 @@ export default function Checkout() {
       const result = await verify.json();
 
       if (!result.verified) {
-        setError(result.reason || "Payment verification failed");
+        setError("Your payment wasn't completed. Please try again.");
         setPlacing(false);
         return;
       }
@@ -314,7 +338,7 @@ export default function Checkout() {
       // `orders.payment_ref` and alerting on orphans) or a webhook-based
       // fallback order-creation path — both are backend work outside what a
       // client-side fix can guarantee.
-      setError(err.message);
+      setError(friendlyOrderError(err));
       setPlacing(false);
     }
   };
@@ -369,18 +393,19 @@ export default function Checkout() {
           handleSuccessfulPayment(response);
         },
         onCancel: () => {
+          setError("Payment cancelled. Your order hasn't been placed.");
           setPlacing(false);
         },
         onError: (err: any) => {
           console.error("PAYSTACK ERROR:", err);
-          setError(err?.message || "Payment failed");
+          setError(friendlyPaystackError(err));
           setPlacing(false);
         },
       });
 
     } catch (err: any) {
       console.error("ORDER ERROR FULL:", err);
-      setError(err.message || "Order creation failed");
+      setError(friendlyOrderError(err));
       setPlacing(false);
     }
   };
@@ -393,12 +418,28 @@ export default function Checkout() {
     );
   }
 
+  const errorBlock = error && (
+    <div className="bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-3">
+      <p className="text-xs text-destructive font-medium">{error}</p>
+    </div>
+  );
+
+  const payCta = (
+    <Button
+      className="w-full rounded-full font-bold h-12 text-sm"
+      disabled={!canPlaceOrder || placing}
+      onClick={handlePlaceOrder}
+    >
+      {placing ? "Processing payment…" : `Pay ${formatNaira(total)}`}
+    </Button>
+  );
+
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <div className="min-h-screen bg-background pb-28 md:pb-12">
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-3">
           <Link href="/cart">
-            <Button variant="ghost" size="icon" className="w-9 h-9 rounded-full">
+            <Button variant="ghost" size="icon" className="w-9 h-9 rounded-full" aria-label="Back to cart">
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
@@ -406,160 +447,215 @@ export default function Checkout() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-4 space-y-4">
+      <main className="max-w-5xl mx-auto px-4 py-4 md:py-8 grid md:grid-cols-[1fr_360px] gap-4 md:gap-6 items-start">
 
-        <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
-          <p className="text-sm font-bold flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-primary" /> Delivery Address
-          </p>
-          <Input placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} className="rounded-xl h-11" />
-          <Input placeholder="Phone number" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl h-11" type="tel" />
-          {phone.trim().length > 0 && !isValidPhone && (
-            <p className="text-xs text-destructive -mt-2">Enter a valid Nigerian number (e.g. 08012345678)</p>
-          )}
-          <Input placeholder="Delivery address" value={address} onChange={(e) => setAddress(e.target.value)} className="rounded-xl h-11" />
+        {/* LEFT: delivery + payment */}
+        <div className="space-y-4 min-w-0">
+          <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
+            <p className="text-sm font-bold flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-primary" /> Delivery Address
+            </p>
 
-          <select
-            value={state}
-            onChange={(e) => {
-              setState(e.target.value);
-              setCity("");
-              setDeliveryFee(0);
-            }}
-            className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="">Select State</option>
-            {NIGERIAN_STATES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+            <div className="space-y-1.5">
+              <Label htmlFor="fullName">Full name</Label>
+              <Input id="fullName" placeholder="e.g. Anike Johnson" value={fullName} onChange={(e) => setFullName(e.target.value)} className="rounded-xl h-11" />
+            </div>
 
-          <select
-            value={city}
-            onChange={(e) => {
-              const value = e.target.value;
-              setCity(value);
-              const selected = cities.find((c) => c.city === value);
-              setDeliveryFee(selected?.delivery_fee || 0);
-            }}
-            disabled={!state}
-            className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
-          >
-            <option value="">
-              {state ? "Select City" : "Select State First"}
-            </option>
-            {cities.map((c) => (
-              <option key={c.id} value={c.city}>
-                {c.city}
-              </option>
-            ))}
-          </select>
-        </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="phone">Phone number</Label>
+              <Input id="phone" placeholder="e.g. 08012345678" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl h-11" type="tel" inputMode="tel" />
+              {phone.trim().length === 0 && (
+                <p className="text-xs text-muted-foreground">Please enter a phone number.</p>
+              )}
+              {phone.trim().length > 0 && !isValidPhone && (
+                <p className="text-xs text-destructive">Please enter a valid phone number (e.g. 08012345678).</p>
+              )}
+            </div>
 
-        <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
-          <p className="text-sm font-bold flex items-center gap-2">
-            <ShoppingBag className="w-4 h-4 text-primary" /> Order Items ({items.length})
-          </p>
-          {items.map((item, i) => (
-            <div key={i} className="flex gap-3 items-center">
-              <img src={item.imageUrl} alt={item.title} className="w-14 h-14 rounded-xl object-contain shrink-0 bg-muted" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold line-clamp-1">{item.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {[item.selectedColor, item.selectedSize].filter(Boolean).join(" / ")} · Qty {item.quantity}
-                </p>
+            <div className="space-y-1.5">
+              <Label htmlFor="address">Delivery address</Label>
+              <Input id="address" placeholder="Street address" value={address} onChange={(e) => setAddress(e.target.value)} className="rounded-xl h-11" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="state">State</Label>
+                <select
+                  id="state"
+                  value={state}
+                  onChange={(e) => {
+                    setState(e.target.value);
+                    setCity("");
+                    setDeliveryFee(0);
+                  }}
+                  className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">Select state</option>
+                  {NIGERIAN_STATES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <p className="text-sm font-bold text-primary shrink-0">{formatNaira(item.price * item.quantity)}</p>
-            </div>
-          ))}
-        </div>
 
-        <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
-          <p className="text-sm font-bold flex items-center gap-2">
-            🏷️ Coupon Code
-          </p>
-          {appliedCoupon ? (
-            <div className="flex items-center justify-between bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2.5">
-              <div>
-                <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400 font-mono">{appliedCoupon.code}</p>
-                <p className="text-xs text-emerald-600 dark:text-emerald-500">
-                  {appliedCoupon.discount_type === "percent" ? `${appliedCoupon.discount_value}% off applied` : `${formatNaira(appliedCoupon.discount_value)} off applied`}
-                </p>
+              <div className="space-y-1.5">
+                <Label htmlFor="city">Delivery area</Label>
+                <select
+                  id="city"
+                  value={city}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setCity(value);
+                    const selected = cities.find((c) => c.city === value);
+                    setDeliveryFee(selected?.delivery_fee || 0);
+                  }}
+                  disabled={!state}
+                  className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                >
+                  <option value="">
+                    {state ? "Select area" : "Select state first"}
+                  </option>
+                  {cities.map((c) => (
+                    <option key={c.id} value={c.city}>
+                      {c.city}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <button onClick={removeCoupon} className="text-xs font-semibold text-muted-foreground underline">Remove</button>
             </div>
-          ) : (
-            <div className="flex gap-2">
-              <Input
-                placeholder="Enter code"
-                value={couponInput}
-                onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
-                className="rounded-xl h-11 font-mono flex-1"
-              />
-              <Button variant="outline" className="rounded-xl h-11" onClick={applyCoupon} disabled={applyingCoupon || !couponInput.trim()}>
-                {applyingCoupon ? "..." : "Apply"}
-              </Button>
-            </div>
-          )}
-          {couponError && <p className="text-xs text-destructive font-medium">{couponError}</p>}
-        </div>
-
-        <div className="bg-card border border-card-border rounded-2xl p-4 space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Subtotal</span>
-            <span className="font-medium">{formatNaira(subtotal)}</span>
           </div>
-          {discount > 0 && (
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Discount ({appliedCoupon.code})</span>
-              <span className="font-medium text-emerald-600">-{formatNaira(discount)}</span>
-            </div>
-          )}
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Delivery</span>
-            {!citySelected ? (
-              <span className="font-medium text-muted-foreground">Select delivery area</span>
+
+          <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
+            <p className="text-sm font-bold flex items-center gap-2">
+              🏷️ Coupon Code
+            </p>
+            {appliedCoupon ? (
+              <div className="flex items-center justify-between bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2.5">
+                <div>
+                  <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400 font-mono">{appliedCoupon.code}</p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-500">
+                    {appliedCoupon.discount_type === "percent" ? `${appliedCoupon.discount_value}% off applied` : `${formatNaira(appliedCoupon.discount_value)} off applied`}
+                  </p>
+                </div>
+                <button onClick={removeCoupon} className="text-xs font-semibold text-muted-foreground underline">Remove</button>
+              </div>
             ) : (
-              <span className={`font-medium ${delivery === 0 ? "text-emerald-600" : ""}`}>
-                {delivery === 0 ? "Free 🎉" : formatNaira(delivery)}
-              </span>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Enter code"
+                  value={couponInput}
+                  onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                  className="rounded-xl h-11 font-mono flex-1"
+                  aria-label="Coupon code"
+                />
+                <Button variant="outline" className="rounded-xl h-11" onClick={applyCoupon} disabled={applyingCoupon || !couponInput.trim()}>
+                  {applyingCoupon ? "..." : "Apply"}
+                </Button>
+              </div>
+            )}
+            {couponError && <p className="text-xs text-destructive font-medium">{couponError}</p>}
+          </div>
+
+          <p className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground px-1">
+            <Lock className="w-3.5 h-3.5" /> Payment is secured by Paystack. Your card details are encrypted and never stored on KAT.
+          </p>
+
+          <div className="hidden md:block">{errorBlock}</div>
+        </div>
+
+        {/* RIGHT: order summary, sticky on desktop */}
+        <div className="md:sticky md:top-[76px] space-y-4">
+          <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
+            <p className="text-sm font-bold flex items-center gap-2">
+              <ShoppingBag className="w-4 h-4 text-primary" /> Order Items ({items.length})
+            </p>
+            {items.map((item, i) => (
+              <div key={i} className="flex gap-3 items-center">
+                <img src={item.imageUrl} alt={item.title} className="w-14 h-14 rounded-xl object-contain shrink-0 bg-muted" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold line-clamp-2">{item.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {[item.selectedColor, item.selectedSize].filter(Boolean).join(" / ")} · Qty {item.quantity}
+                  </p>
+                </div>
+                <p className="text-sm font-bold text-primary shrink-0">{formatNaira(item.price * item.quantity)}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-card border border-card-border rounded-2xl p-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Subtotal</span>
+              <span className="font-medium">{formatNaira(subtotal)}</span>
+            </div>
+            {discount > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Discount ({appliedCoupon.code})</span>
+                <span className="font-medium text-emerald-600">-{formatNaira(discount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Delivery</span>
+              {!citySelected ? (
+                <span className="font-medium text-muted-foreground">Select delivery area</span>
+              ) : (
+                <span className={`font-medium ${delivery === 0 ? "text-emerald-600" : ""}`}>
+                  {delivery === 0 ? "Free delivery" : formatNaira(delivery)}
+                </span>
+              )}
+            </div>
+
+            {!freeDeliveryUnlocked && (
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-primary" /> Add {formatNaira(amountToFreeDelivery)} more to unlock free delivery.
+              </p>
+            )}
+            {freeDeliveryUnlocked && (
+              <p className="text-[11px] text-emerald-600 font-medium flex items-center gap-1">
+                🎉 Free delivery unlocked
+              </p>
+            )}
+
+            <Separator />
+            <div className="flex justify-between font-black text-base">
+              <span>Total</span>
+              <span className="text-primary">{formatNaira(total)}</span>
+            </div>
+            {discount > 0 && (
+              <p className="text-xs text-emerald-600 font-semibold text-right">You saved {formatNaira(discount)} 🎉</p>
             )}
           </div>
-          <Separator />
-          <div className="flex justify-between font-black text-base">
-            <span>Total</span>
-            <span className="text-primary">{formatNaira(total)}</span>
+
+          <p className="md:hidden flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground text-center px-4">
+            <Lock className="w-3 h-3" /> Payment is secured by Paystack. Your card details are encrypted and never stored on KAT.
+          </p>
+
+          <div className="md:hidden">{errorBlock}</div>
+
+          {/* Desktop CTA sits inline with the sticky summary */}
+          <div className="hidden md:block space-y-2">
+            {!canPlaceOrder && (
+              <p className="text-xs text-center text-muted-foreground">
+                Fill in your name, phone, address, state and delivery area to continue
+              </p>
+            )}
+            {payCta}
           </div>
-          {discount > 0 && (
-            <p className="text-xs text-emerald-600 font-semibold text-right">You saved {formatNaira(discount)} 🎉</p>
-          )}
         </div>
-
-        <p className="text-[11px] text-muted-foreground text-center px-4">
-          🔒 Payment is secured by Paystack. Your card details are encrypted and never stored on KAT.
-        </p>
-
-        {error && (
-          <div className="bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-3">
-            <p className="text-xs text-destructive font-medium">{error}</p>
-          </div>
-        )}
       </main>
 
-      <div className="fixed bottom-[62px] left-0 right-0 p-4 bg-background/95 backdrop-blur-md border-t border-border z-30">
-        <div className="max-w-2xl mx-auto space-y-2">
+      {/* Mobile sticky CTA */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-md border-t border-border z-30 md:hidden">
+        <div className="max-w-5xl mx-auto space-y-2">
           {!canPlaceOrder && (
             <p className="text-xs text-center text-muted-foreground">
               Fill in your name, phone, address, state and delivery area to continue
             </p>
           )}
-          <Button className="w-full rounded-full font-bold h-12 text-sm" disabled={!canPlaceOrder || placing} onClick={handlePlaceOrder}>
-            {placing ? "Placing order..." : `Place Order — ${formatNaira(total)}`}
-          </Button>
+          {payCta}
         </div>
       </div>
     </div>
   );
-      }
+        }
