@@ -75,6 +75,23 @@ export function useListings(filters?: {
       let query = supabase
         .from("products")
         .select("*")
+        // FIX (root cause of drafts appearing on buyer-facing surfaces):
+        // this query previously had no status filter at all, so every row
+        // in `products` was returned — including rows Seller.tsx saves with
+        // status: "draft" via saveProduct("draft"). Excluding "draft" here,
+        // at the shared data-access layer, is what actually enforces
+        // "seller draft = never buyer-visible" for every consumer of this
+        // hook (Home, and anything else built on useListings/useListing),
+        // rather than patching it per-screen after the fact.
+        //
+        // Using .neq("status", "draft") rather than .eq("status", "published")
+        // deliberately: Seller.tsx's saveProduct() only ever writes "draft"
+        // or "published" to this column, but if a null/undefined status
+        // value exists on any older row (e.g. rows created before this
+        // field existed), .eq("status","published") would incorrectly hide
+        // it from buyers too. .neq() only excludes rows explicitly marked
+        // draft and lets everything else through unchanged.
+        .neq("status", "draft")
         .order("created_at", { ascending: false });
 
       if (filters?.isThrift !== undefined) {
@@ -114,11 +131,22 @@ export function useListing(id: string | null) {
       setError(null);
 
       const [listingRes, reviewsRes] = await Promise.all([
-        supabase.from("products").select("*").eq("id", id).single(),
+        // FIX: same gap as useListings above — a draft product's direct URL
+        // (/listing/:id) was fully viewable by any buyer since this query
+        // had no status filter either. Excluding drafts here closes that
+        // surface too (product detail pages, and anything that links
+        // directly to a listing by id rather than going through the list
+        // query above).
+        supabase.from("products").select("*").eq("id", id).neq("status", "draft").single(),
         supabase.from("reviews").select("*").eq("product_id", id).order("id"),
       ]);
 
       if (listingRes.error) {
+        // A draft (or a genuinely missing product) now surfaces as a normal
+        // "not found" error here rather than a distinct case — that's the
+        // correct behavior for a buyer hitting a draft's URL directly: it
+        // should look exactly like a product that doesn't exist, not reveal
+        // that a hidden draft exists at that id.
         setError(listingRes.error.message);
         setLoading(false);
         return;
@@ -136,4 +164,4 @@ export function useListing(id: string | null) {
   }, [id]);
 
   return { listing, loading, error };
-}
+        }
