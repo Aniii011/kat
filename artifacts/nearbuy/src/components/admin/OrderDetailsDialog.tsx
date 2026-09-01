@@ -85,7 +85,7 @@ export default function OrderDetailsDialog({
       <DialogContent className="max-w-xl rounded-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 flex-wrap">
-            Order #{order.id.slice(0, 8)}
+            Order #{order.payment_ref || order.id.slice(0, 8)}
             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${STATUS_COLORS[status] || STATUS_COLORS.pending}`}>
               {STATUS_LABELS[status] || status}
             </span>
@@ -252,4 +252,4 @@ export default function OrderDetailsDialog({
       </DialogContent>
     </Dialog>
   );
-            }
+}
