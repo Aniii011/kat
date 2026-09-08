@@ -4,7 +4,7 @@ import { useAuth } from "@/context/auth-context";
 import { useCart } from "@/hooks/use-cart";
 import { supabase } from "@/lib/supabase";
 import {
-  ArrowLeft, MapPin, ShoppingBag, Lock, Sparkles,
+  ArrowLeft, MapPin, ShoppingBag, Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +13,6 @@ import { Separator } from "@/components/ui/separator";
 import { NIGERIAN_STATES } from "@/lib/nigeriaStates";
 
 function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
-
-const FREE_DELIVERY_THRESHOLD = 25000;
 
 // Turns whatever a failed order-creation / verification attempt throws into
 // language a buyer can actually act on. Never shown: Postgres/Supabase error
@@ -97,11 +95,8 @@ export default function Checkout() {
 
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   const citySelected = !!city;
-  // Don't claim delivery is "Free" before we actually know the fee for the chosen area.
-  const delivery = citySelected ? (subtotal >= 25000 ? 0 : deliveryFee) : 0;
-
-  const amountToFreeDelivery = Math.max(0, FREE_DELIVERY_THRESHOLD - subtotal);
-  const freeDeliveryUnlocked = subtotal >= FREE_DELIVERY_THRESHOLD;
+  // Delivery is always the selected city's fee — no subtotal-based free delivery.
+  const delivery = citySelected ? deliveryFee : 0;
 
   const discount = appliedCoupon
     ? appliedCoupon.discount_type === "percent"
@@ -606,17 +601,6 @@ export default function Checkout() {
               )}
             </div>
 
-            {!freeDeliveryUnlocked && (
-              <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-primary" /> Add {formatNaira(amountToFreeDelivery)} more to unlock free delivery.
-              </p>
-            )}
-            {freeDeliveryUnlocked && (
-              <p className="text-[11px] text-emerald-600 font-medium flex items-center gap-1">
-                🎉 Free delivery unlocked
-              </p>
-            )}
-
             <Separator />
             <div className="flex justify-between font-black text-base">
               <span>Total</span>
@@ -658,4 +642,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-        }
+  }
