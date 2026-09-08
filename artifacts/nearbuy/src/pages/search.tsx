@@ -158,7 +158,7 @@ export default function Search() {
   }, []);
 
   const fetchFeatured = async () => {
-    const { data } = await supabase.from("products").select("*").eq("is_thrift", false).order("created_at", { ascending: false }).limit(20);
+    const { data } = await supabase.from("products").select("*").eq("is_thrift", false).neq("status", "draft").order("created_at", { ascending: false }).limit(20);
     if (data) setFeatured(data);
   };
 
@@ -205,7 +205,7 @@ export default function Search() {
 
   const searchProducts = useCallback(async (q: string) => {
     setLoading(true);
-    let queryBuilder = supabase.from("products").select("*");
+    let queryBuilder = supabase.from("products").select("*").neq("status", "draft");
 
     if (q.trim()) {
       queryBuilder = queryBuilder.or(`title.ilike.%${q}%,description.ilike.%${q}%,category.ilike.%${q}%,seller_name.ilike.%${q}%`);
@@ -693,4 +693,4 @@ export default function Search() {
       </main>
     </div>
   );
-    }
+      }
