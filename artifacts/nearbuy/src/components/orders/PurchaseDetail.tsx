@@ -91,7 +91,7 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
               {STATUS_META[group.headlineStatus].message}
             </p>
             {isCancelled && (
-              
+              <a
                 href="https://wa.me/2348000000000"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -238,7 +238,7 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
         className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-xl border-t border-border px-5 py-3"
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}
       >
-        
+        <a
           href="https://wa.me/2348000000000"
           target="_blank"
           rel="noopener noreferrer"
@@ -256,4 +256,4 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
       </div>
     </motion.div>
   );
-  }
+      }
