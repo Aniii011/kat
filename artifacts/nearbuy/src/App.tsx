@@ -23,6 +23,7 @@ import SellerOrders from "@/pages/seller-orders";
 import Store from "@/pages/store";
 import Checkout from "@/pages/checkout";
 import OrderConfirmation from "@/pages/order-confirmation";
+import Orders from "@/pages/orders";
 import WishlistPage from "@/pages/wishlist";
 import WishlistView from "@/pages/wishlist-view";
 import ShopByStore from "@/pages/shop-by-store";
@@ -45,6 +46,7 @@ function Router() {
       <Route path="/shop/:storeId" component={ShopByStore} />
       <Route path="/checkout" component={Checkout} />
       <Route path="/order-confirmation" component={OrderConfirmation} />
+      <Route path="/orders" component={Orders} />
       <Route path="/wishlists" component={WishlistPage} />
       <Route path="/wishlist/:id" component={WishlistView} />
       <Route path="/admin" component={Admin} />
