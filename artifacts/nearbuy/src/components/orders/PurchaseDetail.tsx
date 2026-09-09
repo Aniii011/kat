@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, MapPin, Package, MessageCircle, Copy, Check, ChevronDown } from "lucide-react";
+import { ArrowLeft, MessageCircle, Copy, Check, ChevronDown } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { PurchaseGroup } from "@/lib/order-groups";
 import { STATUS_META, normalizeStatus, estimatedDeliveryLabel } from "@/lib/order-status";
@@ -49,110 +49,90 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
   };
 
   const firstLine = group.lines[0];
+  const heroProduct = firstLine.product_id ? productsById[firstLine.product_id] : undefined;
   const eta = estimatedDeliveryLabel(group.createdAt, group.headlineStatus);
   const isCancelled = group.headlineStatus === "cancelled";
-  const isDelivered = group.allDelivered;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 16 }}
-      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25 }}
       className="fixed inset-0 z-50 bg-background overflow-y-auto"
     >
-      <header className="sticky top-0 z-10 bg-background/90 backdrop-blur-xl px-4 py-3 flex items-center gap-3">
-        <button onClick={onClose} className="w-9 h-9 rounded-full hover:bg-muted flex items-center justify-center shrink-0" aria-label="Back to orders">
-          <ArrowLeft className="w-5 h-5" />
+      {/* ── The cover: photo IS the first screen. Status is set into it. ── */}
+      <div className={`relative w-full aspect-[4/5] bg-muted ${isCancelled ? "grayscale" : ""}`}>
+        {heroProduct?.image_url ? (
+          <img src={heroProduct.image_url} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <span className="text-xs text-muted-foreground/60">No photo</span>
+          </div>
+        )}
+
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-black/50" />
+
+        <button
+          onClick={onClose}
+          className="absolute top-4 left-4 w-9 h-9 rounded-full bg-black/35 backdrop-blur-sm flex items-center justify-center"
+          aria-label="Back to orders"
+        >
+          <ArrowLeft className="w-5 h-5 text-white" />
         </button>
+
         {group.paymentRef && (
-          <button onClick={copyRef} className="ml-auto flex items-center gap-1.5 text-[11px] text-muted-foreground font-mono bg-muted rounded-full px-3 py-1.5 max-w-[55%]">
+          <button
+            onClick={copyRef}
+            className="absolute top-4 right-4 max-w-[45%] flex items-center gap-1.5 text-[10px] text-white/80 font-mono bg-black/35 backdrop-blur-sm rounded-full px-2.5 py-1.5"
+          >
             <span className="truncate">#{group.paymentRef}</span>
-            {copied ? <Check className="w-3 h-3 text-emerald-500 shrink-0" /> : <Copy className="w-3 h-3 shrink-0" />}
+            {copied ? <Check className="w-3 h-3 text-emerald-400 shrink-0" /> : <Copy className="w-3 h-3 shrink-0" />}
           </button>
         )}
-      </header>
 
-      <main className="max-w-lg mx-auto px-5 pb-32">
-        {/* ── Screen one: what / when / where, in that order of visual weight ── */}
-        <section className="pt-3 pb-7 space-y-5">
-          <div>
-            <p className="text-xs text-muted-foreground">
-              Placed {new Date(group.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" })}
-            </p>
-            <h1
-              className={`mt-1 text-[32px] leading-[1.05] font-bold tracking-tight [font-family:'Outfit',sans-serif] ${
-                isCancelled ? "text-red-500 dark:text-red-400" : "text-foreground"
-              }`}
-            >
-              {STATUS_META[group.headlineStatus].label}
-            </h1>
-            <p className="text-[15px] text-muted-foreground mt-1.5 max-w-[30ch]">
-              {STATUS_META[group.headlineStatus].message}
-            </p>
-            {isCancelled && (
-              <a
-                href="https://wa.me/2348000000000"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm font-bold text-primary mt-3"
-              >
-                <MessageCircle className="w-4 h-4" /> Chat with us about this order
-              </a>
+        <div className="absolute inset-x-0 bottom-0 px-5 pb-6">
+          <h1 className="text-white text-[34px] leading-[1.05] font-bold tracking-tight [font-family:'Outfit',sans-serif]">
+            {STATUS_META[group.headlineStatus].label}
+          </h1>
+          <p className="text-white/80 text-[14px] mt-1.5 max-w-[85%]">
+            {eta
+              ? `${group.headlineStatus === "out_for_delivery" ? "Arriving" : "Estimated"} ${eta}`
+              : STATUS_META[group.headlineStatus].message}
+          </p>
+        </div>
+      </div>
+
+      <main className="max-w-lg mx-auto px-5">
+        {isCancelled && (
+          <a
+            href="https://wa.me/2348000000000"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm font-bold text-primary mt-5"
+          >
+            <MessageCircle className="w-4 h-4" /> Chat with us about this order
+          </a>
+        )}
+
+        {/* delivering to — quiet, single line */}
+        {firstLine.buyer_address && (
+          <div className="pt-6 pb-5">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Delivering to</p>
+            <p className="text-[15px] font-semibold mt-1">{firstLine.buyer_address}</p>
+            {firstLine.delivery_area && (
+              <p className="text-[13px] text-muted-foreground">{firstLine.delivery_area}, {firstLine.delivery_state}</p>
             )}
           </div>
-
-          {!isCancelled && !isDelivered && (
-            <div className="relative h-[3px] rounded-full bg-muted overflow-hidden">
-              <motion.div
-                className="absolute inset-y-0 left-0 rounded-full bg-primary"
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.max(6, ((["pending","accepted","preparing","out_for_delivery","delivered"].indexOf(group.headlineStatus)) / 4) * 100)}%` }}
-                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-              />
-            </div>
-          )}
-
-          {eta && !isCancelled && (
-            <div className="flex items-center gap-3 py-1">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <Package className="w-4.5 h-4.5 text-primary" />
-              </div>
-              <div>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-semibold">
-                  {group.headlineStatus === "out_for_delivery" ? "Expected today" : "Estimated delivery"}
-                </p>
-                <p className="text-[15px] font-bold">{eta}</p>
-              </div>
-            </div>
-          )}
-
-          {firstLine.buyer_address && (
-            <div className="flex items-center gap-3 py-1">
-              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-                <MapPin className="w-4.5 h-4.5 text-foreground/70" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-semibold">Delivering to</p>
-                <p className="text-[15px] font-bold truncate">{firstLine.buyer_address}</p>
-                {firstLine.delivery_area && (
-                  <p className="text-xs text-muted-foreground truncate">{firstLine.delivery_area}, {firstLine.delivery_state}</p>
-                )}
-              </div>
-            </div>
-          )}
-        </section>
+        )}
 
         <div className="h-px bg-border" />
 
-        {/* ── Progressive reveal: timeline is collapsed for simple orders ── */}
+        {/* timeline — collapsed by default for simple orders */}
         {!isCancelled && (
-          <section className="py-6">
-            <button
-              onClick={() => setTimelineOpen((v) => !v)}
-              className="w-full flex items-center justify-between"
-            >
-              <p className="text-sm font-bold">Order timeline</p>
+          <div className="py-5">
+            <button onClick={() => setTimelineOpen((v) => !v)} className="w-full flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Timeline</p>
               <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${timelineOpen ? "rotate-180" : ""}`} />
             </button>
             <AnimatePresence initial={false}>
@@ -161,18 +141,15 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.25 }}
+                  transition={{ duration: 0.22 }}
                   className="overflow-hidden"
                 >
-                  <div className="pt-5 space-y-6">
+                  <div className="pt-4 space-y-5">
                     {group.lines.map((line) => (
                       <div key={line.id}>
                         {group.lines.length > 1 && (
-                          <p className="text-xs font-semibold text-muted-foreground mb-3 truncate">
+                          <p className="text-[13px] font-semibold text-foreground mb-2 truncate">
                             {(line.product_id && productsById[line.product_id]?.title) || "Item"}
-                            {line.product_id && productsById[line.product_id]?.sellerName
-                              ? ` · ${productsById[line.product_id]?.sellerName}`
-                              : ""}
                           </p>
                         )}
                         <Timeline status={normalizeStatus(line.admin_status)} events={eventsByOrder[line.id]} />
@@ -182,78 +159,55 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
                 </motion.div>
               )}
             </AnimatePresence>
-          </section>
+          </div>
         )}
 
         <div className="h-px bg-border" />
 
-        {/* ── Items ── */}
-        <section className="py-6 space-y-4">
-          <p className="text-sm font-bold">
+        {/* items — set as a quiet manifest, not repeated product cards */}
+        <div className="py-5 space-y-4">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             {group.lines.length} {group.lines.length === 1 ? "item" : "items"}
             {group.sellerCount > 1 ? ` · ${group.sellerCount} sellers` : ""}
           </p>
-
-          <div className="space-y-3">
+          <div className="space-y-3.5">
             {group.lines.map((line) => {
               const product = line.product_id ? productsById[line.product_id] : undefined;
               const color = line.variant?.color;
               const size = line.variant?.size;
               return (
-                <div key={line.id} className="flex gap-3.5 items-center">
-                  <div className="w-16 h-16 rounded-2xl bg-muted overflow-hidden shrink-0">
-                    {product?.image_url ? (
-                      <img src={product.image_url} alt={product.title} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Package className="w-5 h-5 text-muted-foreground" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    {product?.sellerName && (
-                      <p className="text-[11px] text-muted-foreground truncate">{product.sellerName}</p>
-                    )}
-                    <p className="text-sm font-semibold truncate">{product?.title || "Product"}</p>
-                    <p className="text-xs text-muted-foreground">
+                <div key={line.id} className="flex items-baseline justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[14px] font-medium truncate">{product?.title || "Product"}</p>
+                    <p className="text-[12px] text-muted-foreground">
+                      {product?.sellerName ? `${product.sellerName} · ` : ""}
                       {[color, size ? `Size ${size}` : null].filter(Boolean).join(" · ")}
                       {(color || size) ? " · " : ""}Qty {line.quantity ?? 1}
                     </p>
                   </div>
-                  <p className="text-sm font-bold shrink-0 tabular-nums">{formatNaira(line.total ?? line.amount ?? 0)}</p>
+                  <p className="text-[14px] font-semibold shrink-0 tabular-nums">{formatNaira(line.total ?? line.amount ?? 0)}</p>
                 </div>
               );
             })}
           </div>
+        </div>
 
-          <div className="flex justify-between items-baseline pt-3">
-            <span className="text-sm text-muted-foreground">Total paid</span>
-            <span className="text-lg font-bold tabular-nums">{formatNaira(group.total)}</span>
-          </div>
-        </section>
-      </main>
+        <div className="h-px bg-border" />
 
-      {/* sticky help bar — thumb reach on mobile */}
-      <div
-        className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-xl border-t border-border px-5 py-3"
-        style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}
-      >
+        <div className="py-5 flex justify-between items-baseline">
+          <span className="text-[13px] text-muted-foreground">Total paid</span>
+          <span className="text-[18px] font-bold tabular-nums">{formatNaira(group.total)}</span>
+        </div>
+
         <a
           href="https://wa.me/2348000000000"
           target="_blank"
           rel="noopener noreferrer"
-          className="max-w-lg mx-auto flex items-center gap-3"
+          className="block text-center text-[13px] text-muted-foreground pb-10 pt-2"
         >
-          <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center shrink-0">
-            <MessageCircle className="w-4 h-4 text-foreground/70" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold leading-tight">Need help with this order?</p>
-            <p className="text-[11px] text-muted-foreground leading-tight">Chat with us on WhatsApp</p>
-          </div>
-          <span className="text-xs font-bold text-primary shrink-0">Chat →</span>
+          Need help with this order? <span className="text-primary font-semibold">Chat with us</span>
         </a>
-      </div>
+      </main>
     </motion.div>
   );
-      }
+              }
