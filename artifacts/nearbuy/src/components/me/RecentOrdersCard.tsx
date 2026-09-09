@@ -110,7 +110,10 @@ export default function RecentOrdersCard({ userId }: RecentOrdersCardProps) {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm font-bold flex items-center gap-2"><Package className="w-4 h-4 text-primary" /> Orders</p>
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-bold flex items-center gap-2"><Package className="w-4 h-4 text-primary" /> Orders</p>
+        <Link href="/orders" className="text-xs font-semibold text-primary">See all</Link>
+      </div>
 
       {attentionOrder && (
         <AttentionBanner order={attentionOrder} onSelect={(o) => setSelectedOrder(orders.find((full) => full.id === o.id) ?? null)} />
@@ -135,4 +138,4 @@ export default function RecentOrdersCard({ userId }: RecentOrdersCardProps) {
       />
     </div>
   );
-  }
+            }
