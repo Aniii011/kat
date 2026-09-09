@@ -94,15 +94,12 @@ export default function Orders() {
             <Button className="rounded-full mt-4" onClick={() => navigate("/me")}>Sign in</Button>
           </div>
         ) : loading ? (
-          <div className="space-y-3">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="rounded-[20px] border border-card-border/70 overflow-hidden">
-                <div className="p-2.5"><Skeleton className="aspect-[4/3] w-full rounded-2xl" /></div>
-                <div className="px-4 pb-4 space-y-2">
-                  <Skeleton className="h-3 w-28" />
-                  <Skeleton className="h-4 w-40" />
-                  <Skeleton className="h-[3px] w-full rounded-full" />
-                </div>
+          <div className="divide-y divide-border">
+            {[0, 1].map((i) => (
+              <div key={i} className="py-6 first:pt-2 space-y-3">
+                <Skeleton className="-mx-4 aspect-[4/5] w-[calc(100%+2rem)] rounded-none" />
+                <Skeleton className="h-6 w-40" />
+                <Skeleton className="h-3 w-28" />
               </div>
             ))}
           </div>
@@ -148,9 +145,11 @@ export default function Orders() {
             {visible.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-10">Nothing here right now.</p>
             ) : (
-              <div className="space-y-3">
+              <div className="divide-y divide-border">
                 {visible.map((group) => (
-                  <PurchaseCard key={group.groupKey} group={group} productsById={productsById} onOpen={setSelected} />
+                  <div key={group.groupKey} className="py-6 first:pt-2">
+                    <PurchaseCard group={group} productsById={productsById} onOpen={setSelected} />
+                  </div>
                 ))}
               </div>
             )}
@@ -165,4 +164,4 @@ export default function Orders() {
       </AnimatePresence>
     </div>
   );
-         }
+}
