@@ -295,6 +295,17 @@ export default function Admin() {
     setActionLoading(null);
   };
 
+  const updateOrderNote = async (orderId: string, note: string) => {
+    const { error } = await supabase.from("orders").update({ admin_note: note || null }).eq("id", orderId);
+    if (error) {
+      console.error("NOTE UPDATE FAILED:", error);
+      alert("Failed to save note: " + error.message);
+      return;
+    }
+    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, admin_note: note || null } : o));
+    setSelectedOrder((prev: any) => prev && prev.id === orderId ? { ...prev, admin_note: note || null } : prev);
+  };
+
   // ── UNCHANGED 7-day series (still used for existing chart-adjacent logic where relevant) ──
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
@@ -1034,6 +1045,7 @@ export default function Admin() {
         seller={selectedOrder ? users.find((u) => u.id === selectedOrder.seller_id) : null}
         onClose={() => setSelectedOrder(null)}
         onUpdateStatus={updateOrderStatus}
+        onUpdateNote={updateOrderNote}
       />
     </div>
   );
@@ -1079,4 +1091,4 @@ function TrendChart({ orders, rangeDays, metric, commissionRate }: { orders: any
       </div>
     </div>
   );
-  }
+}
