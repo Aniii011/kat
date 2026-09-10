@@ -20,6 +20,7 @@ export interface OrderLine {
   delivery_area?: string | null;
   delivery_state?: string | null;
   payment_ref?: string | null;
+  admin_note?: string | null;
 }
 
 export interface PurchaseGroup {
