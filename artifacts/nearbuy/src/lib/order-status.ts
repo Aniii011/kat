@@ -81,22 +81,3 @@ export function currentStepIndex(status: OrderStatus): number {
   if (status === "ready_for_pickup") return STATUS_SEQUENCE.indexOf("preparing");
   return 0;
 }
-
-export function estimatedDeliveryLabel(createdAt: string, status: OrderStatus): string | null {
-  if (status === "delivered" || status === "completed" || status === "cancelled") return null;
-  const created = new Date(createdAt);
-  const days = status === "out_for_delivery" ? 1 : 5;
-  const eta = new Date(created);
-  eta.setDate(eta.getDate() + days);
-  return eta.toLocaleDateString("en-NG", { weekday: "long", month: "long", day: "numeric" });
-}
-
-// Short form for tight spaces (the list card) — "16 Sep", no weekday.
-export function estimatedDeliveryShortLabel(createdAt: string, status: OrderStatus): string | null {
-  if (status === "delivered" || status === "completed" || status === "cancelled") return null;
-  const created = new Date(createdAt);
-  const days = status === "out_for_delivery" ? 1 : 5;
-  const eta = new Date(created);
-  eta.setDate(eta.getDate() + days);
-  return eta.toLocaleDateString("en-NG", { month: "short", day: "numeric" });
-                                          }
