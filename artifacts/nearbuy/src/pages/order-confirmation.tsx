@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { CheckCircle2, ShoppingBag, MapPin, Package, Home, MessageCircle, Copy, Check, AlertCircle } from "lucide-react";
+import { CheckCircle2, ShoppingBag, MapPin, Home, MessageCircle, Copy, Check, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
@@ -61,12 +61,6 @@ export default function OrderConfirmation() {
       </div>
     );
   }
-
-  const estimatedDelivery = () => {
-    const d = new Date();
-    d.setDate(d.getDate() + 5);
-    return d.toLocaleDateString("en-NG", { weekday: "long", month: "long", day: "numeric" });
-  };
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -153,11 +147,6 @@ export default function OrderConfirmation() {
             <p className="text-muted-foreground">{order.phone}</p>
             <p className="text-muted-foreground">{order.address}</p>
           </div>
-          <div className="bg-primary/5 border border-primary/20 rounded-xl p-3">
-            <p className="text-xs font-semibold text-primary flex items-center gap-1.5">
-              <Package className="w-3.5 h-3.5" /> Estimated delivery: {estimatedDelivery()}
-            </p>
-          </div>
         </motion.div>
 
         {/* What happens next */}
@@ -231,4 +220,4 @@ export default function OrderConfirmation() {
       </main>
     </div>
   );
-  }
+              }
