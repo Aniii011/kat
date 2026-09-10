@@ -1,6 +1,6 @@
-import { Check } from "lucide-react";
+import { Package, ChevronRight, Check } from "lucide-react";
 import type { PurchaseGroup } from "@/lib/order-groups";
-import { STATUS_META, estimatedDeliveryShortLabel } from "@/lib/order-status";
+import { STATUS_META } from "@/lib/order-status";
 
 function formatNaira(n: number) {
   return "₦" + Number(n || 0).toLocaleString("en-NG");
@@ -12,68 +12,61 @@ interface PurchaseCardProps {
   onOpen: (group: PurchaseGroup) => void;
 }
 
-// A journal entry, not a card. Full-bleed image, then a single confident
-// line of status typography beneath it. No border, no rounded box, no
-// thumbnail cluster — the photo and the status word carry everything.
+// Standard order row: thumbnail, title, status, price — the pattern every
+// marketplace uses because it's the one people already know how to read.
 export default function PurchaseCard({ group, productsById, onOpen }: PurchaseCardProps) {
   const meta = STATUS_META[group.headlineStatus];
-  const eta = estimatedDeliveryShortLabel(group.createdAt, group.headlineStatus);
   const isCancelled = group.headlineStatus === "cancelled";
   const isDelivered = group.allDelivered;
   const hero = group.lines[0];
   const heroProduct = hero.product_id ? productsById[hero.product_id] : undefined;
   const extraCount = group.lines.length - 1;
-
-  const captionLine =
-    group.lines.length === 1
-      ? heroProduct?.title || "Order"
-      : `${heroProduct?.title ? heroProduct.title + " + " : ""}${extraCount} more`;
+  const note = group.lines.find((l) => l.admin_note)?.admin_note;
 
   return (
-    <button onClick={() => onOpen(group)} className="group w-full text-left block">
-      {/* full-bleed image — negative margin cancels the feed's side padding */}
-      <div className={`relative -mx-4 aspect-[4/5] overflow-hidden bg-muted ${isCancelled ? "grayscale" : ""}`}>
+    <button
+      onClick={() => onOpen(group)}
+      className="w-full flex items-center gap-3 py-4 border-b border-border text-left"
+    >
+      <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-muted shrink-0">
         {heroProduct?.image_url ? (
-          <img
-            src={heroProduct.image_url}
-            alt=""
-            className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.02]"
-          />
+          <img src={heroProduct.image_url} alt="" className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <span className="text-xs text-muted-foreground/60 tracking-wide">No photo</span>
+            <Package className="w-5 h-5 text-muted-foreground" />
           </div>
         )}
-        {isCancelled && <div className="absolute inset-0 bg-background/40" />}
-        {group.lines.length > 1 && (
-          <span className="absolute bottom-3 right-3 text-[11px] font-semibold text-white bg-black/45 backdrop-blur-sm rounded-full px-2.5 py-1">
+        {extraCount > 0 && (
+          <span className="absolute bottom-0.5 right-0.5 text-[9px] font-bold text-white bg-black/60 rounded px-1">
             +{extraCount}
           </span>
         )}
       </div>
 
-      {/* status, set as a sentence — the single largest element in the entry */}
-      <div className="pt-4 pb-6">
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+          {new Date(group.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
+        </p>
+        <p className="text-sm font-medium truncate mt-0.5">
+          {group.lines.length === 1 ? heroProduct?.title || "Order" : `${group.lines.length} items`}
+        </p>
         <p
-          className={`flex items-center gap-2 text-[22px] leading-tight font-bold tracking-tight [font-family:'Outfit',sans-serif] ${
-            isCancelled ? "text-muted-foreground" : isDelivered ? "text-foreground" : "text-primary"
+          className={`text-xs font-semibold mt-1 flex items-center gap-1 ${
+            isCancelled ? "text-red-500" : isDelivered ? "text-emerald-500" : "text-primary"
           }`}
         >
-          {isDelivered && <Check className="w-4 h-4 shrink-0" strokeWidth={3} />}
+          {isDelivered && <Check className="w-3 h-3" strokeWidth={3} />}
           {meta.label}
-          {eta && !isCancelled && !isDelivered && (
-            <span className="text-[13px] font-medium text-muted-foreground ml-auto shrink-0">{eta}</span>
-          )}
         </p>
-        <p className="text-[13px] text-muted-foreground mt-1 truncate">
-          {captionLine}
-        </p>
-        <p className="text-[11px] text-muted-foreground/70 mt-2 tracking-wide">
-          {new Date(group.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}
-          {group.sellerCount > 1 && <> · {group.sellerCount} sellers</>}
-          {" · "}{formatNaira(group.total)}
-        </p>
+        {note && (
+          <p className="text-[11px] text-amber-500 mt-0.5 truncate">{note}</p>
+        )}
       </div>
+
+      <div className="text-right shrink-0">
+        <p className="text-sm font-bold tabular-nums">{formatNaira(group.total)}</p>
+      </div>
+      <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
     </button>
   );
 }
