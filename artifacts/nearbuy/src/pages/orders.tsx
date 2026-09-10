@@ -11,7 +11,7 @@ import PurchaseCard from "@/components/orders/PurchaseCard";
 import PurchaseDetail from "@/components/orders/PurchaseDetail";
 
 const ORDER_COLUMNS =
-  "id, product_id, seller_id, admin_status, buyer_address, total, amount, created_at, quantity, variant, delivery_area, delivery_state, payment_ref";
+  "id, product_id, seller_id, admin_status, admin_note, buyer_address, total, amount, created_at, quantity, variant, delivery_area, delivery_state, payment_ref";
 
 type Filter = "active" | "all" | "cancelled";
 
@@ -94,12 +94,15 @@ export default function Orders() {
             <Button className="rounded-full mt-4" onClick={() => navigate("/me")}>Sign in</Button>
           </div>
         ) : loading ? (
-          <div className="divide-y divide-border">
-            {[0, 1].map((i) => (
-              <div key={i} className="py-6 first:pt-2 space-y-3">
-                <Skeleton className="-mx-4 aspect-[4/5] w-[calc(100%+2rem)] rounded-none" />
-                <Skeleton className="h-6 w-40" />
-                <Skeleton className="h-3 w-28" />
+          <div className="space-y-4">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex items-center gap-3 py-4 border-b border-border">
+                <Skeleton className="w-16 h-16 rounded-lg shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
               </div>
             ))}
           </div>
@@ -145,11 +148,9 @@ export default function Orders() {
             {visible.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-10">Nothing here right now.</p>
             ) : (
-              <div className="divide-y divide-border">
+              <div>
                 {visible.map((group) => (
-                  <div key={group.groupKey} className="py-6 first:pt-2">
-                    <PurchaseCard group={group} productsById={productsById} onOpen={setSelected} />
-                  </div>
+                  <PurchaseCard key={group.groupKey} group={group} productsById={productsById} onOpen={setSelected} />
                 ))}
               </div>
             )}
