@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Package, Printer } from "lucide-react";
 
 type Props = {
@@ -15,6 +16,7 @@ type Props = {
   seller?: any | null;
   onClose: () => void;
   onUpdateStatus: (id: string, status: string) => void;
+  onUpdateNote: (id: string, note: string) => void;
 };
 
 function formatNaira(n: number) {
@@ -50,19 +52,37 @@ export default function OrderDetailsDialog({
   seller,
   onClose,
   onUpdateStatus,
+  onUpdateNote,
 }: Props) {
   const [updating, setUpdating] = useState(false);
+  const [noteDraft, setNoteDraft] = useState(order?.admin_note || "");
+  const [savingNote, setSavingNote] = useState(false);
+  const [lastLoadedOrderId, setLastLoadedOrderId] = useState<string | null>(null);
 
   if (!order) return null;
+
+  // Reset the draft whenever a different order is opened, without
+  // clobbering what the admin is actively typing for the current one.
+  if (order.id !== lastLoadedOrderId) {
+    setLastLoadedOrderId(order.id);
+    setNoteDraft(order.admin_note || "");
+  }
 
   const status = order.admin_status || "pending";
   const color = order.variant?.color;
   const size = order.variant?.size;
+  const noteChanged = noteDraft !== (order.admin_note || "");
 
   const handleClick = async (newStatus: string) => {
     setUpdating(true);
     await onUpdateStatus(order.id, newStatus);
     setUpdating(false);
+  };
+
+  const handleSaveNote = async () => {
+    setSavingNote(true);
+    await onUpdateNote(order.id, noteDraft.trim());
+    setSavingNote(false);
   };
 
   const statusButton = (key: string, label: string) => {
@@ -200,6 +220,29 @@ export default function OrderDetailsDialog({
             </div>
           </div>
 
+          {/* Note to customer — only ever written by admin, never guessed by the app */}
+          <div className="no-print">
+            <p className="text-xs text-muted-foreground mb-2">
+              Note to customer <span className="text-muted-foreground/70">(optional — shown on their order page, e.g. a delay or logistics update)</span>
+            </p>
+            <Textarea
+              value={noteDraft}
+              onChange={(e) => setNoteDraft(e.target.value)}
+              placeholder="e.g. Delayed due to road closure on the Lagos–Ibadan expressway — expect an extra 1–2 days."
+              className="rounded-2xl min-h-[80px]"
+            />
+            <div className="flex justify-end mt-2">
+              <Button
+                size="sm"
+                className="rounded-full"
+                disabled={!noteChanged || savingNote}
+                onClick={handleSaveNote}
+              >
+                {savingNote ? "Saving..." : "Save note"}
+              </Button>
+            </div>
+          </div>
+
           {/* Printable packing slip — hidden on screen, only shown when printing */}
           <div id="packing-slip" className="hidden print-only">
             <div style={{ padding: "24px", fontFamily: "sans-serif" }}>
@@ -252,4 +295,4 @@ export default function OrderDetailsDialog({
       </DialogContent>
     </Dialog>
   );
-}
+    }
