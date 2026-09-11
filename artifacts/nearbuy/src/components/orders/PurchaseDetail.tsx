@@ -4,7 +4,7 @@ import { ArrowLeft, Package, MessageCircle, Copy, Check, RotateCcw } from "lucid
 import { Link } from "wouter";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import type { PurchaseGroup } from "@/lib/order-groups";
+import { resolveProduct, type PurchaseGroup } from "@/lib/order-groups";
 import { STATUS_META, normalizeStatus, deliveryExpectationCopy } from "@/lib/order-status";
 import Timeline from "./Timeline";
 
@@ -50,6 +50,7 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
   };
 
   const firstLine = group.lines[0];
+  const firstProduct = resolveProduct(firstLine, productsById);
   const isCancelled = group.headlineStatus === "cancelled";
   const isDelivered = group.allDelivered;
   const deliveryCopy = deliveryExpectationCopy(group.headlineStatus);
@@ -93,15 +94,15 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
         <section className="flex items-center gap-3">
           <div className="flex -space-x-3 shrink-0">
             {group.lines.slice(0, 3).map((line, i) => {
-              const p = line.product_id ? productsById[line.product_id] : undefined;
+              const p = resolveProduct(line, productsById);
               return (
                 <div
                   key={line.id}
                   className="w-20 h-20 rounded-xl overflow-hidden bg-muted border-2 border-background"
                   style={{ zIndex: 3 - i }}
                 >
-                  {p?.image_url ? (
-                    <img src={p.image_url} alt="" className="w-full h-full object-cover" />
+                  {p.imageUrl ? (
+                    <img src={p.imageUrl} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <Package className="w-5 h-5 text-muted-foreground" />
@@ -113,14 +114,10 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold truncate">
-              {group.lines.length === 1
-                ? (firstLine.product_id && productsById[firstLine.product_id]?.title) || "Order"
-                : `${group.lines.length} items`}
+              {group.lines.length === 1 ? firstProduct.title : `${group.lines.length} items`}
             </p>
             <p className="text-xs text-muted-foreground truncate">
-              {group.sellerCount > 1
-                ? `From ${group.sellerCount} sellers`
-                : (firstLine.product_id && productsById[firstLine.product_id]?.sellerName) || null}
+              {group.sellerCount > 1 ? `From ${group.sellerCount} sellers` : firstProduct.sellerName || null}
             </p>
           </div>
         </section>
@@ -176,7 +173,7 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
                 <div key={line.id}>
                   {group.lines.length > 1 && (
                     <p className="text-xs font-semibold text-foreground mb-2 truncate">
-                      {(line.product_id && productsById[line.product_id]?.title) || "Item"}
+                      {resolveProduct(line, productsById).title}
                     </p>
                   )}
                   <Timeline status={normalizeStatus(line.admin_status)} events={eventsByOrder[line.id]} />
@@ -200,18 +197,18 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
               <div key={sellerId} className="space-y-3">
                 {group.sellerCount > 1 && (
                   <p className="text-xs font-semibold text-muted-foreground">
-                    {(lines[0].product_id && productsById[lines[0].product_id]?.sellerName) || "Seller"}
+                    {resolveProduct(lines[0], productsById).sellerName || "Seller"}
                   </p>
                 )}
                 {lines.map((line) => {
-                  const product = line.product_id ? productsById[line.product_id] : undefined;
+                  const product = resolveProduct(line, productsById);
                   const color = line.variant?.color;
                   const size = line.variant?.size;
                   return (
                     <div key={line.id} className="flex gap-3">
                       <div className="w-20 h-20 rounded-lg overflow-hidden bg-muted shrink-0">
-                        {product?.image_url ? (
-                          <img src={product.image_url} alt={product.title} className="w-full h-full object-cover" />
+                        {product.imageUrl ? (
+                          <img src={product.imageUrl} alt={product.title} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             <Package className="w-6 h-6 text-muted-foreground" />
@@ -219,7 +216,7 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold truncate">{product?.title || "Product"}</p>
+                        <p className="text-sm font-semibold truncate">{product.title}</p>
                         <p className="text-xs text-muted-foreground">
                           {[color, size ? `Size ${size}` : null].filter(Boolean).join(" · ")}
                           {(color || size) ? " · " : ""}Qty {line.quantity ?? 1}
@@ -284,4 +281,4 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
       </main>
     </motion.div>
   );
-        }
+                                         }
