@@ -11,9 +11,9 @@ import PurchaseCard from "@/components/orders/PurchaseCard";
 import PurchaseDetail from "@/components/orders/PurchaseDetail";
 
 const ORDER_COLUMNS =
-  "id, product_id, seller_id, admin_status, admin_note, buyer_address, total, amount, created_at, quantity, variant, delivery_area, delivery_state, payment_ref";
+  "id, product_id, product_title, product_image, product_seller_name, seller_id, admin_status, admin_note, buyer_address, total, amount, delivery_fee, discount_amount, created_at, quantity, variant, delivery_area, delivery_state, payment_ref";
 
-type Filter = "active" | "all" | "cancelled";
+type Filter = "active" | "delivered" | "cancelled" | "all";
 
 export default function Orders() {
   const { user } = useAuth();
@@ -70,8 +70,13 @@ export default function Orders() {
 
   const groups = groupOrdersByPurchase(lines);
   const activeGroups = groups.filter(isGroupActive);
+  const deliveredGroups = groups.filter((g) => g.allDelivered);
   const cancelledGroups = groups.filter((g) => g.headlineStatus === "cancelled");
-  const visible = filter === "active" ? activeGroups : filter === "cancelled" ? cancelledGroups : groups;
+  const visible =
+    filter === "active" ? activeGroups :
+    filter === "delivered" ? deliveredGroups :
+    filter === "cancelled" ? cancelledGroups :
+    groups;
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -84,7 +89,14 @@ export default function Orders() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 pb-5 space-y-5">
-        <h1 className="text-[26px] font-bold tracking-tight [font-family:'Outfit',sans-serif] px-0.5">Your Orders</h1>
+        <div className="px-0.5">
+          <h1 className="text-[26px] font-bold tracking-tight [font-family:'Outfit',sans-serif]">Your Orders</h1>
+          {!loading && !errored && groups.length > 0 && (
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {groups.length} {groups.length === 1 ? "order" : "orders"}
+            </p>
+          )}
+        </div>
 
         {!user?.id ? (
           <div className="text-center py-16">
@@ -94,14 +106,18 @@ export default function Orders() {
             <Button className="rounded-full mt-4" onClick={() => navigate("/me")}>Sign in</Button>
           </div>
         ) : loading ? (
-          <div className="space-y-4">
+          <div>
             {[0, 1, 2].map((i) => (
-              <div key={i} className="flex items-center gap-3 py-4 border-b border-border">
-                <Skeleton className="w-16 h-16 rounded-lg shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-3 w-24" />
-                  <Skeleton className="h-4 w-40" />
+              <div key={i} className="flex gap-4 py-5 border-b border-border">
+                <Skeleton className="w-24 h-24 rounded-2xl shrink-0" />
+                <div className="flex-1 space-y-2 py-1">
                   <Skeleton className="h-3 w-20" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-3 w-24" />
+                  <div className="flex justify-between pt-3">
+                    <Skeleton className="h-3.5 w-20" />
+                    <Skeleton className="h-3.5 w-16" />
+                  </div>
                 </div>
               </div>
             ))}
@@ -129,8 +145,9 @@ export default function Orders() {
             <div className="flex items-center gap-5 border-b border-border px-0.5">
               {([
                 ["active", `Active${activeGroups.length ? ` (${activeGroups.length})` : ""}`],
-                ["all", "All"],
+                ...(deliveredGroups.length ? [["delivered", "Delivered"] as const] : []),
                 ...(cancelledGroups.length ? [["cancelled", "Cancelled"] as const] : []),
+                ["all", "All"],
               ] as const).map(([key, label]) => (
                 <button
                   key={key}
