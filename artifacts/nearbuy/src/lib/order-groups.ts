@@ -15,6 +15,12 @@ export interface OrderLine {
   delivery_fee?: number | null;
   discount_amount?: number | null;
   product_id?: string | null;
+  // Snapshot of the product as it was at checkout — see supabase-setup.sql.
+  // Only present on orders placed after this column existed; older rows
+  // will have these as null and rely purely on the live product join.
+  product_title?: string | null;
+  product_image?: string | null;
+  product_seller_name?: string | null;
   // Real, populated at checkout from `products.seller_id` — safe to group by.
   seller_id?: string | null;
   buyer_address?: string | null;
@@ -23,6 +29,38 @@ export interface OrderLine {
   delivery_area?: string | null;
   delivery_state?: string | null;
   payment_ref?: string | null;
+}
+
+export interface ResolvedProduct {
+  title: string;
+  imageUrl: string | null;
+  sellerName: string | null;
+}
+
+/**
+ * Live product data wins when it exists (it's fresher — a seller may have
+ * updated the photo or fixed a typo in the title since purchase). When the
+ * product has been edited out of existence, fall back to what was actually
+ * true at checkout, captured in the order-time snapshot columns. Only when
+ * BOTH are missing (a pre-snapshot order whose product was later deleted —
+ * exactly the `#cb7c6012` case) do we fall back to an honest placeholder.
+ */
+export function resolveProduct(
+  line: OrderLine,
+  productsById: Record<string, { title: string; image_url?: string | null; sellerName?: string | null }>
+): ResolvedProduct {
+  const live = line.product_id ? productsById[line.product_id] : undefined;
+  if (live) {
+    return { title: live.title, imageUrl: live.image_url || null, sellerName: live.sellerName || null };
+  }
+  if (line.product_title || line.product_image || line.product_seller_name) {
+    return {
+      title: line.product_title || "Product",
+      imageUrl: line.product_image || null,
+      sellerName: line.product_seller_name || null,
+    };
+  }
+  return { title: "Product no longer available", imageUrl: null, sellerName: null };
 }
 
 export interface PurchaseGroup {
