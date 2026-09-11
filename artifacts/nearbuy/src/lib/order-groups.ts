@@ -9,8 +9,11 @@ export interface OrderLine {
   id: string;
   created_at: string;
   admin_status: string | null;
+  admin_note?: string | null;
   total?: number | null;
   amount?: number | null;
+  delivery_fee?: number | null;
+  discount_amount?: number | null;
   product_id?: string | null;
   // Real, populated at checkout from `products.seller_id` — safe to group by.
   seller_id?: string | null;
@@ -20,7 +23,6 @@ export interface OrderLine {
   delivery_area?: string | null;
   delivery_state?: string | null;
   payment_ref?: string | null;
-  admin_note?: string | null;
 }
 
 export interface PurchaseGroup {
@@ -28,6 +30,15 @@ export interface PurchaseGroup {
   paymentRef: string | null;
   createdAt: string;
   lines: OrderLine[];
+  /** Sum of each line's item total — excludes delivery fee. */
+  subtotal: number;
+  /** Delivery fee for the whole purchase (checkout writes the same value
+   *  onto every line in a batch, so we take one representative value
+   *  rather than summing it once per line). */
+  deliveryFee: number;
+  /** Discount applied, same one-value-per-purchase logic as deliveryFee. */
+  discount: number;
+  /** What was actually charged: subtotal + delivery − discount. */
   total: number;
   /** Distinct seller count among the lines, when known. */
   sellerCount: number;
@@ -81,13 +92,19 @@ export function groupOrdersByPurchase(lines: OrderLine[]): PurchaseGroup[] {
     }
 
     const sellerIds = new Set(groupLines.map((l) => l.seller_id).filter(Boolean));
+    const subtotal = groupLines.reduce((sum, l) => sum + Number(l.total ?? l.amount ?? 0), 0);
+    const deliveryFee = Number(groupLines[0].delivery_fee ?? 0);
+    const discount = Number(groupLines[0].discount_amount ?? 0);
 
     groups.push({
       groupKey,
       paymentRef: groupLines[0].payment_ref || null,
       createdAt: groupLines[0].created_at,
       lines: groupLines,
-      total: groupLines.reduce((sum, l) => sum + Number(l.total ?? l.amount ?? 0), 0),
+      subtotal,
+      deliveryFee,
+      discount,
+      total: subtotal + deliveryFee - discount,
       sellerCount: sellerIds.size || 1,
       headlineStatus,
       allDelivered,
