@@ -264,6 +264,12 @@ export default function Checkout() {
 
       const rows = items.map((item, i) => ({
         product_id: item.listingId,
+        // Snapshot of what was actually bought, captured at purchase time.
+        // If the listing is later edited or deleted, this order still shows
+        // what the buyer actually saw and paid for — never a blank fallback.
+        product_title: item.title,
+        product_image: item.imageUrl,
+        product_seller_name: item.sellerName,
         buyer_id: user?.id || null,
         buyer_name: fullName.trim(),
         buyer_phone: phone.trim(),
@@ -642,4 +648,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-  }
+               }
