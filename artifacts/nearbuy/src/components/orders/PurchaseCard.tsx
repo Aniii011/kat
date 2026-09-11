@@ -1,5 +1,6 @@
 import { Package, Check } from "lucide-react";
 import type { PurchaseGroup } from "@/lib/order-groups";
+import { resolveProduct } from "@/lib/order-groups";
 import { STATUS_META } from "@/lib/order-status";
 
 function formatNaira(n: number) {
@@ -21,15 +22,15 @@ export default function PurchaseCard({ group, productsById, onOpen }: PurchaseCa
   const isCancelled = group.headlineStatus === "cancelled";
   const isDelivered = group.allDelivered;
   const hero = group.lines[0];
-  const heroProduct = hero.product_id ? productsById[hero.product_id] : undefined;
+  const heroProduct = resolveProduct(hero, productsById);
   const extraCount = group.lines.length - 1;
   const sellerLabel =
-    group.sellerCount > 1 ? `${group.sellerCount} sellers` : heroProduct?.sellerName || null;
+    group.sellerCount > 1 ? `${group.sellerCount} sellers` : heroProduct.sellerName || null;
 
   const title =
     extraCount === 0
-      ? heroProduct?.title || "Order"
-      : `${heroProduct?.title ? heroProduct.title + " " : ""}+ ${extraCount} more`;
+      ? heroProduct.title
+      : `${heroProduct.title} + ${extraCount} more`;
 
   return (
     <button
@@ -37,8 +38,8 @@ export default function PurchaseCard({ group, productsById, onOpen }: PurchaseCa
       className="w-full text-left flex gap-4 py-5 border-b border-border"
     >
       <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-muted shrink-0">
-        {heroProduct?.image_url ? (
-          <img src={heroProduct.image_url} alt="" className="w-full h-full object-cover" />
+        {heroProduct.imageUrl ? (
+          <img src={heroProduct.imageUrl} alt="" className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Package className="w-7 h-7 text-muted-foreground" />
