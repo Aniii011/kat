@@ -12,9 +12,11 @@ export type OrderStatus =
   | "cancelled";
 
 export interface StatusMeta {
-  /** What the customer sees as the current headline state. */
+  /** Short word/phrase for tight spaces — the list row. */
   label: string;
-  /** One calm sentence — what this status means for them right now. */
+  /** A full human sentence for the detail page headline. */
+  headline: string;
+  /** One calm sentence of reassurance/context underneath the headline. */
   message: string;
 }
 
@@ -24,35 +26,43 @@ export interface StatusMeta {
 export const STATUS_META: Record<OrderStatus, StatusMeta> = {
   pending: {
     label: "Order placed",
-    message: "We've received your order and it's waiting on the seller to confirm.",
+    headline: "Your order has been placed",
+    message: "We've let the seller know. They'll confirm it shortly.",
   },
   accepted: {
     label: "Confirmed",
-    message: "The seller has confirmed your order.",
+    headline: "Your order has been confirmed",
+    message: "The seller has accepted your order and will begin preparing it.",
   },
   preparing: {
     label: "Being prepared",
-    message: "Your item is being packed for delivery.",
+    headline: "Your order is being prepared",
+    message: "The seller is packing your item for delivery.",
   },
   ready_for_pickup: {
     label: "Ready for pickup",
-    message: "Your item is packed and waiting to be picked up.",
+    headline: "Your order is ready for pickup",
+    message: "It's packed and waiting for our delivery partner to collect it.",
   },
   out_for_delivery: {
     label: "Out for delivery",
-    message: "Your order is on its way to you.",
+    headline: "Your order is on its way",
+    message: "It's out for delivery and should reach you soon.",
   },
   delivered: {
     label: "Delivered",
-    message: "Delivered. We hope you love it.",
+    headline: "Your order has arrived",
+    message: "We hope you love it.",
   },
   completed: {
     label: "Completed",
-    message: "This order is complete.",
+    headline: "Your order is complete",
+    message: "This order has been fulfilled.",
   },
   cancelled: {
     label: "Cancelled",
-    message: "This order was cancelled and will not be delivered.",
+    headline: "This order was cancelled",
+    message: "It will not be delivered.",
   },
 };
 
@@ -68,6 +78,25 @@ export const STATUS_SEQUENCE: OrderStatus[] = [
 
 export function normalizeStatus(raw: string | null | undefined): OrderStatus {
   return (raw as OrderStatus) || "pending";
+}
+
+// Honest delivery-expectation copy. There is no ETA field in the database,
+// so this never invents a date or range — it explains what's true right
+// now and when a firmer answer will exist.
+export function deliveryExpectationCopy(status: OrderStatus): string | null {
+  switch (status) {
+    case "pending":
+      return "Delivery timing will appear here once the seller confirms your order.";
+    case "accepted":
+    case "preparing":
+      return "Your seller is preparing your order. Delivery timing will appear here once it's on its way.";
+    case "ready_for_pickup":
+      return "Awaiting pickup by our delivery partner.";
+    case "out_for_delivery":
+      return "On its way to you now.";
+    default:
+      return null;
+  }
 }
 
 export function isTerminal(status: OrderStatus) {
