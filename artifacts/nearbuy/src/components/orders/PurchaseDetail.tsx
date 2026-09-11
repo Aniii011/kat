@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Package, MessageCircle, Copy, Check } from "lucide-react";
+import { ArrowLeft, Package, MessageCircle, Copy, Check, RotateCcw } from "lucide-react";
+import { Link } from "wouter";
 import { supabase } from "@/lib/supabase";
+import { Button } from "@/components/ui/button";
 import type { PurchaseGroup } from "@/lib/order-groups";
-import { STATUS_META, normalizeStatus } from "@/lib/order-status";
+import { STATUS_META, normalizeStatus, deliveryExpectationCopy } from "@/lib/order-status";
 import Timeline from "./Timeline";
 
 function formatNaira(n: number) {
@@ -49,6 +51,19 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
 
   const firstLine = group.lines[0];
   const isCancelled = group.headlineStatus === "cancelled";
+  const isDelivered = group.allDelivered;
+  const deliveryCopy = deliveryExpectationCopy(group.headlineStatus);
+  const cancelNote = group.lines.find((l) => l.admin_note)?.admin_note;
+
+  // Group items by seller for the manifest — a multi-seller purchase should
+  // read as "3 items from 2 sellers", not one undifferentiated list.
+  const bySeller = new Map<string, typeof group.lines>();
+  for (const line of group.lines) {
+    const key = line.seller_id || "unknown";
+    const arr = bySeller.get(key);
+    if (arr) arr.push(line);
+    else bySeller.set(key, [line]);
+  }
 
   return (
     <motion.div
@@ -74,47 +89,74 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-5 space-y-6 pb-16">
-        {/* ── Status: its own clear section, straight from admin_status ── */}
-        <section className="rounded-xl border border-border p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-            {group.lines.length > 1 ? "Order status" : "Status"}
-          </p>
-
-          {isCancelled ? (
-            <div className="space-y-3">
-              <p className="text-base font-bold text-red-500">{STATUS_META.cancelled.label}</p>
-              <p className="text-sm text-muted-foreground">{STATUS_META.cancelled.message}</p>
-              <a
-                href="https://wa.me/2348000000000"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm font-bold text-primary"
-              >
-                <MessageCircle className="w-4 h-4" /> Chat with us about this order
-              </a>
-            </div>
-          ) : (
-            <div className="space-y-5">
-              {group.lines.map((line) => (
-                <div key={line.id}>
-                  {group.lines.length > 1 && (
-                    <p className="text-xs font-semibold text-foreground mb-2 truncate">
-                      {(line.product_id && productsById[line.product_id]?.title) || "Item"}
-                    </p>
-                  )}
-                  <Timeline status={normalizeStatus(line.admin_status)} events={eventsByOrder[line.id]} />
-                  {line.admin_note && (
-                    <p className="text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2 mt-2">
-                      {line.admin_note}
-                    </p>
+        {/* ── What I bought — real imagery, real title, real seller ── */}
+        <section className="flex items-center gap-3">
+          <div className="flex -space-x-3 shrink-0">
+            {group.lines.slice(0, 3).map((line, i) => {
+              const p = line.product_id ? productsById[line.product_id] : undefined;
+              return (
+                <div
+                  key={line.id}
+                  className="w-20 h-20 rounded-xl overflow-hidden bg-muted border-2 border-background"
+                  style={{ zIndex: 3 - i }}
+                >
+                  {p?.image_url ? (
+                    <img src={p.image_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Package className="w-5 h-5 text-muted-foreground" />
+                    </div>
                   )}
                 </div>
-              ))}
-            </div>
+              );
+            })}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold truncate">
+              {group.lines.length === 1
+                ? (firstLine.product_id && productsById[firstLine.product_id]?.title) || "Order"
+                : `${group.lines.length} items`}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {group.sellerCount > 1
+                ? `From ${group.sellerCount} sellers`
+                : (firstLine.product_id && productsById[firstLine.product_id]?.sellerName) || null}
+            </p>
+          </div>
+        </section>
+
+        {/* ── What is happening ── */}
+        <section>
+          <h1
+            className={`text-[26px] leading-tight font-bold tracking-tight [font-family:'Outfit',sans-serif] ${
+              isCancelled ? "text-red-500" : "text-foreground"
+            }`}
+          >
+            {STATUS_META[group.headlineStatus].headline}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1.5">
+            {isCancelled
+              ? (cancelNote || "No further details were provided.")
+              : STATUS_META[group.headlineStatus].message}
+          </p>
+
+          {deliveryCopy && (
+            <p className="text-sm text-primary font-medium mt-3">{deliveryCopy}</p>
+          )}
+
+          {isCancelled && (
+            <a
+              href="https://wa.me/2348000000000"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm font-bold text-primary mt-3"
+            >
+              <MessageCircle className="w-4 h-4" /> Chat with us — including about a refund
+            </a>
           )}
         </section>
 
-        {/* ── Delivering to ── */}
+        {/* ── Where it's going ── */}
         {firstLine.buyer_address && (
           <section>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Delivering to</p>
@@ -125,51 +167,107 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
           </section>
         )}
 
-        {/* ── Items — image, title, variant, price, exactly what was ordered ── */}
+        {/* ── Status progress, per line (per seller when it differs) ── */}
+        {!isCancelled && (
+          <section>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-3">Progress</p>
+            <div className="space-y-5">
+              {group.lines.map((line) => (
+                <div key={line.id}>
+                  {group.lines.length > 1 && (
+                    <p className="text-xs font-semibold text-foreground mb-2 truncate">
+                      {(line.product_id && productsById[line.product_id]?.title) || "Item"}
+                    </p>
+                  )}
+                  <Timeline status={normalizeStatus(line.admin_status)} events={eventsByOrder[line.id]} />
+                  {line.admin_note && (
+                    <p className="text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2 mt-2">{line.admin_note}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── What was ordered, grouped by seller ── */}
         <section>
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-3">
             {group.lines.length} {group.lines.length === 1 ? "item" : "items"}
             {group.sellerCount > 1 ? ` · ${group.sellerCount} sellers` : ""}
           </p>
-          <div className="space-y-4">
-            {group.lines.map((line) => {
-              const product = line.product_id ? productsById[line.product_id] : undefined;
-              const color = line.variant?.color;
-              const size = line.variant?.size;
-              return (
-                <div key={line.id} className="flex gap-3">
-                  <div className="w-20 h-20 rounded-lg overflow-hidden bg-muted shrink-0">
-                    {product?.image_url ? (
-                      <img src={product.image_url} alt={product.title} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Package className="w-6 h-6 text-muted-foreground" />
+          <div className="space-y-5">
+            {Array.from(bySeller.entries()).map(([sellerId, lines]) => (
+              <div key={sellerId} className="space-y-3">
+                {group.sellerCount > 1 && (
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    {(lines[0].product_id && productsById[lines[0].product_id]?.sellerName) || "Seller"}
+                  </p>
+                )}
+                {lines.map((line) => {
+                  const product = line.product_id ? productsById[line.product_id] : undefined;
+                  const color = line.variant?.color;
+                  const size = line.variant?.size;
+                  return (
+                    <div key={line.id} className="flex gap-3">
+                      <div className="w-20 h-20 rounded-lg overflow-hidden bg-muted shrink-0">
+                        {product?.image_url ? (
+                          <img src={product.image_url} alt={product.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Package className="w-6 h-6 text-muted-foreground" />
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    {product?.sellerName && (
-                      <p className="text-[11px] text-muted-foreground truncate">{product.sellerName}</p>
-                    )}
-                    <p className="text-sm font-semibold truncate">{product?.title || "Product"}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {[color, size ? `Size ${size}` : null].filter(Boolean).join(" · ")}
-                      {(color || size) ? " · " : ""}Qty {line.quantity ?? 1}
-                    </p>
-                    <p className="text-sm font-bold mt-1">{formatNaira(line.total ?? line.amount ?? 0)}</p>
-                  </div>
-                </div>
-              );
-            })}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold truncate">{product?.title || "Product"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {[color, size ? `Size ${size}` : null].filter(Boolean).join(" · ")}
+                          {(color || size) ? " · " : ""}Qty {line.quantity ?? 1}
+                        </p>
+                        <p className="text-sm font-bold mt-1">{formatNaira(line.total ?? line.amount ?? 0)}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </section>
 
-        <div className="border-t border-border pt-4 flex justify-between items-center">
-          <span className="text-sm text-muted-foreground">Total paid</span>
-          <span className="text-base font-black text-primary">{formatNaira(group.total)}</span>
-        </div>
+        {/* ── Payment breakdown — real fields only ── */}
+        <section className="border-t border-border pt-4 space-y-1.5">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Subtotal</span>
+            <span className="tabular-nums">{formatNaira(group.subtotal)}</span>
+          </div>
+          {group.deliveryFee > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Delivery fee</span>
+              <span className="tabular-nums">{formatNaira(group.deliveryFee)}</span>
+            </div>
+          )}
+          {group.discount > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Discount</span>
+              <span className="tabular-nums text-emerald-500">−{formatNaira(group.discount)}</span>
+            </div>
+          )}
+          <div className="flex justify-between items-center pt-1.5">
+            <span className="text-sm font-semibold">Total paid</span>
+            <span className="text-base font-black text-primary tabular-nums">{formatNaira(group.total)}</span>
+          </div>
+        </section>
 
-        {!isCancelled && (
+        {/* ── What can I do — one primary action, not a dump of options ── */}
+        {isDelivered ? (
+          firstLine.product_id && (
+            <Link href={`/listing/${firstLine.product_id}`}>
+              <Button variant="outline" className="rounded-full gap-1.5 w-full">
+                <RotateCcw className="w-4 h-4" /> Buy again
+              </Button>
+            </Link>
+          )
+        ) : !isCancelled ? (
           <a
             href="https://wa.me/2348000000000"
             target="_blank"
@@ -182,8 +280,8 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
               <p className="text-xs text-muted-foreground">Chat with us on WhatsApp</p>
             </div>
           </a>
-        )}
+        ) : null}
       </main>
     </motion.div>
   );
-}
+        }
