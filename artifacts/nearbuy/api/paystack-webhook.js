@@ -69,12 +69,19 @@ export default async function handler(req, res) {
 
     const productLookups = await Promise.all(
       orderIntent.items.map((item) =>
-        supabase.from("products").select("seller_id, store_id").eq("id", item.listingId).single()
+        supabase.from("products").select("seller_id, store_id, title, image_url, seller_name").eq("id", item.listingId).single()
       )
     );
 
     const rows = orderIntent.items.map((item, i) => ({
       product_id: item.listingId,
+      // Same order-time snapshot as checkout.tsx and verify-payment.js —
+      // this webhook only fires when the client never made it back, so
+      // this is often the ONLY chance to capture what was actually bought
+      // before a later listing edit/deletion could blank it out.
+      product_title: productLookups[i].data?.title || item.title || "Product",
+      product_image: productLookups[i].data?.image_url || item.imageUrl || null,
+      product_seller_name: productLookups[i].data?.seller_name || item.sellerName || null,
       buyer_id: orderIntent.buyerId || null,
       buyer_name: orderIntent.fullName,
       buyer_phone: orderIntent.phone,
@@ -90,7 +97,10 @@ export default async function handler(req, res) {
       discount_amount: orderIntent.discount || 0,
       status: "pending",
       seller_status: "pending",
-      admin_status: "pending",
+      // Matches checkout.tsx / verify-payment.js: orders skip the "pending"
+      // wait for seller confirmation regardless of which path created them.
+      admin_status: "accepted",
+      assigned_to_seller: Boolean(productLookups[i].data?.seller_id),
       seller_id: productLookups[i].data?.seller_id || null,
       store_id: productLookups[i].data?.store_id || null,
       payment_ref: reference,
@@ -118,7 +128,7 @@ export default async function handler(req, res) {
     }
 
     await supabase.from("order_events").insert(
-      insertedOrders.map((o) => ({ order_id: o.id, status: "pending" }))
+      insertedOrders.map((o) => ({ order_id: o.id, status: "accepted" }))
     );
 
     console.log("PAYSTACK WEBHOOK: reconciled order(s) for payment that the client never confirmed.", {
@@ -132,4 +142,4 @@ export default async function handler(req, res) {
     console.error("PAYSTACK WEBHOOK ERROR:", err);
     return res.status(500).json({ error: err.message || "Webhook processing failed" });
   }
-  }
+}
