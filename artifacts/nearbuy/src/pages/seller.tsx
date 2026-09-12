@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
@@ -17,6 +17,8 @@ import { THRIFT_DEFAULT_STOCK } from "@/lib/thrift-config";
 import { SELLER_CATEGORY_TO_TOP_CATEGORIES, type SellerCategoryId } from "@/lib/seller-categories";
 import SellerCategoryGate from "@/components/seller/add-product/SellerCategoryGate";
 import AddProductComposer from "@/components/seller/add-product/AddProductComposer";
+import PackingListCard, { type PackingGroup } from "@/components/seller/PackingListCard";
+
 
 function formatNaira(n: number) {
   return "₦" + Number(n || 0).toLocaleString("en-NG");
@@ -779,6 +781,20 @@ export default function Seller() {
     setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, admin_status: status } : o));
   };
 
+  // Bulk version — used by the packing list to move every order in a
+  // product+variant group forward in one tap, instead of the seller
+  // clicking through each order individually.
+  const bulkUpdateOrderStatus = async (orderIds: string[], status: string) => {
+    const { error } = await supabase.from("orders").update({ admin_status: status, updated_at: new Date().toISOString() }).in("id", orderIds);
+    if (error) {
+      console.error("SELLER BULK STATUS UPDATE FAILED:", error);
+      alert(friendlyError(error, "Couldn't update these orders. Please try again."));
+      return;
+    }
+    await supabase.from("order_events").insert(orderIds.map((id) => ({ order_id: id, status })));
+    setOrders((prev) => prev.map((o) => orderIds.includes(o.id) ? { ...o, admin_status: status } : o));
+  };
+
   // ── ADD/EDIT PRODUCT ── (untouched)
   if (showUpload) {
     if (sellerCategory === undefined) {
@@ -1096,6 +1112,7 @@ export default function Seller() {
               products={products}
               cancellationRate={cancellationRate}
               onUpdateStatus={updateOrderStatus}
+              onBulkUpdateStatus={bulkUpdateOrderStatus}
             />
           )}
 
@@ -1502,11 +1519,58 @@ function SellerProductsSection({ products, onEdit, onDelete, onDuplicate, onAdd 
 }
 
 // ── ORDERS (grouped by urgency, with aging) ──
-function SellerOrdersSection({ orders, products, cancellationRate, onUpdateStatus }: any) {
+function SellerOrdersSection({ orders, products, cancellationRate, onUpdateStatus, onBulkUpdateStatus }: any) {
+  const [view, setView] = useState<"individual" | "packing">("individual");
+  const [bulkUpdating, setBulkUpdating] = useState<string | null>(null);
+
   const needsAction = orders.filter((o: any) => (o.admin_status || "pending") === "pending");
   const inProgress = orders.filter((o: any) => ["accepted", "preparing", "ready_for_pickup"].includes(o.admin_status));
   const handedOff = orders.filter((o: any) => ["out_for_delivery", "delivered", "completed"].includes(o.admin_status));
   const cancelled = orders.filter((o: any) => o.admin_status === "cancelled");
+
+  // Packing list: groups every order still sitting at "accepted" (i.e.
+  // confirmed but not yet started) by product + variant, so a seller who
+  // got the same item from several different buyers sees one combined
+  // quantity to pack instead of hunting through separate order cards.
+  // Once an order moves to "preparing" it's already being handled
+  // individually and drops out of this view.
+  const packingGroups: PackingGroup[] = useMemo(() => {
+    const toPack = orders.filter((o: any) => (o.admin_status || "pending") === "accepted");
+    const groups = new Map<string, PackingGroup>();
+
+    for (const o of toPack) {
+      const variantKey = o.variant ? JSON.stringify(o.variant) : "no-variant";
+      const groupKey = `${o.product_id || "unknown"}::${variantKey}`;
+      const product = products.find((p: any) => p.id === o.product_id);
+      const variantLabel = o.variant
+        ? [o.variant.color, o.variant.size, o.variant.shoeSize].filter(Boolean).join(" / ") || null
+        : null;
+
+      const existing = groups.get(groupKey);
+      if (existing) {
+        existing.totalQty += o.quantity || 1;
+        existing.orders.push({ id: o.id, buyer_name: o.buyer_name, quantity: o.quantity || 1, created_at: o.created_at });
+      } else {
+        groups.set(groupKey, {
+          groupKey,
+          productId: o.product_id,
+          title: product?.title || o.product_title || "Product",
+          imageUrl: product?.image_url || o.product_image || null,
+          variantLabel: variantLabel ? `Variant: ${variantLabel}` : null,
+          totalQty: o.quantity || 1,
+          orders: [{ id: o.id, buyer_name: o.buyer_name, quantity: o.quantity || 1, created_at: o.created_at }],
+        });
+      }
+    }
+
+    return Array.from(groups.values()).sort((a, b) => b.totalQty - a.totalQty);
+  }, [orders, products]);
+
+  const handleBulkMarkPreparing = async (groupKey: string, orderIds: string[]) => {
+    setBulkUpdating(groupKey);
+    await onBulkUpdateStatus(orderIds, "preparing");
+    setBulkUpdating(null);
+  };
 
   const OrderRow = ({ o, showAction }: { o: any; showAction: boolean }) => {
     const status = o.admin_status || "pending";
@@ -1546,10 +1610,55 @@ function SellerOrdersSection({ orders, products, cancellationRate, onUpdateStatu
       </div>
       <p className="text-xs text-muted-foreground">Cancellation rate: {cancellationRate.toFixed(1)}%</p>
 
-      <OrderGroup title={`Needs action · ${needsAction.length}`} orders={needsAction} render={(o) => <OrderRow key={o.id} o={o} showAction />} />
-      <OrderGroup title={`In progress · ${inProgress.length}`} orders={inProgress} render={(o) => <OrderRow key={o.id} o={o} showAction />} />
-      <OrderGroup title={`Handed to logistics · ${handedOff.length}`} orders={handedOff} render={(o) => <OrderRow key={o.id} o={o} showAction={false} />} muted />
-      <OrderGroup title={`Cancelled · ${cancelled.length}`} orders={cancelled} render={(o) => <OrderRow key={o.id} o={o} showAction={false} />} muted />
+      <div className="flex gap-1.5 p-1 bg-muted rounded-full">
+        <button
+          onClick={() => setView("individual")}
+          className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold py-2 rounded-full transition-all ${
+            view === "individual" ? "bg-background shadow-sm" : "text-muted-foreground"
+          }`}
+        >
+          Individual Orders
+        </button>
+        <button
+          onClick={() => setView("packing")}
+          className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold py-2 rounded-full transition-all ${
+            view === "packing" ? "bg-background shadow-sm" : "text-muted-foreground"
+          }`}
+        >
+          Packing List
+          {packingGroups.length > 0 && (
+            <span className="text-[10px] bg-primary text-primary-foreground rounded-full px-1.5">{packingGroups.length}</span>
+          )}
+        </button>
+      </div>
+
+      {view === "packing" ? (
+        packingGroups.length === 0 ? (
+          <div className="text-center py-12 border border-dashed border-border rounded-2xl">
+            <p className="text-sm font-bold">Nothing to pack right now</p>
+            <p className="text-xs text-muted-foreground mt-1">Newly accepted orders grouped by item will show up here.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {packingGroups.map((group) => (
+              <PackingListCard
+                key={group.groupKey}
+                group={group}
+                updating={bulkUpdating === group.groupKey}
+                actionLabel="Preparing"
+                onMarkProcessing={(orderIds) => handleBulkMarkPreparing(group.groupKey, orderIds)}
+              />
+            ))}
+          </div>
+        )
+      ) : (
+        <>
+          <OrderGroup title={`Needs action · ${needsAction.length}`} orders={needsAction} render={(o) => <OrderRow key={o.id} o={o} showAction />} />
+          <OrderGroup title={`In progress · ${inProgress.length}`} orders={inProgress} render={(o) => <OrderRow key={o.id} o={o} showAction />} />
+          <OrderGroup title={`Handed to logistics · ${handedOff.length}`} orders={handedOff} render={(o) => <OrderRow key={o.id} o={o} showAction={false} />} muted />
+          <OrderGroup title={`Cancelled · ${cancelled.length}`} orders={cancelled} render={(o) => <OrderRow key={o.id} o={o} showAction={false} />} muted />
+        </>
+      )}
     </div>
   );
 }
