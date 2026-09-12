@@ -1,42 +1,70 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import ThemeSwitcher from "@/components/theme-switcher";
 import { useTheme } from "@/context/theme-context";
 import { useAuth } from "@/context/auth-context";
 import AuthModal from "@/components/auth-modal";
 import { supabase } from "@/lib/supabase";
-import RecentOrdersCard from "@/components/me/RecentOrdersCard";
-import WishlistsSummaryCard from "@/components/me/WishlistsSummaryCard";
-import StyleProfileCard from "@/components/me/StyleProfileCard";
+import ActiveOrderBanner from "@/components/me/ActiveOrderBanner";
+import SettingsSheet from "@/components/me/SettingsSheet";
+import BuyerOrderDialog from "@/components/BuyerOrderDialog";
 import {
-  MapPin, RotateCcw, HelpCircle, LogOut,
-  ChevronRight, Edit3, Check, Shield, BadgeCheck,
+  MapPin, RotateCcw, HelpCircle,
+  ChevronRight, Edit3, Check, BadgeCheck,
   Store, LogIn, UserCircle2, ShieldCheck, AlertTriangle,
-  Palette, X, MessageCircle, Camera, Phone,
+  X, MessageCircle, Camera, Phone, Settings as SettingsIcon,
+  Package, Heart, MessageSquare, Star, Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 
-const BASE_OPTIONS = [
-  { value: "white" as const, label: "White", bg: "#ffffff" },
-  { value: "black" as const, label: "Black", bg: "#0d0d0d" },
-];
-
-const ACCENT_OPTIONS = [
-  { value: "pink" as const, label: "Pink", color: "#e0508a" },
-  { value: "beige" as const, label: "Beige", color: "#b8966a" },
-  { value: "purple" as const, label: "Purple", color: "#9b59d6" },
-  { value: "sage" as const, label: "Sage", color: "#4a9e6e" },
-  { value: "blue" as const, label: "Blue", color: "#3b82f6" },
-];
+const SUPPORT_EMAIL = "supportkat00@gmail.com";
 
 interface ProfileRow {
   full_name: string | null;
   avatar_url: string | null;
   phone: string | null;
   preferred_aesthetics: string[] | null;
+}
+
+// Simple tap-to-navigate row — Jumia-style: icon, label, chevron,
+// optional badge count. No thumbnails on this page by design.
+function MeRow({
+  icon: Icon,
+  label,
+  sublabel,
+  badge,
+  href,
+  onClick,
+}: {
+  icon: typeof Package;
+  label: string;
+  sublabel?: string;
+  badge?: number;
+  href?: string;
+  onClick?: () => void;
+}) {
+  const content = (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted transition-colors text-sm"
+    >
+      <span className="text-muted-foreground"><Icon className="w-4 h-4" /></span>
+      <span className="flex-1 text-left">
+        <span className="font-medium block">{label}</span>
+        {sublabel && <span className="text-xs text-muted-foreground">{sublabel}</span>}
+      </span>
+      {!!badge && badge > 0 && (
+        <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[11px] font-bold flex items-center justify-center">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
+      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+    </button>
+  );
+
+  return href ? <Link href={href}>{content}</Link> : content;
 }
 
 export default function Me() {
@@ -50,7 +78,10 @@ export default function Me() {
   const [displayName, setDisplayName] = useState(() => localStorage.getItem("kat_name") || "");
   const [phoneNumber, setPhoneNumber] = useState(() => localStorage.getItem("kat_phone") || "");
   const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem("kat_avatar") || "");
-  const [preferredAesthetics, setPreferredAesthetics] = useState<string[]>([]);
+
+  // Row badge/visibility state
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [awaitingReviewCount, setAwaitingReviewCount] = useState(0);
 
   useEffect(() => {
     if (!user?.id) {
@@ -88,14 +119,48 @@ export default function Me() {
         setPhoneNumber(data.phone);
         localStorage.setItem("kat_phone", data.phone);
       }
-      setPreferredAesthetics(data.preferred_aesthetics ?? []);
       setProfileLoading(false);
     };
 
     loadProfile();
-    return () => {
-      cancelled = true;
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  // Unread messages badge — reads the unread_message_counts view
+  // from kat_schema.sql.
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+
+    const loadUnread = async () => {
+      const { data } = await supabase
+        .from("unread_message_counts")
+        .select("unread_count")
+        .eq("user_id", user.id)
+        .maybeSingle<{ unread_count: number }>();
+      if (!cancelled) setUnreadMessages(data?.unread_count ?? 0);
     };
+
+    loadUnread();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  // Reviews row only shows if there's at least one delivered order
+  // with no review yet — reads orders_awaiting_review view.
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+
+    const loadAwaitingReview = async () => {
+      const { count } = await supabase
+        .from("orders_awaiting_review")
+        .select("order_id", { count: "exact", head: true })
+        .eq("buyer_id", user.id);
+      if (!cancelled) setAwaitingReviewCount(count ?? 0);
+    };
+
+    loadAwaitingReview();
+    return () => { cancelled = true; };
   }, [user?.id]);
 
   const [editingProfile, setEditingProfile] = useState(false);
@@ -116,6 +181,8 @@ export default function Me() {
   const [showHelp, setShowHelp] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showReturns, setShowReturns] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -186,11 +253,11 @@ export default function Me() {
     await signOut();
     setSigningOut(false);
     setShowSignOutConfirm(false);
+    setShowSettings(false);
   };
 
   const effectiveName = displayName || user?.email?.split("@")[0] || "KAT Member";
   const initials = effectiveName.slice(0, 2).toUpperCase();
-  const currentAccent = ACCENT_OPTIONS.find((a) => a.value === theme.accent);
 
   if (!user) {
     return (
@@ -198,7 +265,6 @@ export default function Me() {
         <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
           <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
             <div className="flex-1"><h1 className="text-base font-black">My Account</h1></div>
-            <ThemeSwitcher />
           </div>
         </header>
         <main className="flex-1 flex flex-col items-center justify-center px-6 pb-28 text-center">
@@ -228,7 +294,7 @@ export default function Me() {
 
       <AnimatePresence>
         {showSignOutConfirm && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center px-6">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center px-6">
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-card border border-card-border rounded-3xl p-6 max-w-xs w-full shadow-xl">
               <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
                 <AlertTriangle className="w-6 h-6 text-destructive" />
@@ -258,13 +324,13 @@ export default function Me() {
               </div>
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">Need help? We're here for you!</p>
-                <a href="mailto:support@kat.ng" className="flex items-center gap-3 p-3 rounded-xl bg-muted hover:bg-accent transition-colors">
+                <a href={`mailto:${SUPPORT_EMAIL}?subject=KAT Support Request`} className="flex items-center gap-3 p-3 rounded-xl bg-muted hover:bg-accent transition-colors">
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                     <MessageCircle className="w-4 h-4 text-primary" />
                   </div>
                   <div>
                     <p className="text-sm font-semibold">Email Support</p>
-                    <p className="text-xs text-muted-foreground">support@kat.ng</p>
+                    <p className="text-xs text-muted-foreground">{SUPPORT_EMAIL}</p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
                 </a>
@@ -276,7 +342,7 @@ export default function Me() {
 
       <AnimatePresence>
         {showPrivacy && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center px-4 pb-4 sm:pb-0">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center px-4 pb-4 sm:pb-0">
             <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }} className="bg-card border border-card-border rounded-3xl p-6 max-w-sm w-full shadow-xl max-h-[80vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-black text-base">Privacy Policy</h3>
@@ -290,7 +356,7 @@ export default function Me() {
                   { title: "Information We Collect", content: "We collect information you provide when creating an account, making purchases, or contacting support." },
                   { title: "How We Use Your Information", content: "We use your information to process orders, send updates, and improve our services." },
                   { title: "Data Security", content: "We use industry-standard security measures. Payment details are encrypted and never stored on our servers." },
-                  { title: "Your Rights", content: "You can access, update, or delete your personal information at any time by contacting us on WhatsApp." },
+                  { title: "Your Rights", content: "You can access, update, or delete your personal information at any time by contacting us." },
                 ].map(({ title, content }) => (
                   <div key={title}>
                     <p className="font-semibold text-foreground mb-1">{title}</p>
@@ -321,7 +387,7 @@ export default function Me() {
                 <p>✗ Thrift items are non-refundable once payment is complete</p>
                 <p>✗ Beauty and health items cannot be returned once opened</p>
               </div>
-              <a href="https://wa.me/2348103925304?text=I want to start a return request" target="_blank" rel="noopener noreferrer">
+              <a href={`mailto:${SUPPORT_EMAIL}?subject=Return Request`}>
                 <Button variant="outline" size="sm" className="rounded-full w-full">Start a Return Request</Button>
               </a>
             </motion.div>
@@ -329,15 +395,39 @@ export default function Me() {
         )}
       </AnimatePresence>
 
+      <SettingsSheet
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        theme={theme}
+        setBase={setBase}
+        setAccent={setAccent}
+        onOpenPrivacy={() => { setShowSettings(false); setShowPrivacy(true); }}
+        onSignOut={() => setShowSignOutConfirm(true)}
+      />
+
+      <BuyerOrderDialog
+        open={!!selectedOrderId}
+        order={selectedOrderId ? { id: selectedOrderId } as any : null}
+        product={null}
+        onClose={() => setSelectedOrderId(null)}
+      />
+
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
           <div className="flex-1"><h1 className="text-base font-black">My Account</h1></div>
-          <ThemeSwitcher />
+          <button
+            onClick={() => setShowSettings(true)}
+            aria-label="Settings"
+            className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
+          >
+            <SettingsIcon className="w-5 h-5" />
+          </button>
         </div>
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-4 pb-24 space-y-4">
 
+        {/* Profile header */}
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-card-border rounded-3xl p-5">
           {editingProfile ? (
             <div className="space-y-4">
@@ -437,13 +527,28 @@ export default function Me() {
           )}
         </motion.div>
 
-        <RecentOrdersCard userId={user.id} />
+        {/* Active order banner — only renders when there's a live order */}
+        <ActiveOrderBanner userId={user.id} onSelect={setSelectedOrderId} />
 
-        <WishlistsSummaryCard userId={user.id} />
-
-        {!profileLoading && (
-          <StyleProfileCard userId={user.id} initialSelected={preferredAesthetics} />
-        )}
+        {/* Core rows — Jumia-style, tap-to-reveal, no thumbnails here */}
+        <div className="bg-card border border-card-border rounded-2xl overflow-hidden">
+          <MeRow icon={Package} label="Orders" href="/orders" />
+          <Separator />
+          <MeRow icon={Heart} label="Wishlist" href="/wishlists" />
+          <Separator />
+          <MeRow icon={MessageSquare} label="Messages" badge={unreadMessages} href="/messages" />
+          {awaitingReviewCount > 0 && (
+            <>
+              <Separator />
+              <MeRow
+                icon={Star}
+                label="Reviews"
+                sublabel={`${awaitingReviewCount} awaiting review`}
+                href="/reviews"
+              />
+            </>
+          )}
+        </div>
 
         <div className="bg-card border border-card-border rounded-2xl overflow-hidden">
           <button
@@ -500,23 +605,11 @@ export default function Me() {
           </AnimatePresence>
 
           <Separator />
-          <button onClick={() => setShowReturns(true)} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted transition-colors text-sm">
-            <span className="text-muted-foreground"><RotateCcw className="w-4 h-4" /></span>
-            <span className="flex-1 text-left font-medium">Returns</span>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </button>
+          <MeRow icon={RotateCcw} label="Returns" onClick={() => setShowReturns(true)} />
           <Separator />
-          <button onClick={() => setShowHelp(true)} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted transition-colors text-sm">
-            <span className="text-muted-foreground"><HelpCircle className="w-4 h-4" /></span>
-            <span className="flex-1 text-left font-medium">Help & Support</span>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </button>
+          <MeRow icon={Users} label="Following" href="/following" />
           <Separator />
-          <button onClick={() => setShowPrivacy(true)} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted transition-colors text-sm">
-            <span className="text-muted-foreground"><Shield className="w-4 h-4" /></span>
-            <span className="flex-1 text-left font-medium">Privacy Policy</span>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </button>
+          <MeRow icon={HelpCircle} label="Help & Support" onClick={() => setShowHelp(true)} />
         </div>
 
         {(user?.isAdmin || user?.sellerVerified) && (
@@ -542,46 +635,7 @@ export default function Me() {
           </div>
         )}
 
-        <div className="bg-card border border-card-border rounded-2xl p-4 space-y-4">
-          <p className="font-bold text-sm flex items-center gap-2"><Palette className="w-4 h-4 text-primary" /> App Theme</p>
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">Background</p>
-            <div className="grid grid-cols-2 gap-2">
-              {BASE_OPTIONS.map((t) => (
-                <button key={t.value} onClick={() => setBase(t.value)} className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${theme.base === t.value ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"}`}>
-                  <span className="w-5 h-5 rounded-full border border-border shadow-sm shrink-0" style={{ background: t.bg }} />
-                  <span className="text-xs font-medium">{t.label}</span>
-                  {theme.base === t.value && <Check className="w-3 h-3 text-primary ml-auto" />}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">Accent Color</p>
-            <div className="grid grid-cols-5 gap-2">
-              {ACCENT_OPTIONS.map((a) => (
-                <button key={a.value} onClick={() => setAccent(a.value)} title={a.label} className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${theme.accent === a.value ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"}`}>
-                  <span className="w-6 h-6 rounded-full shadow-sm" style={{ background: a.color }} />
-                  <span className="text-[9px] font-medium text-muted-foreground">{a.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="bg-muted rounded-xl p-3 flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Current:</span>
-            <span className="w-4 h-4 rounded-full border border-border shrink-0" style={{ background: theme.base === "white" ? "#ffffff" : "#0d0d0d" }} />
-            <span className="text-xs font-medium capitalize">{theme.base}</span>
-            <span className="text-muted-foreground text-xs mx-1">+</span>
-            <span className="w-4 h-4 rounded-full shrink-0" style={{ background: currentAccent?.color }} />
-            <span className="text-xs font-medium capitalize">{theme.accent}</span>
-          </div>
-        </div>
-
-        <Button variant="outline" className="w-full rounded-2xl h-12 border-destructive/30 text-destructive hover:bg-destructive/10 font-semibold gap-2" onClick={() => setShowSignOutConfirm(true)}>
-          <LogOut className="w-4 h-4" /> Sign Out
-        </Button>
-
       </main>
     </div>
   );
-      }
+}
