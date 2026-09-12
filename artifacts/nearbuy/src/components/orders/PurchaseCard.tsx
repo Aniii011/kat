@@ -13,66 +13,86 @@ interface PurchaseCardProps {
   onOpen: (group: PurchaseGroup) => void;
 }
 
-// A purchase, not a table row: a real product photo with enough presence
-// to anchor the block, an identity line, and a status/price footer that
-// carries equal weight — every question answered without a tap, using the
-// full width instead of squeezing everything into a side column.
+const MAX_THUMBS = 4;
+
+// A purchase, recognizable at a glance: a strip of the real product photos
+// it contains (not one hero image), then an identity/status/price footer.
 export default function PurchaseCard({ group, productsById, onOpen }: PurchaseCardProps) {
   const meta = STATUS_META[group.headlineStatus];
   const isCancelled = group.headlineStatus === "cancelled";
   const isDelivered = group.allDelivered;
-  const hero = group.lines[0];
-  const heroProduct = resolveProduct(hero, productsById);
-  const extraCount = group.lines.length - 1;
+
+  const resolved = group.lines.map((line) => resolveProduct(line, productsById));
+  const shown = resolved.slice(0, MAX_THUMBS);
+  const overflow = resolved.length - shown.length;
+
   const sellerLabel =
-    group.sellerCount > 1 ? `${group.sellerCount} sellers` : heroProduct.sellerName || null;
+    group.sellerCount > 1 ? `${group.sellerCount} sellers` : resolved[0]?.sellerName || null;
 
   const title =
-    extraCount === 0
-      ? heroProduct.title
-      : `${heroProduct.title} + ${extraCount} more`;
+    group.lines.length === 1
+      ? resolved[0].title
+      : `${group.lines.length} items`;
 
   return (
     <button
       onClick={() => onOpen(group)}
-      className="w-full text-left flex gap-4 py-5 border-b border-border"
+      className="w-full text-left flex flex-col gap-3 py-5 border-b border-border"
     >
-      <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-muted shrink-0">
-        {heroProduct.imageUrl ? (
-          <img src={heroProduct.imageUrl} alt="" className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Package className="w-7 h-7 text-muted-foreground" />
-          </div>
-        )}
-        {extraCount > 0 && (
-          <span className="absolute bottom-1.5 right-1.5 text-[10px] font-bold text-white bg-black/65 rounded px-1.5 py-0.5">
-            +{extraCount}
-          </span>
-        )}
+      {/* thumbnail strip — the purchase, recognizable without reading text */}
+      <div className="flex gap-2">
+        {shown.map((product, i) => {
+          const isLast = i === shown.length - 1 && overflow > 0;
+          return (
+            <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden bg-muted shrink-0">
+              {product.imageUrl ? (
+                <img src={product.imageUrl} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Package className="w-5 h-5 text-muted-foreground" />
+                </div>
+              )}
+              {isLast && (
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                  <span className="text-[11px] font-bold text-white">+{overflow}</span>
+                </div>
+              )}
+              {isCancelled && <div className="absolute inset-0 bg-background/50" />}
+            </div>
+          );
+        })}
       </div>
 
-      <div className="flex-1 min-w-0 flex flex-col">
-        {sellerLabel && (
-          <p className="text-[10.5px] font-semibold text-muted-foreground uppercase tracking-wide truncate">
-            {sellerLabel}
+      <div className="flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          {sellerLabel && (
+            <p className="text-[10.5px] font-semibold text-muted-foreground uppercase tracking-wide truncate">
+              {sellerLabel}
+            </p>
+          )}
+          <p className="text-[15px] font-semibold leading-snug mt-0.5 truncate">{title}</p>
+          <p className="text-[11px] text-muted-foreground mt-1">
+            {isCancelled && group.cancelledAt
+              ? `Cancelled ${new Date(group.cancelledAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}`
+              : new Date(group.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
           </p>
-        )}
-        <p className="text-[15px] font-semibold leading-snug mt-0.5 line-clamp-2">{title}</p>
-        <p className="text-[11px] text-muted-foreground mt-1">
-          {new Date(group.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
-        </p>
+          {isCancelled && (
+            <p className="text-[11px] text-muted-foreground/80 mt-0.5 truncate">
+              {group.cancelReason || "No reason given"}
+            </p>
+          )}
+        </div>
 
-        <div className="flex items-center justify-between mt-auto pt-2.5">
+        <div className="text-right shrink-0">
+          <p className="text-[15px] font-bold tabular-nums">{formatNaira(group.total)}</p>
           <p
-            className={`text-[13px] font-semibold flex items-center gap-1 ${
+            className={`text-[13px] font-semibold flex items-center justify-end gap-1 mt-1 ${
               isCancelled ? "text-red-500" : isDelivered ? "text-emerald-500" : "text-primary"
             }`}
           >
             {isDelivered && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
             {meta.label}
           </p>
-          <p className="text-[15px] font-bold tabular-nums">{formatNaira(group.total)}</p>
         </div>
       </div>
     </button>
