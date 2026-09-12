@@ -205,6 +205,26 @@ export default function Checkout() {
     try {
       const expectedAmountKobo = total * 100;
 
+      // Order creation now happens server-side (see /api/verify-payment) —
+      // the browser only asks the server to verify-and-fulfill, and never
+      // touches `processed_payments` or inserts `orders` rows directly.
+      // This orderIntent shape must exactly match what's attached as
+      // Paystack metadata below (fullName, discount, nested buyerId) —
+      // paystack-webhook.js's reconciliation path reads that same metadata
+      // shape, so the two paths would silently diverge if these differed.
+      const orderIntent = {
+        items,
+        fullName: fullName.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        state,
+        city,
+        deliveryFee: delivery,
+        couponCode: appliedCoupon?.code || null,
+        discount,
+        buyerId: user?.id || null,
+      };
+
       const verify = await fetch("/api/verify-payment", {
         method: "POST",
         headers: {
@@ -217,147 +237,34 @@ export default function Checkout() {
           // expected — without this, verification only proved "a successful
           // charge exists for this reference," not "for the right amount."
           expectedAmount: expectedAmountKobo,
+          orderIntent,
         }),
       });
 
       const result = await verify.json();
 
-      if (!result.verified) {
-        setError("Your payment wasn't completed. Please try again.");
-        setPlacing(false);
-        return;
-      }
-
-      // ── Idempotency claim ──
-      // FIX: previously this did a SELECT to check for an existing order,
-      // then an INSERT — two separate round-trips with a real race window
-      // between them. A `processed_payments` table with payment_ref as its
-      // PRIMARY KEY makes this atomic: only one caller can ever successfully
-      // claim a given reference, so two near-simultaneous callback firings
-      // (or a client callback racing the server-side reconciliation webhook)
-      // cannot both proceed to create orders.
-      const { error: claimError } = await supabase
-        .from("processed_payments")
-        .insert({ payment_ref: response.reference });
-
-      if (claimError) {
-        // Someone else already claimed this reference — either a duplicate
-        // callback on this same client, or the reconciliation webhook beat
-        // us to it. Either way, orders SHOULD already exist for this
-        // payment — but if the earlier attempt claimed the reference and
-        // then failed/was interrupted before actually inserting the order
-        // rows, existingOrders comes back empty here. That must NOT be
-        // treated as success: the buyer would see a full confirmation
-        // screen for an order that doesn't exist, with money already taken.
-        // Retry with short waits before concluding it's genuinely missing —
-        // the process that claimed the reference (this client's own
-        // duplicate callback, or the server-side reconciliation webhook)
-        // may simply still be mid-insert.
-        let existingOrders: { id: string }[] | null = null;
-        for (let attempt = 0; attempt < 5; attempt++) {
-          const { data } = await supabase
-            .from("orders")
-            .select("id")
-            .eq("payment_ref", response.reference);
-          if (data && data.length > 0) {
-            existingOrders = data;
-            break;
-          }
-          await new Promise((resolve) => setTimeout(resolve, 1200));
-        }
-
-        if (!existingOrders || existingOrders.length === 0) {
-          setError(
-            "Your payment went through, but we couldn't confirm your order was created. " +
-            "Please don't pay again — contact support with reference " + response.reference + " and we'll sort it out."
-          );
-          setPlacing(false);
-          return;
-        }
-
-        const orderIds = existingOrders.map((o) => o.id);
-        sessionStorage.setItem(
-          "kat_order_confirmed",
-          JSON.stringify(buildConfirmationPayload(orderIds, response.reference))
+      if (result.processing) {
+        // Another process (a duplicate callback, or the reconciliation
+        // webhook) is already mid-fulfillment for this exact reference.
+        // This is NOT a failure — the order is very likely about to exist —
+        // so don't tell the buyer to contact support over nothing.
+        setError(
+          "Your payment was received and your order is still being confirmed. " +
+          "Please wait a moment, then check Orders before trying again."
         );
-        sessionStorage.removeItem("kat_checkout_items");
-        clearCart();
         setPlacing(false);
-        navigate("/order-confirmation");
         return;
       }
 
-      // ── Order creation ──
-      // FIX: previously this looped over `items` doing one INSERT per item, with
-      // `if (error) throw` breaking the loop on first failure. That meant a cart
-      // of 3 items could end up with item #1 charged-and-inserted, then items
-      // #2-#3 never created if the 2nd insert failed for any reason — the buyer
-      // is charged for 3 items but only 1 gets an order. A single batched
-      // `.insert([...])` call is one Postgres statement: either every line item
-      // is created, or none are (a genuine insert-level failure rolls back the
-      // whole statement rather than leaving a partial set of rows behind).
-      const productLookups = await Promise.all(
-        items.map((item) =>
-          supabase.from("products").select("seller_id, store_id").eq("id", item.listingId).single()
-        )
-      );
-
-      const rows = items.map((item, i) => ({
-        product_id: item.listingId,
-        // Snapshot of what was actually bought, captured at purchase time.
-        // If the listing is later edited or deleted, this order still shows
-        // what the buyer actually saw and paid for — never a blank fallback.
-        product_title: item.title,
-        product_image: item.imageUrl,
-        product_seller_name: item.sellerName,
-        buyer_id: user?.id || null,
-        buyer_name: fullName.trim(),
-        buyer_phone: phone.trim(),
-        buyer_address: address.trim(),
-        delivery_state: state,
-        delivery_area: city,
-        delivery_fee: delivery,
-        amount: item.price,
-        quantity: item.quantity,
-        total: item.price * item.quantity,
-        variant: { color: item.selectedColor || null, size: item.selectedSize || null },
-        coupon_code: appliedCoupon?.code || null,
-        discount_amount: discount,
-        status: "pending",
-        seller_status: "pending",
-        // Orders skip the "pending" wait for seller confirmation — a slow
-        // or unavailable seller shouldn't leave a buyer sitting on
-        // "pending" long enough to get anxious and cancel. Every order is
-        // accepted immediately on successful payment.
-        admin_status: "accepted",
-        seller_id: productLookups[i].data?.seller_id || null,
-        // The seller is already known from the product listing at this
-        // point — there's nothing left to "assign" later. Setting this
-        // true here (instead of relying on a manual admin step) is what
-        // actually makes the order visible on the seller's dashboard.
-        assigned_to_seller: !!productLookups[i].data?.seller_id,
-        store_id: productLookups[i].data?.store_id || null,
-        payment_ref: response.reference,
-      }));
-
-      const { data: insertedOrders, error: insertError } = await supabase
-        .from("orders")
-        .insert(rows)
-        .select();
-
-      if (insertError) throw insertError;
-      if (!insertedOrders || insertedOrders.length !== items.length) {
-        // Defensive check: if the insert reports success but didn't return the
-        // expected number of rows, don't silently proceed as if everything is
-        // fine — surface it rather than confirming an order that may be short.
-        throw new Error("Order creation returned an unexpected number of rows. Please contact support before retrying payment.");
+      if (!result.verified || !result.orderIds || result.orderIds.length === 0) {
+        setError(result.error || result.reason || "Your payment wasn't completed. Please try again.");
+        setPlacing(false);
+        return;
       }
 
-      const orderIds = insertedOrders.map((o) => o.id);
-      await supabase.from("order_events").insert(
-        insertedOrders.map((o) => ({ order_id: o.id, status: "accepted" }))
-      );
-
+      // result.created (fresh) or result.alreadyCreated (this reference was
+      // already fulfilled by an earlier request/the webhook) both mean the
+      // order genuinely exists — either way, this is success.
       if (appliedCoupon) {
         await supabase
           .from("coupons")
@@ -367,7 +274,7 @@ export default function Checkout() {
 
       sessionStorage.setItem(
         "kat_order_confirmed",
-        JSON.stringify(buildConfirmationPayload(orderIds, response.reference))
+        JSON.stringify(buildConfirmationPayload(result.orderIds, response.reference))
       );
 
       sessionStorage.removeItem("kat_checkout_items");
@@ -378,16 +285,6 @@ export default function Checkout() {
 
     } catch (err: any) {
       console.error("ORDER ERROR:", err);
-      // NOTE: if this fires AFTER a successful Paystack charge (verify.verified
-      // was true) but the order insert itself failed, the buyer has been
-      // charged with no order on file. That combination is now structurally
-      // prevented by the batched insert above for the "some rows fail" case,
-      // but a total insert failure (e.g. network drop after payment) can still
-      // occur. This is the one remaining gap that genuinely needs either a
-      // server-side reconciliation job (matching Paystack transactions against
-      // `orders.payment_ref` and alerting on orphans) or a webhook-based
-      // fallback order-creation path — both are backend work outside what a
-      // client-side fix can guarantee.
       setError(friendlyOrderError(err));
       setPlacing(false);
     }
