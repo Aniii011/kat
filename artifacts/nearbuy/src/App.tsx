@@ -27,6 +27,10 @@ import Orders from "@/pages/orders";
 import WishlistPage from "@/pages/wishlist";
 import WishlistView from "@/pages/wishlist-view";
 import ShopByStore from "@/pages/shop-by-store";
+import Messages from "@/pages/messages";
+import MessageThread from "@/pages/message-thread";
+import Reviews from "@/pages/reviews";
+import Following from "@/pages/following";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +53,10 @@ function Router() {
       <Route path="/orders" component={Orders} />
       <Route path="/wishlists" component={WishlistPage} />
       <Route path="/wishlist/:id" component={WishlistView} />
+      <Route path="/messages" component={Messages} />
+      <Route path="/messages/:userId" component={MessageThread} />
+      <Route path="/reviews" component={Reviews} />
+      <Route path="/following" component={Following} />
       <Route path="/admin" component={Admin} />
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/auth/callback" component={AuthCallback} />
