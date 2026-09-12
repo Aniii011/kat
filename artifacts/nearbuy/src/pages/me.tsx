@@ -69,7 +69,7 @@ function MeRow({
 export default function Me() {
   const [, navigate] = useLocation();
   const { theme, setBase, setAccent } = useTheme();
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading: authLoading } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
 
@@ -260,6 +260,23 @@ export default function Me() {
 
   const effectiveName = displayName || user?.email?.split("@")[0] || "KAT Member";
   const initials = effectiveName.slice(0, 2).toUpperCase();
+
+  // Auth restores asynchronously on refresh (supabase.auth.getSession()).
+  // Checking only `!user` here — without also checking authLoading — meant
+  // a logged-in person refreshing the page saw a flash of the "Sign In"
+  // screen before their session finished restoring. Show a neutral loading
+  // state instead until we actually know whether they're signed in.
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
+          <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
+            <div className="flex-1"><h1 className="text-base font-black">My Account</h1></div>
+          </div>
+        </header>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -633,4 +650,4 @@ export default function Me() {
       </main>
     </div>
   );
-}
+          }
