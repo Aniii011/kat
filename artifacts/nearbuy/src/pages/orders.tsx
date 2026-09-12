@@ -16,7 +16,7 @@ const ORDER_COLUMNS =
 type Filter = "all" | OrderStage;
 
 export default function Orders() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [, navigate] = useLocation();
   const [lines, setLines] = useState<OrderLine[]>([]);
   const [productsById, setProductsById] = useState<Record<string, { title: string; image_url?: string | null; sellerName?: string | null }>>({});
@@ -116,7 +116,19 @@ export default function Orders() {
           )}
         </div>
 
-        {!user?.id ? (
+        {authLoading ? (
+          <div>
+            {[0, 1].map((i) => (
+              <div key={i} className="flex gap-4 py-5 border-b border-border">
+                <Skeleton className="w-24 h-24 rounded-2xl shrink-0" />
+                <div className="flex-1 space-y-2 py-1">
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className="h-4 w-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : !user?.id ? (
           <div className="text-center py-16">
             <Package className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
             <p className="font-bold">Sign in to see your orders</p>
@@ -201,4 +213,4 @@ export default function Orders() {
       </AnimatePresence>
     </div>
   );
-            }
+}
