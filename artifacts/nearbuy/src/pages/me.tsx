@@ -5,7 +5,7 @@ import { useTheme } from "@/context/theme-context";
 import { useAuth } from "@/context/auth-context";
 import AuthModal from "@/components/auth-modal";
 import { supabase } from "@/lib/supabase";
-import ActiveOrderBanner from "@/components/me/ActiveOrderBanner";
+import ActiveOrderBanner, { type ActiveOrder } from "@/components/me/ActiveOrderBanner";
 import SettingsSheet from "@/components/me/SettingsSheet";
 import BuyerOrderDialog from "@/components/BuyerOrderDialog";
 import {
@@ -182,7 +182,7 @@ export default function Me() {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showReturns, setShowReturns] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<ActiveOrder | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -406,10 +406,10 @@ export default function Me() {
       />
 
       <BuyerOrderDialog
-        open={!!selectedOrderId}
-        order={selectedOrderId ? { id: selectedOrderId } as any : null}
-        product={null}
-        onClose={() => setSelectedOrderId(null)}
+        open={!!selectedOrder}
+        order={selectedOrder}
+        product={selectedOrder ? { title: selectedOrder.product_title, image_url: selectedOrder.product_image } : null}
+        onClose={() => setSelectedOrder(null)}
       />
 
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
@@ -528,7 +528,7 @@ export default function Me() {
         </motion.div>
 
         {/* Active order banner — only renders when there's a live order */}
-        <ActiveOrderBanner userId={user.id} onSelect={setSelectedOrderId} />
+        <ActiveOrderBanner userId={user.id} onSelect={setSelectedOrder} />
 
         {/* Core rows — Jumia-style, tap-to-reveal, no thumbnails here */}
         <div className="bg-card border border-card-border rounded-2xl overflow-hidden">
@@ -638,4 +638,4 @@ export default function Me() {
       </main>
     </div>
   );
-}
+    }
