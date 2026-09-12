@@ -13,12 +13,7 @@ export default async function handler(req, res) {
     });
   }
 
-  const {
-    reference,
-    expectedAmount,
-    orderIntent,
-    buyerId,
-  } = req.body || {};
+  const { reference, expectedAmount, orderIntent } = req.body || {};
 
   if (!reference) {
     return res.status(400).json({
@@ -44,6 +39,13 @@ export default async function handler(req, res) {
       error: "Order information is missing.",
     });
   }
+
+  // buyerId lives nested in orderIntent — this is the exact same shape
+  // already attached as Paystack metadata at transaction init time (see
+  // checkout.tsx), which paystack-webhook.js also reads from. Keeping one
+  // single orderIntent shape everywhere means the client path and the
+  // webhook reconciliation path can never silently drift apart.
+  const buyerId = orderIntent.buyerId;
 
   if (!buyerId) {
     return res.status(400).json({
@@ -216,7 +218,7 @@ export default async function handler(req, res) {
       await supabaseAdmin
         .from("products")
         .select(
-          "id, seller_id, store_id, seller_name, title, image"
+          "id, seller_id, store_id, seller_name, title, image_url"
         )
         .in("id", listingIds);
 
@@ -263,13 +265,18 @@ export default async function handler(req, res) {
       rows.push({
         product_id: item.listingId,
         product_title: product.title || item.title || "Product",
-        product_image: product.image || item.image || null,
+        product_image: product.image_url || item.imageUrl || null,
         product_seller_name:
           product.seller_name || item.sellerName || null,
 
         buyer_id: buyerId,
 
-        buyer_name: orderIntent.buyerName || null,
+        // Real orderIntent field names — must match exactly what
+        // checkout.tsx attaches as Paystack metadata (fullName, discount),
+        // since paystack-webhook.js reads that same metadata shape for its
+        // own reconciliation path. A mismatch here would silently corrupt
+        // orders created via one path but not the other.
+        buyer_name: orderIntent.fullName || null,
         buyer_address: orderIntent.address || null,
         buyer_phone: orderIntent.phone || null,
 
@@ -284,12 +291,13 @@ export default async function handler(req, res) {
           Number(item.price || 0) *
           Number(item.quantity || 1),
 
-        variant: item.variant || null,
+        variant: {
+          color: item.selectedColor || null,
+          size: item.selectedSize || null,
+        },
 
         coupon_code: orderIntent.couponCode || null,
-        discount_amount: Number(
-          orderIntent.discountAmount || 0
-        ),
+        discount_amount: Number(orderIntent.discount || 0),
 
         status: "pending",
         seller_status: "pending",
@@ -375,4 +383,4 @@ export default async function handler(req, res) {
           : "Payment verification failed.",
     });
   }
-  }
+      }
