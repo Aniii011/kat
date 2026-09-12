@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "@/context/theme-context";
 import { useAuth } from "@/context/auth-context";
@@ -7,7 +7,6 @@ import AuthModal from "@/components/auth-modal";
 import { supabase } from "@/lib/supabase";
 import ActiveOrderBanner, { type ActiveOrder } from "@/components/me/ActiveOrderBanner";
 import SettingsSheet from "@/components/me/SettingsSheet";
-import BuyerOrderDialog from "@/components/BuyerOrderDialog";
 import {
   MapPin, RotateCcw, HelpCircle,
   ChevronRight, Edit3, Check, BadgeCheck,
@@ -68,6 +67,7 @@ function MeRow({
 }
 
 export default function Me() {
+  const [, navigate] = useLocation();
   const { theme, setBase, setAccent } = useTheme();
   const { user, signOut } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
@@ -182,7 +182,9 @@ export default function Me() {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showReturns, setShowReturns] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<ActiveOrder | null>(null);
+  const openOrder = (order: ActiveOrder) => {
+    navigate(`/orders?open=${encodeURIComponent(order.payment_ref || order.id)}`);
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -405,13 +407,6 @@ export default function Me() {
         onSignOut={() => setShowSignOutConfirm(true)}
       />
 
-      <BuyerOrderDialog
-        open={!!selectedOrder}
-        order={selectedOrder}
-        product={selectedOrder ? { title: selectedOrder.product_title, image_url: selectedOrder.product_image } : null}
-        onClose={() => setSelectedOrder(null)}
-      />
-
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
           <div className="flex-1"><h1 className="text-base font-black">My Account</h1></div>
@@ -528,7 +523,7 @@ export default function Me() {
         </motion.div>
 
         {/* Active order banner — only renders when there's a live order */}
-        <ActiveOrderBanner userId={user.id} onSelect={setSelectedOrder} />
+        <ActiveOrderBanner userId={user.id} onSelect={openOrder} />
 
         {/* Core rows — Jumia-style, tap-to-reveal, no thumbnails here */}
         <div className="bg-card border border-card-border rounded-2xl overflow-hidden">
@@ -638,4 +633,4 @@ export default function Me() {
       </main>
     </div>
   );
-    }
+}
