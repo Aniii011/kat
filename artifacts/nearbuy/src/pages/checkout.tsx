@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/auth-context";
 import { useCart } from "@/hooks/use-cart";
@@ -61,6 +61,13 @@ export default function Checkout() {
   const [couponError, setCouponError] = useState("");
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [placing, setPlacing] = useState(false);
+  // Paystack's inline SDK can fire onSuccess more than once for the same
+  // transaction on flaky connections. Two concurrent runs of the payment
+  // handler racing each other risks one run's real error getting silently
+  // overwritten by the other's generic fallback message. This guard makes
+  // only the FIRST callback do any work; every later firing for the same
+  // popup instance is a no-op.
+  const paymentHandledRef = useRef(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -186,6 +193,15 @@ export default function Checkout() {
   });
 
   const handleSuccessfulPayment = async (response: any) => {
+    if (paymentHandledRef.current) {
+      // A duplicate onSuccess firing for a transaction already being (or
+      // already finished being) processed — ignore it outright rather than
+      // letting two executions race each other.
+      console.warn("Duplicate onSuccess callback ignored for", response?.reference);
+      return;
+    }
+    paymentHandledRef.current = true;
+
     try {
       const expectedAmountKobo = total * 100;
 
@@ -233,10 +249,22 @@ export default function Checkout() {
         // rows, existingOrders comes back empty here. That must NOT be
         // treated as success: the buyer would see a full confirmation
         // screen for an order that doesn't exist, with money already taken.
-        const { data: existingOrders } = await supabase
-          .from("orders")
-          .select("id")
-          .eq("payment_ref", response.reference);
+        // Retry with short waits before concluding it's genuinely missing —
+        // the process that claimed the reference (this client's own
+        // duplicate callback, or the server-side reconciliation webhook)
+        // may simply still be mid-insert.
+        let existingOrders: { id: string }[] | null = null;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const { data } = await supabase
+            .from("orders")
+            .select("id")
+            .eq("payment_ref", response.reference);
+          if (data && data.length > 0) {
+            existingOrders = data;
+            break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1200));
+        }
 
         if (!existingOrders || existingOrders.length === 0) {
           setError(
@@ -367,6 +395,11 @@ export default function Checkout() {
 
   const handlePlaceOrder = async () => {
     if (!canPlaceOrder) return;
+
+    // Reset the duplicate-callback guard for this fresh attempt — it should
+    // only block a second firing WITHIN one payment, not block the buyer
+    // from ever retrying after a genuine earlier failure.
+    paymentHandledRef.current = false;
 
     setPlacing(true);
     setError("");
@@ -669,4 +702,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-              }
+      }
