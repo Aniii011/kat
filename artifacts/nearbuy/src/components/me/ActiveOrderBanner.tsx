@@ -14,7 +14,7 @@ import { supabase } from "@/lib/supabase";
 // already excluded by the active_orders view.
 const STATUS_META: Record<string, { label: string; icon: typeof Truck; sub: string }> = {
   pending: { label: "Order placed", icon: Clock, sub: "We've let the seller know" },
-  accepted: { label: "Order confirmed", icon: CheckCircle2, sub: "Seller is getting it ready" },
+  accepted: { label: "Order confirmed", icon: CheckCircle2, sub: "Being prepared for delivery" },
   preparing: { label: "Order is being prepared", icon: Package, sub: "Being packed for delivery" },
   ready_for_pickup: { label: "Ready for pickup", icon: ShoppingBag, sub: "Waiting for delivery pickup" },
   out_for_delivery: { label: "Your order is on its way", icon: Truck, sub: "Should reach you soon" },
