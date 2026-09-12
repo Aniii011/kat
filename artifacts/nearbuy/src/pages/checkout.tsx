@@ -303,6 +303,11 @@ export default function Checkout() {
         // accepted immediately on successful payment.
         admin_status: "accepted",
         seller_id: productLookups[i].data?.seller_id || null,
+        // The seller is already known from the product listing at this
+        // point — there's nothing left to "assign" later. Setting this
+        // true here (instead of relying on a manual admin step) is what
+        // actually makes the order visible on the seller's dashboard.
+        assigned_to_seller: !!productLookups[i].data?.seller_id,
         store_id: productLookups[i].data?.store_id || null,
         payment_ref: response.reference,
       }));
@@ -664,4 +669,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-}
+              }
