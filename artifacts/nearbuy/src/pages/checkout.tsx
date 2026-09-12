@@ -285,7 +285,11 @@ export default function Checkout() {
         discount_amount: discount,
         status: "pending",
         seller_status: "pending",
-        admin_status: "pending",
+        // Orders skip the "pending" wait for seller confirmation — a slow
+        // or unavailable seller shouldn't leave a buyer sitting on
+        // "pending" long enough to get anxious and cancel. Every order is
+        // accepted immediately on successful payment.
+        admin_status: "accepted",
         seller_id: productLookups[i].data?.seller_id || null,
         store_id: productLookups[i].data?.store_id || null,
         payment_ref: response.reference,
@@ -306,7 +310,7 @@ export default function Checkout() {
 
       const orderIds = insertedOrders.map((o) => o.id);
       await supabase.from("order_events").insert(
-        insertedOrders.map((o) => ({ order_id: o.id, status: "pending" }))
+        insertedOrders.map((o) => ({ order_id: o.id, status: "accepted" }))
       );
 
       if (appliedCoupon) {
@@ -648,4 +652,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-               }
+          }
