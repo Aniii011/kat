@@ -8,6 +8,7 @@ import { normalizeStatus, isTerminal, type OrderStatus } from "./order-status";
 export interface OrderLine {
   id: string;
   created_at: string;
+  updated_at?: string | null;
   admin_status: string | null;
   admin_note?: string | null;
   total?: number | null;
@@ -86,6 +87,14 @@ export interface PurchaseGroup {
   headlineStatus: OrderStatus;
   allDelivered: boolean;
   anyCancelled: boolean;
+  /** When headlineStatus is "cancelled": the most recent updated_at among
+   *  the cancelled lines — the actual cancellation date, not the placed
+   *  date. Null if unavailable (e.g. status changed outside the app's own
+   *  update path, which is the only place that writes updated_at). */
+  cancelledAt: string | null;
+  /** Real reason, only if an admin actually wrote one via admin_note.
+   *  Never a fabricated or generic default. */
+  cancelReason: string | null;
 }
 
 const STATUS_URGENCY: Record<OrderStatus, number> = {
@@ -134,6 +143,15 @@ export function groupOrdersByPurchase(lines: OrderLine[]): PurchaseGroup[] {
     const deliveryFee = Number(groupLines[0].delivery_fee ?? 0);
     const discount = Number(groupLines[0].discount_amount ?? 0);
 
+    const cancelledLines = groupLines.filter((l) => normalizeStatus(l.admin_status) === "cancelled");
+    const cancelledAt = cancelledLines.length
+      ? cancelledLines.reduce((latest, l) => {
+          const t = l.updated_at || null;
+          return t && (!latest || new Date(t) > new Date(latest)) ? t : latest;
+        }, null as string | null)
+      : null;
+    const cancelReason = cancelledLines.find((l) => l.admin_note)?.admin_note || null;
+
     groups.push({
       groupKey,
       paymentRef: groupLines[0].payment_ref || null,
@@ -147,6 +165,8 @@ export function groupOrdersByPurchase(lines: OrderLine[]): PurchaseGroup[] {
       headlineStatus,
       allDelivered,
       anyCancelled,
+      cancelledAt,
+      cancelReason,
     });
   }
 
@@ -155,6 +175,29 @@ export function groupOrdersByPurchase(lines: OrderLine[]): PurchaseGroup[] {
 
 export function isGroupActive(group: PurchaseGroup) {
   return !group.allDelivered && group.headlineStatus !== "cancelled";
+}
+
+// Buckets the real statuses into the coarser stages the Orders list filters
+// by. No new statuses invented — just grouping the existing 8 into stages
+// a buyer actually thinks in. KAT has no separate "shipped" status, so
+// "out_for_delivery" is its own real stage, not a renamed generic one.
+export type OrderStage = "processing" | "out_for_delivery" | "delivered" | "cancelled";
+
+export function orderStage(status: OrderStatus): OrderStage {
+  switch (status) {
+    case "pending":
+    case "accepted":
+    case "preparing":
+    case "ready_for_pickup":
+      return "processing";
+    case "out_for_delivery":
+      return "out_for_delivery";
+    case "delivered":
+    case "completed":
+      return "delivered";
+    case "cancelled":
+      return "cancelled";
+  }
 }
 
 export { isTerminal };
