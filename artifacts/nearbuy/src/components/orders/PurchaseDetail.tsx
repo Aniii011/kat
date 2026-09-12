@@ -131,9 +131,14 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
           >
             {STATUS_META[group.headlineStatus].headline}
           </h1>
+          {isCancelled && group.cancelledAt && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Cancelled {new Date(group.cancelledAt).toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" })}
+            </p>
+          )}
           <p className="text-sm text-muted-foreground mt-1.5">
             {isCancelled
-              ? (cancelNote || "No further details were provided.")
+              ? (cancelNote || "No reason was given.")
               : STATUS_META[group.headlineStatus].message}
           </p>
 
@@ -281,4 +286,4 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
       </main>
     </motion.div>
   );
-                                         }
+        }
