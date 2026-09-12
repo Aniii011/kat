@@ -15,7 +15,10 @@ export default async function handler(req, res) {
 
   const { reference, expectedAmount, orderIntent } = req.body || {};
 
+  console.log("verify-payment request body:", JSON.stringify(req.body));
+
   if (!reference) {
+    console.error("verify-payment 400: missing reference");
     return res.status(400).json({
       verified: false,
       error: "Payment reference is required.",
@@ -27,6 +30,7 @@ export default async function handler(req, res) {
     !Number.isFinite(expectedAmount) ||
     expectedAmount <= 0
   ) {
+    console.error("verify-payment 400: invalid expectedAmount", expectedAmount);
     return res.status(400).json({
       verified: false,
       error: "Invalid expected amount.",
@@ -34,6 +38,7 @@ export default async function handler(req, res) {
   }
 
   if (!orderIntent || !Array.isArray(orderIntent.items)) {
+    console.error("verify-payment 400: missing/invalid orderIntent.items", orderIntent);
     return res.status(400).json({
       verified: false,
       error: "Order information is missing.",
@@ -48,6 +53,7 @@ export default async function handler(req, res) {
   const buyerId = orderIntent.buyerId;
 
   if (!buyerId) {
+    console.error("verify-payment 400: missing buyerId on orderIntent", orderIntent);
     return res.status(400).json({
       verified: false,
       error: "Buyer information is missing.",
@@ -203,6 +209,7 @@ export default async function handler(req, res) {
       .filter(Boolean);
 
     if (listingIds.length !== orderIntent.items.length) {
+      console.error("verify-payment 400: item missing listingId", orderIntent.items);
       await supabaseAdmin
         .from("processed_payments")
         .delete()
@@ -251,6 +258,7 @@ export default async function handler(req, res) {
       const product = productMap.get(item.listingId);
 
       if (!product) {
+        console.error("verify-payment 400: product not found", item.listingId, "known ids:", Array.from(productMap.keys()));
         await supabaseAdmin
           .from("processed_payments")
           .delete()
@@ -383,4 +391,4 @@ export default async function handler(req, res) {
           : "Payment verification failed.",
     });
   }
-      }
+        }
