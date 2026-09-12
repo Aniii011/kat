@@ -227,15 +227,27 @@ export default function Checkout() {
       if (claimError) {
         // Someone else already claimed this reference — either a duplicate
         // callback on this same client, or the reconciliation webhook beat
-        // us to it. Either way, orders already exist (or are being created)
-        // for this payment. Look them up and route to confirmation instead
-        // of silently stopping, so the buyer never gets stuck.
+        // us to it. Either way, orders SHOULD already exist for this
+        // payment — but if the earlier attempt claimed the reference and
+        // then failed/was interrupted before actually inserting the order
+        // rows, existingOrders comes back empty here. That must NOT be
+        // treated as success: the buyer would see a full confirmation
+        // screen for an order that doesn't exist, with money already taken.
         const { data: existingOrders } = await supabase
           .from("orders")
           .select("id")
           .eq("payment_ref", response.reference);
 
-        const orderIds = (existingOrders || []).map((o) => o.id);
+        if (!existingOrders || existingOrders.length === 0) {
+          setError(
+            "Your payment went through, but we couldn't confirm your order was created. " +
+            "Please don't pay again — contact support with reference " + response.reference + " and we'll sort it out."
+          );
+          setPlacing(false);
+          return;
+        }
+
+        const orderIds = existingOrders.map((o) => o.id);
         sessionStorage.setItem(
           "kat_order_confirmed",
           JSON.stringify(buildConfirmationPayload(orderIds, response.reference))
@@ -652,4 +664,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-          }
+}
