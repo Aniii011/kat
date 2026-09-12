@@ -6,14 +6,14 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { groupOrdersByPurchase, isGroupActive, type OrderLine, type PurchaseGroup } from "@/lib/order-groups";
+import { groupOrdersByPurchase, orderStage, type OrderLine, type OrderStage, type PurchaseGroup } from "@/lib/order-groups";
 import PurchaseCard from "@/components/orders/PurchaseCard";
 import PurchaseDetail from "@/components/orders/PurchaseDetail";
 
 const ORDER_COLUMNS =
-  "id, product_id, product_title, product_image, product_seller_name, seller_id, admin_status, admin_note, buyer_address, total, amount, delivery_fee, discount_amount, created_at, quantity, variant, delivery_area, delivery_state, payment_ref";
+  "id, product_id, product_title, product_image, product_seller_name, seller_id, admin_status, admin_note, updated_at, buyer_address, total, amount, delivery_fee, discount_amount, created_at, quantity, variant, delivery_area, delivery_state, payment_ref";
 
-type Filter = "active" | "delivered" | "cancelled" | "all";
+type Filter = "all" | OrderStage;
 
 export default function Orders() {
   const { user } = useAuth();
@@ -22,8 +22,9 @@ export default function Orders() {
   const [productsById, setProductsById] = useState<Record<string, { title: string; image_url?: string | null; sellerName?: string | null }>>({});
   const [loading, setLoading] = useState(true);
   const [errored, setErrored] = useState(false);
-  const [filter, setFilter] = useState<Filter>("active");
+  const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<PurchaseGroup | null>(null);
+  const [autoOpenedFor, setAutoOpenedFor] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.id) { setLoading(false); return; }
@@ -69,14 +70,31 @@ export default function Orders() {
   }, [user?.id]);
 
   const groups = groupOrdersByPurchase(lines);
-  const activeGroups = groups.filter(isGroupActive);
-  const deliveredGroups = groups.filter((g) => g.allDelivered);
-  const cancelledGroups = groups.filter((g) => g.headlineStatus === "cancelled");
-  const visible =
-    filter === "active" ? activeGroups :
-    filter === "delivered" ? deliveredGroups :
-    filter === "cancelled" ? cancelledGroups :
-    groups;
+
+  // Deep-link support: arriving as /orders?open=<paymentRef or orderId>
+  // (from the account-page banner) opens that specific purchase's detail
+  // immediately, instead of dropping the person on the list to find it.
+  useEffect(() => {
+    if (loading || groups.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const openRef = params.get("open");
+    if (!openRef || openRef === autoOpenedFor) return;
+
+    const match = groups.find(
+      (g) => g.paymentRef === openRef || g.lines.some((l) => l.id === openRef)
+    );
+    if (match) {
+      setSelected(match);
+      setAutoOpenedFor(openRef);
+    }
+  }, [loading, groups, autoOpenedFor]);
+
+  const stageGroups = (stage: OrderStage) => groups.filter((g) => orderStage(g.headlineStatus) === stage);
+  const processingGroups = stageGroups("processing");
+  const outForDeliveryGroups = stageGroups("out_for_delivery");
+  const deliveredGroups = stageGroups("delivered");
+  const cancelledGroups = stageGroups("cancelled");
+  const visible = filter === "all" ? groups : stageGroups(filter);
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -142,17 +160,18 @@ export default function Orders() {
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-5 border-b border-border px-0.5">
+            <div className="flex items-center gap-5 border-b border-border px-0.5 overflow-x-auto no-scrollbar">
               {([
-                ["active", `Active${activeGroups.length ? ` (${activeGroups.length})` : ""}`],
+                ["all", "All"],
+                ["processing", `Processing${processingGroups.length ? ` (${processingGroups.length})` : ""}`],
+                ...(outForDeliveryGroups.length ? [["out_for_delivery", "Out for Delivery"] as const] : []),
                 ...(deliveredGroups.length ? [["delivered", "Delivered"] as const] : []),
                 ...(cancelledGroups.length ? [["cancelled", "Cancelled"] as const] : []),
-                ["all", "All"],
               ] as const).map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => setFilter(key as Filter)}
-                  className={`relative pb-2.5 text-sm transition-colors ${
+                  className={`relative pb-2.5 text-sm whitespace-nowrap transition-colors ${
                     filter === key ? "font-bold text-foreground" : "font-medium text-muted-foreground"
                   }`}
                 >
@@ -182,4 +201,4 @@ export default function Orders() {
       </AnimatePresence>
     </div>
   );
-}
+            }
