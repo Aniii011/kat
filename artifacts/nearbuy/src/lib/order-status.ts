@@ -32,7 +32,7 @@ export const STATUS_META: Record<OrderStatus, StatusMeta> = {
   accepted: {
     label: "Confirmed",
     headline: "Your order has been confirmed",
-    message: "The seller has accepted your order and will begin preparing it.",
+    message: "Your order is confirmed and will be prepared for delivery.",
   },
   preparing: {
     label: "Being prepared",
