@@ -1,16 +1,27 @@
 import { useEffect, useState } from "react";
-import { Truck, Package, Clock } from "lucide-react";
+import { Truck, Package, Clock, ShoppingBag, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
-// Buyer-facing journey uses SELLER_STATUS (confirmed in
-// seller-orders.tsx): pending -> processing -> shipped -> delivered.
-// admin_status is a separate internal field (pending/assigned/
-// completed/cancelled) and never reaches "delivered" — it's not
-// what tells us the buyer has the item.
+// admin_status is the buyer-facing source of truth (see lib/order-status.ts —
+// it's the app's existing single source of truth for order status display).
+// seller_status is a separate, internal signal for each seller's own handoff
+// of goods to the hub; it's not shown to buyers directly since one purchase
+// can combine items from multiple sellers.
+//
+// Labels mirror lib/order-status.ts's STATUS_META so this banner never says
+// something different from the /orders detail page. Only non-terminal
+// statuses need an entry here — delivered/completed/cancelled orders are
+// already excluded by the active_orders view.
 const STATUS_META: Record<string, { label: string; icon: typeof Truck; sub: string }> = {
-  pending: { label: "Order placed", icon: Clock, sub: "Waiting for seller to start processing" },
-  processing: { label: "Order is being prepared", icon: Package, sub: "Your seller is packing it up" },
-  shipped: { label: "Your order has shipped", icon: Truck, sub: "On its way to you" },
+  pending: { label: "Order placed", icon: Clock, sub: "We've let the seller know" },
+  accepted: { label: "Order confirmed", icon: CheckCircle2, sub: "Seller is getting it ready" },
+  preparing: { label: "Order is being prepared", icon: Package, sub: "Being packed for delivery" },
+  ready_for_pickup: { label: "Ready for pickup", icon: ShoppingBag, sub: "Waiting for delivery pickup" },
+  out_for_delivery: { label: "Your order is on its way", icon: Truck, sub: "Should reach you soon" },
+  // 'assigned' is a real value your admin dashboard sets today (admin-orders.tsx)
+  // that isn't in the buyer-facing OrderStatus type yet — map it to something
+  // sensible rather than hiding the banner entirely.
+  assigned: { label: "Order confirmed", icon: CheckCircle2, sub: "Assigned to a seller" },
 };
 
 // Full order shape — matches what BuyerOrderDialog expects, since
@@ -48,9 +59,9 @@ export default function ActiveOrderBanner({ userId, onSelect }: ActiveOrderBanne
 
     const load = async () => {
       setLoading(true);
-      // active_orders is the helper view from kat_schema.sql —
-      // excludes admin_status = 'cancelled' and seller_status =
-      // 'delivered', sorted most recent first.
+      // active_orders is the helper view from kat_schema.sql — excludes
+      // admin_status in ('delivered', 'completed', 'cancelled'), sorted
+      // most recent first.
       const { data, error } = await supabase
         .from("active_orders")
         .select(ORDER_COLUMNS)
@@ -69,9 +80,7 @@ export default function ActiveOrderBanner({ userId, onSelect }: ActiveOrderBanne
 
   if (loading || !order) return null;
 
-  // seller_status is null until the seller touches the order —
-  // treat that as "pending" for display purposes.
-  const status = order.seller_status || "pending";
+  const status = order.admin_status || "pending";
   const meta = STATUS_META[status];
   if (!meta) return null; // unrecognized status — fail quiet rather than show something wrong
 
@@ -93,4 +102,4 @@ export default function ActiveOrderBanner({ userId, onSelect }: ActiveOrderBanne
       </div>
     </button>
   );
-}
+    }
