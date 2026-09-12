@@ -11,14 +11,20 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-type AdminStatus = "pending" | "assigned" | "completed" | "cancelled";
+type AdminStatus = "pending" | "completed" | "cancelled";
 
 const STATUS_CONFIG: Record<AdminStatus, { label: string; color: string; icon: React.ReactNode }> = {
   pending:   { label: "Pending",   color: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400", icon: <Clock className="w-3 h-3" /> },
-  assigned:  { label: "Assigned",  color: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400", icon: <Send className="w-3 h-3" /> },
   completed: { label: "Completed", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400", icon: <CheckCircle className="w-3 h-3" /> },
   cancelled: { label: "Cancelled", color: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400", icon: <XCircle className="w-3 h-3" /> },
 };
+
+// Statuses set directly by the seller as they prepare an order
+// (see seller.tsx's SELLER_CONTROLLED_STATUSES). This admin view treats
+// all of them the same way a plain "in progress, not my action needed"
+// badge would — admin only steps in to complete or cancel.
+const IN_PROGRESS_STATUSES = ["accepted", "preparing", "ready_for_pickup", "out_for_delivery"];
+const inProgressBadge = { label: "In Progress", color: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400", icon: <Send className="w-3 h-3" /> };
 
 function formatNaira(n: number) {
   return "₦" + Number(n || 0).toLocaleString("en-NG");
@@ -30,7 +36,7 @@ export default function AdminOrders() {
   const [products, setProducts] = useState<Record<string, any>>({});
   const [buyers, setBuyers] = useState<Record<string, any>>({});
   const [sellers, setSellers] = useState<any[]>([]);
-  const [filter, setFilter] = useState<AdminStatus | "all">("all");
+  const [filter, setFilter] = useState<AdminStatus | "in_progress" | "all">("all");
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -91,26 +97,7 @@ export default function AdminOrders() {
     fetchAll();
   }, [isAdmin]);
 
-  const assignToSeller = async (orderId: string, sellerId: string) => {
-    setActionLoading(orderId);
-    await supabase
-      .from("orders")
-      .update({
-        seller_id: sellerId,
-        assigned_to_seller: true,
-        admin_status: "assigned",
-        seller_status: "pending",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", orderId);
-    setOrders((prev) => prev.map((o) => o.id === orderId
-      ? { ...o, seller_id: sellerId, assigned_to_seller: true, admin_status: "assigned", seller_status: "pending" }
-      : o
-    ));
-    setActionLoading(null);
-  };
-
-  const updateAdminStatus = async (orderId: string, status: AdminStatus) => {
+  const updateAdminStatus = async (orderId: string, status: AdminStatus | "accepted") => {
     setActionLoading(orderId);
     await supabase
       .from("orders")
@@ -134,8 +121,11 @@ export default function AdminOrders() {
   }
 
   const filtered = orders.filter((o) => {
-    const status: AdminStatus = (o.admin_status || "pending") as AdminStatus;
-    const matchStatus = filter === "all" || status === filter;
+    const status = o.admin_status || "pending";
+    const matchStatus =
+      filter === "all" ? true :
+      filter === "in_progress" ? IN_PROGRESS_STATUSES.includes(status) :
+      status === filter;
     const buyer = buyers[o.buyer_id];
     const matchSearch = !search || [o.id, o.payment_ref, buyer?.full_name, buyer?.email, o.buyer_address]
       .some((f) => f?.toLowerCase().includes(search.toLowerCase()));
@@ -145,7 +135,7 @@ export default function AdminOrders() {
   const counts = {
     all: orders.length,
     pending: orders.filter((o) => (o.admin_status || "pending") === "pending").length,
-    assigned: orders.filter((o) => o.admin_status === "assigned").length,
+    in_progress: orders.filter((o) => IN_PROGRESS_STATUSES.includes(o.admin_status)).length,
     completed: orders.filter((o) => o.admin_status === "completed").length,
     cancelled: orders.filter((o) => o.admin_status === "cancelled").length,
   };
@@ -178,7 +168,7 @@ export default function AdminOrders() {
 
         {/* Status filter strip */}
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-          {(["all", "pending", "assigned", "completed", "cancelled"] as const).map((s) => (
+          {(["all", "pending", "in_progress", "completed", "cancelled"] as const).map((s) => (
             <button
               key={s}
               onClick={() => setFilter(s)}
@@ -188,7 +178,7 @@ export default function AdminOrders() {
                   : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
               }`}
             >
-              {s === "all" ? "All Orders" : STATUS_CONFIG[s].label}
+              {s === "all" ? "All Orders" : s === "in_progress" ? "In Progress" : STATUS_CONFIG[s].label}
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold min-w-[18px] text-center ${
                 filter === s ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
               }`}>
@@ -220,8 +210,10 @@ export default function AdminOrders() {
             </div>
           ) : (
             filtered.map((order, i) => {
-              const status: AdminStatus = (order.admin_status || "pending") as AdminStatus;
-              const cfg = STATUS_CONFIG[status];
+              const status = order.admin_status || "pending";
+              const cfg = IN_PROGRESS_STATUSES.includes(status)
+                ? inProgressBadge
+                : STATUS_CONFIG[status as AdminStatus] || STATUS_CONFIG.pending;
               const isExpanded = expanded === order.id;
               const product = products[order.product_id];
               const buyer = buyers[order.buyer_id];
@@ -323,43 +315,28 @@ export default function AdminOrders() {
                             </div>
                           </div>
 
-                          {/* Assign to seller */}
+                          {/* Seller info — every order is auto-routed to its seller at
+                              checkout (the seller_id comes straight from the product
+                              listing), so there's nothing left to assign here. This is
+                              just visibility into who's fulfilling it and how far along
+                              they've gotten. */}
                           <div className="space-y-2">
                             <p className="text-[10px] text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                              <Send className="w-3 h-3" /> Assign to Seller
+                              <Send className="w-3 h-3" /> Seller
                             </p>
-                            {order.assigned_to_seller ? (
-                              <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3 flex items-center justify-between">
-                                <div>
-                                  <p className="text-sm font-bold">
-                                    {sellers.find((s) => s.id === order.seller_id)?.full_name || "Assigned seller"}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    Seller status: {order.seller_status || "pending"}
-                                  </p>
-                                </div>
-                                <CheckCircle className="w-4 h-4 text-emerald-600" />
+                            <div className="bg-muted/50 rounded-xl p-3 flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-bold truncate">
+                                  {sellers.find((s) => s.id === order.seller_id)?.full_name
+                                    || order.product_seller_name
+                                    || "Unknown seller"}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Prep status: {IN_PROGRESS_STATUSES.includes(status) ? status.replace(/_/g, " ") : "not started"}
+                                </p>
                               </div>
-                            ) : (
-                              <div className="flex flex-wrap gap-2">
-                                {sellers
-                                  .filter((s) => !product?.seller_id || s.id === product.seller_id)
-                                  .map((s) => (
-                                    <Button
-                                      key={s.id}
-                                      size="sm"
-                                      className="rounded-full text-xs"
-                                      disabled={actionLoading === order.id}
-                                      onClick={() => assignToSeller(order.id, s.id)}
-                                    >
-                                      Assign to {s.full_name || s.email}
-                                    </Button>
-                                  ))}
-                                {sellers.filter((s) => !product?.seller_id || s.id === product.seller_id).length === 0 && (
-                                  <p className="text-xs text-muted-foreground">No matching verified sellers found.</p>
-                                )}
-                              </div>
-                            )}
+                              {order.assigned_to_seller && <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />}
+                            </div>
                           </div>
 
                           {/* Admin status actions */}
@@ -391,7 +368,7 @@ export default function AdminOrders() {
                                 variant="outline"
                                 className="rounded-full text-xs"
                                 disabled={actionLoading === order.id}
-                                onClick={() => updateAdminStatus(order.id, "pending")}
+                                onClick={() => updateAdminStatus(order.id, "accepted")}
                               >
                                 Reopen Order
                               </Button>
@@ -410,9 +387,9 @@ export default function AdminOrders() {
         <p className="text-center text-[11px] text-muted-foreground pt-2">
           Showing {filtered.length} of {orders.length} orders ·{" "}
           <span className="text-amber-600 font-semibold">{counts.pending} pending</span>
-          {counts.assigned > 0 && <span className="text-blue-600"> · {counts.assigned} assigned</span>}
+          {counts.in_progress > 0 && <span className="text-blue-600"> · {counts.in_progress} in progress</span>}
         </p>
       </main>
     </div>
   );
-}
+                                    }
