@@ -22,6 +22,7 @@ export interface PackingGroup {
 interface PackingListCardProps {
   group: PackingGroup;
   updating: boolean;
+  actionLabel?: string;
   onMarkProcessing: (orderIds: string[]) => void;
 }
 
@@ -29,7 +30,7 @@ interface PackingListCardProps {
 // seller's still-pending orders. Shows the total the seller needs to pack
 // (summed across every buyer who ordered that exact item), and which
 // individual orders make up that number.
-export default function PackingListCard({ group, updating, onMarkProcessing }: PackingListCardProps) {
+export default function PackingListCard({ group, updating, actionLabel = "Processing", onMarkProcessing }: PackingListCardProps) {
   const [expanded, setExpanded] = useState(false);
   const orderIds = group.orders.map((o) => o.id);
 
@@ -83,7 +84,7 @@ export default function PackingListCard({ group, updating, onMarkProcessing }: P
         onClick={() => onMarkProcessing(orderIds)}
       >
         <Truck className="w-3.5 h-3.5" />
-        {updating ? "Updating..." : `Mark all ${group.orders.length} as Processing`}
+        {updating ? "Updating..." : `Mark all ${group.orders.length} as ${actionLabel}`}
       </Button>
     </div>
   );
