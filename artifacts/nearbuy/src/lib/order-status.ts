@@ -27,17 +27,17 @@ export const STATUS_META: Record<OrderStatus, StatusMeta> = {
   pending: {
     label: "Order placed",
     headline: "Your order has been placed",
-    message: "We've let the seller know. They'll confirm it shortly.",
+    message: "We've received your order.",
   },
   accepted: {
-    label: "Confirmed",
-    headline: "Your order has been confirmed",
-    message: "Your order is confirmed and will be prepared for delivery.",
+    label: "Order processing",
+    headline: "Your order is processing",
+    message: "Your order is being processed and will be prepared for delivery.",
   },
   preparing: {
-    label: "Being prepared",
+    label: "Prepared for delivery",
     headline: "Your order is being prepared",
-    message: "The seller is packing your item for delivery.",
+    message: "Your order is being prepared for delivery.",
   },
   ready_for_pickup: {
     label: "Ready for pickup",
