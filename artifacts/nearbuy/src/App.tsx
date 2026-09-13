@@ -27,8 +27,7 @@ import Orders from "@/pages/orders";
 import WishlistPage from "@/pages/wishlist";
 import WishlistView from "@/pages/wishlist-view";
 import ShopByStore from "@/pages/shop-by-store";
-import Messages from "@/pages/messages";
-import MessageThread from "@/pages/message-thread";
+import Inbox from "@/pages/inbox";
 import Reviews from "@/pages/reviews";
 import Following from "@/pages/following";
 
@@ -53,8 +52,7 @@ function Router() {
       <Route path="/orders" component={Orders} />
       <Route path="/wishlists" component={WishlistPage} />
       <Route path="/wishlist/:id" component={WishlistView} />
-      <Route path="/messages" component={Messages} />
-      <Route path="/messages/:userId" component={MessageThread} />
+      <Route path="/inbox" component={Inbox} />
       <Route path="/reviews" component={Reviews} />
       <Route path="/following" component={Following} />
       <Route path="/admin" component={Admin} />
