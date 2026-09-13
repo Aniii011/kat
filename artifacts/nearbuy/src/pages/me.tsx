@@ -80,7 +80,6 @@ export default function Me() {
   const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem("kat_avatar") || "");
 
   // Row badge/visibility state
-  const [unreadMessages, setUnreadMessages] = useState(0);
   const [awaitingReviewCount, setAwaitingReviewCount] = useState(0);
 
   useEffect(() => {
@@ -123,25 +122,6 @@ export default function Me() {
     };
 
     loadProfile();
-    return () => { cancelled = true; };
-  }, [user?.id]);
-
-  // Unread messages badge — reads the unread_message_counts view
-  // from kat_schema.sql.
-  useEffect(() => {
-    if (!user?.id) return;
-    let cancelled = false;
-
-    const loadUnread = async () => {
-      const { data } = await supabase
-        .from("unread_message_counts")
-        .select("unread_count")
-        .eq("user_id", user.id)
-        .maybeSingle<{ unread_count: number }>();
-      if (!cancelled) setUnreadMessages(data?.unread_count ?? 0);
-    };
-
-    loadUnread();
     return () => { cancelled = true; };
   }, [user?.id]);
 
@@ -548,7 +528,7 @@ export default function Me() {
           <Separator />
           <MeRow icon={Heart} label="Wishlist" href="/wishlists" />
           <Separator />
-          <MeRow icon={MessageSquare} label="Messages" badge={unreadMessages} href="/messages" />
+          <MeRow icon={MessageSquare} label="Inbox" href="/inbox" />
           {awaitingReviewCount > 0 && (
             <>
               <Separator />
@@ -650,4 +630,4 @@ export default function Me() {
       </main>
     </div>
   );
-          }
+      }
