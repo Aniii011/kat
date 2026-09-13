@@ -1,11 +1,11 @@
-import { STATUS_SEQUENCE, currentStepIndex, type OrderStatus } from "@/lib/order-status";
+import { STATUS_SEQUENCE, currentStepIndex, STATUS_META, type OrderStatus } from "@/lib/order-status";
 
 const STEP_LABELS: Record<string, string> = {
-  pending: "Order placed",
-  accepted: "Confirmed by seller",
-  preparing: "Prepared for delivery",
-  out_for_delivery: "Out for delivery",
-  delivered: "Delivered",
+  pending: STATUS_META.pending.label,
+  accepted: STATUS_META.accepted.label,
+  preparing: STATUS_META.preparing.label,
+  out_for_delivery: STATUS_META.out_for_delivery.label,
+  delivered: STATUS_META.delivered.label,
 };
 
 interface TimelineProps {
