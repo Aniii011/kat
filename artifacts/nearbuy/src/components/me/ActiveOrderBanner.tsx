@@ -13,15 +13,15 @@ import { supabase } from "@/lib/supabase";
 // statuses need an entry here — delivered/completed/cancelled orders are
 // already excluded by the active_orders view.
 const STATUS_META: Record<string, { label: string; icon: typeof Truck; sub: string }> = {
-  pending: { label: "Order placed", icon: Clock, sub: "We've let the seller know" },
-  accepted: { label: "Order confirmed", icon: CheckCircle2, sub: "Being prepared for delivery" },
-  preparing: { label: "Order is being prepared", icon: Package, sub: "Being packed for delivery" },
+  pending: { label: "Order placed", icon: Clock, sub: "We've received your order" },
+  accepted: { label: "Order processing", icon: CheckCircle2, sub: "Being prepared for delivery" },
+  preparing: { label: "Prepared for delivery", icon: Package, sub: "Being packed for delivery" },
   ready_for_pickup: { label: "Ready for pickup", icon: ShoppingBag, sub: "Waiting for delivery pickup" },
-  out_for_delivery: { label: "Your order is on its way", icon: Truck, sub: "Should reach you soon" },
+  out_for_delivery: { label: "Out for delivery", icon: Truck, sub: "Should reach you soon" },
   // 'assigned' is a real value your admin dashboard sets today (admin-orders.tsx)
   // that isn't in the buyer-facing OrderStatus type yet — map it to something
   // sensible rather than hiding the banner entirely.
-  assigned: { label: "Order confirmed", icon: CheckCircle2, sub: "Assigned to a seller" },
+  assigned: { label: "Order processing", icon: CheckCircle2, sub: "Assigned to a seller" },
 };
 
 // Full order shape — matches the real Orders detail page's data needs,
@@ -91,8 +91,12 @@ export default function ActiveOrderBanner({ userId, onSelect }: ActiveOrderBanne
       onClick={() => onSelect?.(order)}
       className="w-full text-left bg-card border border-card-border rounded-2xl p-3.5 flex items-center gap-3 hover:bg-muted/30 transition-colors"
     >
-      <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-        <Icon className="w-4 h-4 text-primary" aria-hidden="true" />
+      <div className="w-11 h-11 rounded-xl bg-muted overflow-hidden shrink-0 flex items-center justify-center">
+        {order.product_image ? (
+          <img src={order.product_image} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <Icon className="w-4 h-4 text-primary" aria-hidden="true" />
+        )}
       </div>
       <div className="min-w-0">
         <p className="text-sm font-bold text-primary">{meta.label}</p>
