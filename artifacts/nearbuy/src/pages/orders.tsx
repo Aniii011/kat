@@ -91,9 +91,6 @@ export default function Orders() {
 
   const stageGroups = (stage: OrderStage) => groups.filter((g) => orderStage(g.headlineStatus) === stage);
   const processingGroups = stageGroups("processing");
-  const outForDeliveryGroups = stageGroups("out_for_delivery");
-  const deliveredGroups = stageGroups("delivered");
-  const cancelledGroups = stageGroups("cancelled");
   const visible = filter === "all" ? groups : stageGroups(filter);
 
   return (
@@ -176,9 +173,9 @@ export default function Orders() {
               {([
                 ["all", "All"],
                 ["processing", `Processing${processingGroups.length ? ` (${processingGroups.length})` : ""}`],
-                ...(outForDeliveryGroups.length ? [["out_for_delivery", "Out for Delivery"] as const] : []),
-                ...(deliveredGroups.length ? [["delivered", "Delivered"] as const] : []),
-                ...(cancelledGroups.length ? [["cancelled", "Cancelled"] as const] : []),
+                ["out_for_delivery", "Out for Delivery"],
+                ["delivered", "Delivered"],
+                ["cancelled", "Cancelled"],
               ] as const).map(([key, label]) => (
                 <button
                   key={key}
@@ -213,4 +210,4 @@ export default function Orders() {
       </AnimatePresence>
     </div>
   );
-}
+            }
