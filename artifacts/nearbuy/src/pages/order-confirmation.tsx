@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { CheckCircle2, ShoppingBag, MapPin, Home, MessageCircle, Copy, Check, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { STATUS_SEQUENCE, STATUS_META } from "@/lib/order-status";
 
 function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
 
@@ -158,23 +159,21 @@ export default function OrderConfirmation() {
         >
           <p className="text-sm font-bold">What happens next?</p>
           <div className="space-y-3">
-            {[
-  { step: "1", label: "Order placed", desc: "We've received your order", done: true },
-  { step: "2", label: "Order confirmed", desc: "Your seller has confirmed your order", done: false },
-  { step: "3", label: "Order processed", desc: "Your order is being prepared", done: false },
-  { step: "4", label: "Out for delivery", desc: "Your order is on its way", done: false },
-  { step: "5", label: "Delivered", desc: "Enjoy your new piece! 🎉", done: false },
-].map((s) => (
-              <div key={s.step} className="flex items-start gap-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[10px] font-black ${s.done ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"}`}>
-                  {s.done ? "✓" : s.step}
+            {STATUS_SEQUENCE.map((status, i) => {
+              const meta = STATUS_META[status];
+              const done = i === 0; // reaching this page means the order was just placed
+              return (
+              <div key={status} className="flex items-start gap-3">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[10px] font-black ${done ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"}`}>
+                  {done ? "✓" : i + 1}
                 </div>
                 <div>
-                  <p className={`text-sm font-semibold ${s.done ? "text-emerald-600" : ""}`}>{s.label}</p>
-                  <p className="text-xs text-muted-foreground">{s.desc}</p>
+                  <p className={`text-sm font-semibold ${done ? "text-emerald-600" : ""}`}>{meta.label}</p>
+                  <p className="text-xs text-muted-foreground">{meta.message}</p>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </motion.div>
 
@@ -220,4 +219,4 @@ export default function OrderConfirmation() {
       </main>
     </div>
   );
-              }
+        }
