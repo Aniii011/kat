@@ -19,7 +19,7 @@ interface JewelryComposerProps {
 export default function JewelryComposer(props: JewelryComposerProps) {
   return (
     <div className="space-y-5">
-      <TagPicker label="Material" options={JEWELRY_MATERIAL_OPTIONS} value={props.material} onChange={(v) => props.onMaterialChange(v as string)} />
+      <TagPicker label="Material" options={JEWELRY_MATERIAL_OPTIONS} value={props.material} onChange={(v) => props.onMaterialChange(v as string)} allowCustom />
       <TagPicker label="Color" options={JEWELRY_COLOR_OPTIONS} value={props.color} onChange={(v) => props.onColorChange(v as string)} />
       <TagPicker label="Adjustable" options={JEWELRY_ADJUSTABLE_OPTIONS} value={props.adjustable} onChange={(v) => props.onAdjustableChange(v as string)} />
 
