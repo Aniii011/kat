@@ -31,7 +31,7 @@ export default function FashionComposer(props: FashionComposerProps) {
       <TagPicker label="Color" options={FASHION_COLOR_OPTIONS} value={props.color} onChange={(v) => props.onColorChange(v as string)} />
       <TagPicker label="Size" options={FASHION_SIZE_OPTIONS} value={props.size} onChange={(v) => props.onSizeChange(v as string)} />
       <TagPicker label="Fit" options={FASHION_FIT_OPTIONS} value={props.fit} onChange={(v) => props.onFitChange(v as string)} />
-      <TagPicker label="Material" options={FASHION_MATERIAL_OPTIONS} value={props.material} onChange={(v) => props.onMaterialChange(v as string)} />
+      <TagPicker label="Material" options={FASHION_MATERIAL_OPTIONS} value={props.material} onChange={(v) => props.onMaterialChange(v as string)} allowCustom />
       <TagPicker label="Occasion" options={FASHION_OCCASION_OPTIONS} value={props.occasion} onChange={(v) => props.onOccasionChange(v as string)} />
       <TagPicker label="Audience" options={FASHION_AUDIENCE_OPTIONS} value={props.audience} onChange={(v) => props.onAudienceChange(v as string)} />
       <TagPicker
@@ -56,4 +56,4 @@ export default function FashionComposer(props: FashionComposerProps) {
       />
     </div>
   );
-        }
+}
