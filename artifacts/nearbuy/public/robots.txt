@@ -1,2 +1,24 @@
 User-agent: *
 Allow: /
+Disallow: /cart
+Disallow: /checkout
+Disallow: /order-confirmation
+Disallow: /orders
+Disallow: /me
+Disallow: /wishlists
+Disallow: /wishlist/
+Disallow: /inbox
+Disallow: /following
+Disallow: /reviews
+Disallow: /seller
+Disallow: /seller-orders
+Disallow: /admin
+Disallow: /admin-orders
+Disallow: /admin-sellers
+Disallow: /reset-password
+Disallow: /auth/callback
+Disallow: /search
+Disallow: /shop/
+Disallow: /boards
+
+Sitemap: https://kat.com.ng/sitemap.xml
