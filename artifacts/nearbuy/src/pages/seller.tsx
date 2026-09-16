@@ -2078,4 +2078,4 @@ function EmptyState({ icon, title, action }: any) {
       {action}
     </div>
   );
-   }
+}
