@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { ProductVariant } from "@/lib/product-variants";
 import { COLORS, CLOTHING_SIZES, SHOE_SIZES } from "@/lib/product-option-sets";
+import { Plus, X } from "lucide-react";
 
 function toggle(list: string[], value: string) {
   return list.includes(value) ? list.filter((x) => x !== value) : [...list, value];
@@ -43,6 +44,21 @@ export default function VariantsAccordion({
   defaultOpen = false,
 }: VariantsAccordionProps) {
   const [open, setOpen] = useState(defaultOpen);
+  const [addingCustomColor, setAddingCustomColor] = useState(false);
+  const [customColorInput, setCustomColorInput] = useState("");
+
+  const commitCustomColor = () => {
+    const trimmed = customColorInput.trim();
+    if (trimmed && !selectedColors.includes(trimmed)) {
+      setSelectedColors((prev) => [...prev, trimmed]);
+    }
+    setCustomColorInput("");
+    setAddingCustomColor(false);
+  };
+
+  // A previously-added custom color won't be in the preset COLORS list —
+  // still needs to render as a removable chip.
+  const customSelectedColors = selectedColors.filter((c) => !COLORS.includes(c));
 
   const hasAnySelection =
     selectedColors.length > 0 ||
@@ -84,6 +100,44 @@ export default function VariantsAccordion({
                   {c}
                 </button>
               ))}
+
+              {customSelectedColors.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setSelectedColors((prev) => toggle(prev, c))}
+                  className="text-xs pl-2.5 pr-1.5 py-1 rounded-full border border-primary bg-primary text-primary-foreground font-medium flex items-center gap-1"
+                >
+                  {c}
+                  <X className="w-3 h-3" />
+                </button>
+              ))}
+
+              {!addingCustomColor && (
+                <button
+                  type="button"
+                  onClick={() => setAddingCustomColor(true)}
+                  className="text-xs px-2.5 py-1 rounded-full border border-dashed border-border text-muted-foreground hover:border-primary/50 hover:text-foreground transition-all flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> Custom
+                </button>
+              )}
+
+              {addingCustomColor && (
+                <input
+                  autoFocus
+                  type="text"
+                  value={customColorInput}
+                  onChange={(e) => setCustomColorInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); commitCustomColor(); }
+                    if (e.key === "Escape") { setAddingCustomColor(false); setCustomColorInput(""); }
+                  }}
+                  onBlur={commitCustomColor}
+                  placeholder="e.g. Olive Green"
+                  className="text-xs px-2.5 py-1 rounded-full border border-primary bg-background outline-none w-28"
+                />
+              )}
             </div>
           </div>
 
@@ -181,4 +235,4 @@ export default function VariantsAccordion({
       )}
     </div>
   );
-}
+                                        }
