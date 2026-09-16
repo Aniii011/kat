@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { ProductVariant } from "@/lib/product-variants";
 import { NATIVE_ATTRIBUTE_COLUMNS } from "@/lib/product-attributes";
 import { THRIFT_DEFAULT_STOCK } from "@/lib/thrift-config";
-import { SELLER_CATEGORY_TO_TOP_CATEGORIES, type SellerCategoryId } from "@/lib/seller-categories";
+import { SELLER_CATEGORY_TO_TOP_CATEGORIES, SELLER_CATEGORIES, type SellerCategoryId } from "@/lib/seller-categories";
 import SellerCategoryGate from "@/components/seller/add-product/SellerCategoryGate";
 import AddProductComposer from "@/components/seller/add-product/AddProductComposer";
 import PackingListCard, { type PackingGroup } from "@/components/seller/PackingListCard";
@@ -1137,6 +1137,9 @@ export default function Seller() {
               completenessChecks={completenessChecks}
               completenessPct={completenessPct}
               onStoreUpdated={fetchAll}
+              sellerCategory={sellerCategory}
+              onChangeCategory={handleSellerCategorySelect}
+              savingCategory={savingSellerCategory}
             />
           )}
         </div>
@@ -1924,12 +1927,13 @@ function SellerEarningsSection({ orders, revenue }: any) {
 }
 
 // ── STORE ──
-function SellerStoreSection({ user, isMultiStore, activeStore, completenessChecks, completenessPct, onStoreUpdated }: any) {
+function SellerStoreSection({ user, isMultiStore, activeStore, completenessChecks, completenessPct, onStoreUpdated, sellerCategory, onChangeCategory, savingCategory }: any) {
   const [storeName, setStoreName] = useState("");
   const [storeDescription, setStoreDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
   useEffect(() => {
     if (isMultiStore) {
@@ -1988,6 +1992,59 @@ function SellerStoreSection({ user, isMultiStore, activeStore, completenessCheck
         {saveError && <p className="text-xs text-destructive font-medium">{saveError}</p>}
       </div>
 
+      <div className="border border-border rounded-2xl p-4 space-y-3">
+        <p className="text-sm font-bold">Selling Category</p>
+        <p className="text-xs text-muted-foreground">
+          This determines the fields you fill in when listing a product (sizes, materials, etc).
+          Existing listings keep their own saved details — changing this only affects the form
+          shown when you add or edit a product.
+        </p>
+        <div className="flex items-center justify-between bg-muted rounded-xl px-3 py-2.5">
+          <span className="text-sm font-medium">
+            {SELLER_CATEGORIES.find((c: any) => c.id === sellerCategory)?.emoji}{" "}
+            {SELLER_CATEGORIES.find((c: any) => c.id === sellerCategory)?.label || "Not set"}
+          </span>
+          <Button size="sm" variant="outline" className="rounded-full" onClick={() => setShowCategoryPicker(true)}>
+            Change
+          </Button>
+        </div>
+      </div>
+
+      {showCategoryPicker && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center px-4 pb-4 sm:pb-0">
+          <div className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-black text-base">Change selling category</h3>
+              <button onClick={() => setShowCategoryPicker(false)} aria-label="Close" className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">
+              This changes the fields shown when adding or editing products going forward.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {SELLER_CATEGORIES.map((cat: any) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  disabled={savingCategory}
+                  onClick={async () => {
+                    await onChangeCategory(cat.id as SellerCategoryId);
+                    setShowCategoryPicker(false);
+                  }}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all disabled:opacity-50 ${
+                    sellerCategory === cat.id ? "border-primary bg-primary/5" : "border-border hover:border-primary"
+                  }`}
+                >
+                  <span className="text-2xl">{cat.emoji}</span>
+                  <span className="text-xs font-bold text-center">{cat.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Profile completeness · {completenessPct}%</p>
         <div className="divide-y divide-border border-t border-b border-border">
@@ -2021,4 +2078,4 @@ function EmptyState({ icon, title, action }: any) {
       {action}
     </div>
   );
-}
+   }
