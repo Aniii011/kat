@@ -24,7 +24,7 @@ export default function ShoesComposer(props: ShoesComposerProps) {
     <div className="space-y-5">
       <Input placeholder="Brand (optional)" value={props.brand} onChange={(e) => props.onBrandChange(e.target.value)} className="rounded-xl h-11" />
       <TagPicker label="Material" options={SHOES_MATERIAL_OPTIONS} value={props.material} onChange={(v) => props.onMaterialChange(v as string)} allowCustom />
-      <TagPicker label="Color" options={SHOES_COLOR_OPTIONS} value={props.color} onChange={(v) => props.onColorChange(v as string)} />
+      <TagPicker label="Color" options={SHOES_COLOR_OPTIONS} value={props.color} onChange={(v) => props.onColorChange(v as string)} allowCustom />
       {/* NOTE: SHOES_SIZE_OPTIONS intentionally not rendered here as a standalone
           tag field — shoe size is captured via the Variants accordion below,
           matching how shoe sellers actually think about sizing (per-size stock),
