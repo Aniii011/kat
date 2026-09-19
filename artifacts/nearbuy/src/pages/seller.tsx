@@ -140,6 +140,7 @@ export default function Seller() {
   const [occasion, setOccasion] = useState("");
   const [color, setColor] = useState("");
   const [colorTouched, setColorTouched] = useState(false);
+  const [colorImages, setColorImages] = useState<Record<string, string>>({});
   const [size, setSize] = useState("");
   const [sizeTouched, setSizeTouched] = useState(false);
   const [brand, setBrand] = useState("");
@@ -468,6 +469,7 @@ export default function Seller() {
     setImageFiles([]); setImagePreviews([]); setExistingImages([]);
     setVideoFile(null); setVideoPreview(""); setExistingVideoUrl("");
     setVariants([]); setSelectedColors([]); setSelectedSizes([]); setSelectedShoeSizes([]);
+    setColorImages({});
     setUseVariantPricing(false);
     setExistingAttributes({});
     setUploadError(null);
@@ -491,6 +493,7 @@ export default function Seller() {
     setAudience(p.audience || ""); setFit(p.fit || ""); setMaterial(p.material || ""); setOccasion(p.occasion || "");
     setColor((p.colors && p.colors[0]) || p.attributes?.color || "");
     setColorTouched(false);
+    setColorImages((p.color_images as Record<string, string>) || {});
     setSize((p.clothing_sizes && p.clothing_sizes[0]) || p.attributes?.size || "");
     setSizeTouched(false);
     setBrand(p.attributes?.brand || "");
@@ -551,6 +554,17 @@ export default function Seller() {
       }
     }
     return urls;
+  };
+
+  // Single-file upload, reused for per-color variant photos. Returns null
+  // on failure rather than throwing, so one failed upload doesn't block
+  // the rest of the save.
+  const uploadSingleImage = async (file: File): Promise<string | null> => {
+    const fileName = `${Date.now()}-${Math.random()}-${file.name}`;
+    const { error } = await supabase.storage.from("product-images").upload(fileName, file);
+    if (error) return null;
+    const { data } = supabase.storage.from("product-images").getPublicUrl(fileName);
+    return data.publicUrl;
   };
 
   const uploadVideo = async (): Promise<string> => {
@@ -699,6 +713,7 @@ export default function Seller() {
       image_embedding: imageEmbedding,
       images: allImages,
       video_url: videoUrl || null,
+      color_images: Object.keys(colorImages).length > 0 ? colorImages : null,
       variants: variants.length > 0 ? variants : null,
       use_variant_pricing: useVariantPricing,
       is_thrift: isNewThrift,
@@ -841,6 +856,7 @@ export default function Seller() {
         powerSource={powerSource} onPowerSourceChange={setPowerSource}
         adjustable={adjustable} onAdjustableChange={setAdjustable}
         selectedColors={selectedColors} setSelectedColors={setSelectedColors}
+        colorImages={colorImages} setColorImages={setColorImages} uploadSingleImage={uploadSingleImage}
         selectedSizes={selectedSizes} setSelectedSizes={setSelectedSizes}
         selectedShoeSizes={selectedShoeSizes} setSelectedShoeSizes={setSelectedShoeSizes}
         useVariantPricing={useVariantPricing} setUseVariantPricing={setUseVariantPricing}
@@ -2078,4 +2094,4 @@ function EmptyState({ icon, title, action }: any) {
       {action}
     </div>
   );
-}
+  }
