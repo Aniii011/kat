@@ -87,6 +87,7 @@ export default function ListingDetail() {
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedShoeSize, setSelectedShoeSize] = useState<string | null>(null);
+  const [variantError, setVariantError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [wishlisted, setWishlisted] = useState(false);
   const [showDeposit, setShowDeposit] = useState(false);
@@ -176,7 +177,6 @@ export default function ListingDetail() {
   const allShoeSizes = listing.shoeSizes ?? [];
   const hasVariants = allClothingSizes.length > 0 || allShoeSizes.length > 0 || (listing.colors && listing.colors.length > 0);
   const hasColors = Boolean(listing.colors && listing.colors.length > 0);
-  const [variantError, setVariantError] = useState<string | null>(null);
   // Matches the Temu/SHEIN pattern: Color and Size show together, not
   // gated one behind the other. What's gated is the CTA itself — it
   // reads "Select an option" until every required choice is made.
@@ -1030,4 +1030,4 @@ const handleAddToCart = () => {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
-   }
+    }
