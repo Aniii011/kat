@@ -10,6 +10,8 @@ import {
 
 interface FashionComposerProps {
   color: string; onColorChange: (v: string) => void;
+  colorImages?: Record<string, string>; setColorImages?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  uploadSingleImage?: (file: File) => Promise<string | null>;
   size: string; onSizeChange: (v: string) => void;
   fit: string; onFitChange: (v: string) => void;
   material: string; onMaterialChange: (v: string) => void;
@@ -45,6 +47,9 @@ export default function FashionComposer(props: FashionComposerProps) {
       <VariantsAccordion
         selectedColors={props.selectedColors}
         setSelectedColors={props.setSelectedColors}
+        colorImages={props.colorImages}
+        onColorImagesChange={props.setColorImages}
+        onUploadImage={props.uploadSingleImage}
         selectedSizes={props.selectedSizes}
         setSelectedSizes={props.setSelectedSizes}
         showClothingSizes
