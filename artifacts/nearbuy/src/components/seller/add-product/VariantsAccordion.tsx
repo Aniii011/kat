@@ -13,6 +13,13 @@ function toggle(list: string[], value: string) {
 interface VariantsAccordionProps {
   selectedColors: string[];
   setSelectedColors: React.Dispatch<React.SetStateAction<string[]>>;
+  // Optional: lets the seller attach one reference photo per color, so
+  // buyers can visually tell variants apart (e.g. yellow vs maroon dress)
+  // instead of relying on the color name alone. Only rendered when both
+  // are provided by the parent composer.
+  colorImages?: Record<string, string>;
+  onColorImagesChange?: (next: Record<string, string>) => void;
+  onUploadImage?: (file: File) => Promise<string | null>;
   selectedSizes?: string[];
   setSelectedSizes?: React.Dispatch<React.SetStateAction<string[]>>;
   selectedShoeSizes?: string[];
@@ -30,6 +37,9 @@ interface VariantsAccordionProps {
 export default function VariantsAccordion({
   selectedColors,
   setSelectedColors,
+  colorImages,
+  onColorImagesChange,
+  onUploadImage,
   selectedSizes = [],
   setSelectedSizes,
   selectedShoeSizes = [],
@@ -46,6 +56,11 @@ export default function VariantsAccordion({
   const [open, setOpen] = useState(defaultOpen);
   const [addingCustomColor, setAddingCustomColor] = useState(false);
   const [customColorInput, setCustomColorInput] = useState("");
+  const [addingCustomSize, setAddingCustomSize] = useState(false);
+  const [customSizeInput, setCustomSizeInput] = useState("");
+  const [addingCustomShoeSize, setAddingCustomShoeSize] = useState(false);
+  const [customShoeSizeInput, setCustomShoeSizeInput] = useState("");
+  const [uploadingColor, setUploadingColor] = useState<string | null>(null);
 
   const commitCustomColor = () => {
     const trimmed = customColorInput.trim();
@@ -54,6 +69,41 @@ export default function VariantsAccordion({
     }
     setCustomColorInput("");
     setAddingCustomColor(false);
+  };
+
+  const commitCustomSize = () => {
+    const trimmed = customSizeInput.trim();
+    if (trimmed && setSelectedSizes && !selectedSizes.includes(trimmed)) {
+      setSelectedSizes((prev) => [...prev, trimmed]);
+    }
+    setCustomSizeInput("");
+    setAddingCustomSize(false);
+  };
+
+  const commitCustomShoeSize = () => {
+    const trimmed = customShoeSizeInput.trim();
+    if (trimmed && setSelectedShoeSizes && !selectedShoeSizes.includes(trimmed)) {
+      setSelectedShoeSizes((prev) => [...prev, trimmed]);
+    }
+    setCustomShoeSizeInput("");
+    setAddingCustomShoeSize(false);
+  };
+
+  const handleColorPhotoSelect = async (color: string, file: File | undefined) => {
+    if (!file || !onUploadImage || !onColorImagesChange) return;
+    setUploadingColor(color);
+    const url = await onUploadImage(file);
+    setUploadingColor(null);
+    if (url) {
+      onColorImagesChange({ ...(colorImages || {}), [color]: url });
+    }
+  };
+
+  const removeColorPhoto = (color: string) => {
+    if (!onColorImagesChange || !colorImages) return;
+    const next = { ...colorImages };
+    delete next[color];
+    onColorImagesChange(next);
   };
 
   // A previously-added custom color won't be in the preset COLORS list —
@@ -141,6 +191,47 @@ export default function VariantsAccordion({
             </div>
           </div>
 
+          {/* Reference photo per color — helps buyers tell variants apart
+              at a glance (e.g. yellow vs maroon), and shows on the product
+              page as tappable color swatches with a real thumbnail. Only
+              rendered when the parent composer supports it. */}
+          {selectedColors.length > 0 && onUploadImage && onColorImagesChange && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-2">Photo per color (optional)</p>
+              <div className="flex flex-wrap gap-2">
+                {selectedColors.map((c) => (
+                  <label key={c} className="flex flex-col items-center gap-1 cursor-pointer">
+                    <div className="w-14 h-14 rounded-lg border border-border bg-muted overflow-hidden flex items-center justify-center relative">
+                      {uploadingColor === c ? (
+                        <span className="text-[9px] text-muted-foreground">Uploading...</span>
+                      ) : colorImages?.[c] ? (
+                        <>
+                          <img src={colorImages[c]} alt={c} className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); removeColorPhoto(c); }}
+                            className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-background/90 flex items-center justify-center"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </>
+                      ) : (
+                        <Plus className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground max-w-[56px] truncate">{c}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleColorPhotoSelect(c, e.target.files?.[0])}
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           {showClothingSizes && setSelectedSizes && (
             <div>
               <p className="text-xs font-semibold text-muted-foreground mb-2">Sizes</p>
@@ -159,6 +250,41 @@ export default function VariantsAccordion({
                     {s}
                   </button>
                 ))}
+                {selectedSizes.filter((s) => !CLOTHING_SIZES.includes(s)).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setSelectedSizes((prev) => toggle(prev, s))}
+                    className="text-xs pl-2.5 pr-1.5 py-1 rounded-full border border-primary bg-primary text-primary-foreground font-medium flex items-center gap-1"
+                  >
+                    {s}
+                    <X className="w-3 h-3" />
+                  </button>
+                ))}
+                {!addingCustomSize && (
+                  <button
+                    type="button"
+                    onClick={() => setAddingCustomSize(true)}
+                    className="text-xs px-2.5 py-1 rounded-full border border-dashed border-border text-muted-foreground hover:border-primary/50 hover:text-foreground transition-all flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" /> Custom
+                  </button>
+                )}
+                {addingCustomSize && (
+                  <input
+                    autoFocus
+                    type="text"
+                    value={customSizeInput}
+                    onChange={(e) => setCustomSizeInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") { e.preventDefault(); commitCustomSize(); }
+                      if (e.key === "Escape") { setAddingCustomSize(false); setCustomSizeInput(""); }
+                    }}
+                    onBlur={commitCustomSize}
+                    placeholder="e.g. 01"
+                    className="text-xs px-2.5 py-1 rounded-full border border-primary bg-background outline-none w-20"
+                  />
+                )}
               </div>
             </div>
           )}
@@ -181,6 +307,41 @@ export default function VariantsAccordion({
                     {s}
                   </button>
                 ))}
+                {selectedShoeSizes.filter((s) => !SHOE_SIZES.includes(s)).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setSelectedShoeSizes((prev) => toggle(prev, s))}
+                    className="text-xs pl-2.5 pr-1.5 py-1 rounded-full border border-primary bg-primary text-primary-foreground font-medium flex items-center gap-1"
+                  >
+                    {s}
+                    <X className="w-3 h-3" />
+                  </button>
+                ))}
+                {!addingCustomShoeSize && (
+                  <button
+                    type="button"
+                    onClick={() => setAddingCustomShoeSize(true)}
+                    className="text-xs px-2.5 py-1 rounded-full border border-dashed border-border text-muted-foreground hover:border-primary/50 hover:text-foreground transition-all flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" /> Custom
+                  </button>
+                )}
+                {addingCustomShoeSize && (
+                  <input
+                    autoFocus
+                    type="text"
+                    value={customShoeSizeInput}
+                    onChange={(e) => setCustomShoeSizeInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") { e.preventDefault(); commitCustomShoeSize(); }
+                      if (e.key === "Escape") { setAddingCustomShoeSize(false); setCustomShoeSizeInput(""); }
+                    }}
+                    onBlur={commitCustomShoeSize}
+                    placeholder="e.g. 42.5"
+                    className="text-xs px-2.5 py-1 rounded-full border border-primary bg-background outline-none w-20"
+                  />
+                )}
               </div>
             </div>
           )}
@@ -235,4 +396,4 @@ export default function VariantsAccordion({
       )}
     </div>
   );
-                                        }
+                  }
