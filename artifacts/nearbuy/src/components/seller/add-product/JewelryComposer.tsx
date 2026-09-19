@@ -7,6 +7,8 @@ import { JEWELRY_MATERIAL_OPTIONS, JEWELRY_COLOR_OPTIONS, JEWELRY_ADJUSTABLE_OPT
 interface JewelryComposerProps {
   material: string; onMaterialChange: (v: string) => void;
   color: string; onColorChange: (v: string) => void;
+  colorImages?: Record<string, string>; setColorImages?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  uploadSingleImage?: (file: File) => Promise<string | null>;
   adjustable: string; onAdjustableChange: (v: string) => void;
 
   selectedColors: string[]; setSelectedColors: React.Dispatch<React.SetStateAction<string[]>>;
@@ -26,6 +28,9 @@ export default function JewelryComposer(props: JewelryComposerProps) {
       <VariantsAccordion
         selectedColors={props.selectedColors}
         setSelectedColors={props.setSelectedColors}
+        colorImages={props.colorImages}
+        onColorImagesChange={props.setColorImages}
+        onUploadImage={props.uploadSingleImage}
         useVariantPricing={props.useVariantPricing}
         setUseVariantPricing={props.setUseVariantPricing}
         variants={props.variants}
