@@ -3,6 +3,8 @@ import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { useCart } from "@/hooks/use-cart";
+import { useInteractions } from "@/hooks/use-interactions";
+import { useAuth } from "@/context/auth-context";
 import {
   Search as SearchIcon, X, SlidersHorizontal, Star, BadgeCheck,
   ArrowLeft, Camera, Image, ShoppingBag, CheckCircle2, Loader2,
@@ -121,6 +123,8 @@ function ProductCard({
 }
 
 export default function Search() {
+  const { user } = useAuth();
+  const { logInteraction } = useInteractions(user?.id ?? null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [featured, setFeatured] = useState<any[]>([]);
@@ -133,6 +137,17 @@ export default function Search() {
   const [isImageSearch, setIsImageSearch] = useState(false);
   const [imageSearchError, setImageSearchError] = useState("");
   const [imageSearchPreview, setImageSearchPreview] = useState<string | null>(null);
+
+  // Log the search term once it settles, not on every keystroke.
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) return;
+    const timeout = setTimeout(() => {
+      logInteraction({ eventType: "search", searchTerm: trimmed });
+    }, 800);
+    return () => clearTimeout(timeout);
+  }, [query]);
+
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
   const [addedId, setAddedId] = useState<string | null>(null);
 
@@ -693,4 +708,4 @@ export default function Search() {
       </main>
     </div>
   );
-      }
+    }
