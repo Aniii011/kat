@@ -69,6 +69,8 @@ interface AddProductComposerProps {
 
   // Variants
   selectedColors: string[]; setSelectedColors: React.Dispatch<React.SetStateAction<string[]>>;
+  colorImages: Record<string, string>; setColorImages: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  uploadSingleImage: (file: File) => Promise<string | null>;
   selectedSizes: string[]; setSelectedSizes: React.Dispatch<React.SetStateAction<string[]>>;
   selectedShoeSizes: string[]; setSelectedShoeSizes: React.Dispatch<React.SetStateAction<string[]>>;
   useVariantPricing: boolean; setUseVariantPricing: (v: boolean) => void;
@@ -107,6 +109,7 @@ export default function AddProductComposer(props: AddProductComposerProps) {
     shadeType, onShadeTypeChange, volumeSize, onVolumeSizeChange,
     powerSource, onPowerSourceChange, adjustable, onAdjustableChange,
     selectedColors, setSelectedColors, selectedSizes, setSelectedSizes, selectedShoeSizes, setSelectedShoeSizes,
+    colorImages, setColorImages, uploadSingleImage,
     useVariantPricing, setUseVariantPricing, variants, onGenerateVariants, onUpdateVariant,
     price, onPriceChange, stock, onStockChange,
     sellerNote, onSellerNoteChange, packageSize, onPackageSizeChange, expiryDate, onExpiryDateChange,
@@ -130,6 +133,7 @@ export default function AddProductComposer(props: AddProductComposerProps) {
             audience={audience} onAudienceChange={onAudienceChange}
             aesthetics={aesthetics} onAestheticsChange={onAestheticsChange}
             selectedColors={selectedColors} setSelectedColors={setSelectedColors}
+            colorImages={colorImages} setColorImages={setColorImages} uploadSingleImage={uploadSingleImage}
             selectedSizes={selectedSizes} setSelectedSizes={setSelectedSizes}
             useVariantPricing={useVariantPricing} setUseVariantPricing={setUseVariantPricing}
             variants={variants} onGenerateVariants={onGenerateVariants} onUpdateVariant={onUpdateVariant}
@@ -142,6 +146,7 @@ export default function AddProductComposer(props: AddProductComposerProps) {
             material={material} onMaterialChange={onMaterialChange}
             color={color} onColorChange={onColorChange}
             selectedColors={selectedColors} setSelectedColors={setSelectedColors}
+            colorImages={colorImages} setColorImages={setColorImages} uploadSingleImage={uploadSingleImage}
             selectedShoeSizes={selectedShoeSizes} setSelectedShoeSizes={setSelectedShoeSizes}
             useVariantPricing={useVariantPricing} setUseVariantPricing={setUseVariantPricing}
             variants={variants} onGenerateVariants={onGenerateVariants} onUpdateVariant={onUpdateVariant}
@@ -195,6 +200,7 @@ export default function AddProductComposer(props: AddProductComposerProps) {
             color={color} onColorChange={onColorChange}
             adjustable={adjustable} onAdjustableChange={onAdjustableChange}
             selectedColors={selectedColors} setSelectedColors={setSelectedColors}
+            colorImages={colorImages} setColorImages={setColorImages} uploadSingleImage={uploadSingleImage}
             useVariantPricing={useVariantPricing} setUseVariantPricing={setUseVariantPricing}
             variants={variants} onGenerateVariants={onGenerateVariants} onUpdateVariant={onUpdateVariant}
           />
@@ -322,4 +328,4 @@ export default function AddProductComposer(props: AddProductComposerProps) {
       </div>
     </div>
   );
-}
+            }
