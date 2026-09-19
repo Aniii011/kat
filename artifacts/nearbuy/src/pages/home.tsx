@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useListings } from "@/hooks/use-listings";
@@ -9,6 +9,7 @@ import {
 import { useBoards } from "@/hooks/use-boards";
 import { useAuth } from "@/context/auth-context";
 import { useCart } from "@/hooks/use-cart";
+import { useInteractions } from "@/hooks/use-interactions";
 import ThemeSwitcher from "@/components/theme-switcher";
 import SaveToBoardModal from "@/components/save-to-board-modal";
 import AuthModal from "@/components/auth-modal";
@@ -47,7 +48,17 @@ function ProductCard({
 }) {
   const { addItem } = useCart();
   const { user } = useAuth();
+  const { logInteraction } = useInteractions(user?.id ?? null);
   const [addedToCart, setAddedToCart] = useState(false);
+
+  const handleCardTap = () => {
+    logInteraction({
+      listingId: listing.id,
+      eventType: "tap",
+      category: listing.category,
+      aesthetics: listing.aesthetics,
+    });
+  };
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -74,7 +85,7 @@ function ProductCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(index * 0.04, 0.35), duration: 0.28 }}
     >
-      <Link href={`/listing/${listing.id}`}>
+      <Link href={`/listing/${listing.id}`} onClick={handleCardTap}>
         <div className="group bg-card rounded-2xl overflow-hidden cursor-pointer border border-border hover:shadow-md transition-all duration-300">
           <div className="relative aspect-[3/4] overflow-hidden bg-muted">
             <img
@@ -204,6 +215,20 @@ export default function Home() {
   const { listings: remoteListings, loading } = useListings();
   const allListings = remoteListings;
   const { isSaved } = useBoards();
+  const { getAffinityScores } = useInteractions(user?.id ?? null);
+  const [affinity, setAffinity] = useState<{ categoryScores: Record<string, number>; aestheticScores: Record<string, number> }>({ categoryScores: {}, aestheticScores: {} });
+
+  useEffect(() => {
+    if (!user?.id) {
+      setAffinity({ categoryScores: {}, aestheticScores: {} });
+      return;
+    }
+    let cancelled = false;
+    getAffinityScores().then((scores) => {
+      if (!cancelled) setAffinity(scores);
+    });
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   const openLogin = () => { setAuthMode("login"); setShowAuth(true); };
   const openSignup = () => { setAuthMode("signup"); setShowAuth(true); };
@@ -243,9 +268,24 @@ export default function Home() {
     else if (sortBy === "price-desc") result = [...result].sort((a, b) => b.price - a.price);
     else if (sortBy === "rating")     result = [...result].sort((a, b) => b.rating - a.rating);
     else if (sortBy === "discount")   result = [...result].sort((a, b) => (b.discount ?? 0) - (a.discount ?? 0));
-    else result = [...result].sort((a, b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0));
+    else {
+      // Default view: rank by the signed-in user's own affinity (what
+      // they've tapped/viewed/searched), falling back to the existing
+      // featured-first order for anyone with no signal yet — guests and
+      // brand-new accounts see exactly the same order as before.
+      const scoreOf = (l: Listing) => {
+        let score = affinity.categoryScores[l.category] ?? 0;
+        for (const a of l.aesthetics ?? []) score += affinity.aestheticScores[a] ?? 0;
+        return score;
+      };
+      result = [...result].sort((a, b) => {
+        const diff = scoreOf(b) - scoreOf(a);
+        if (diff !== 0) return diff;
+        return (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0);
+      });
+    }
     return result;
-  }, [topCategory, subCategory, selectedAesthetic, sortBy, allListings]);
+  }, [topCategory, subCategory, selectedAesthetic, sortBy, allListings, affinity]);
 
   const thriftPreview = allListings.filter((l) => l.isThrift).slice(0, 3);
 
@@ -556,4 +596,4 @@ export default function Home() {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
     </div>
   );
-            }
+                             }
