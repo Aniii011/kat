@@ -55,6 +55,8 @@ export default function Checkout() {
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
   const [deliveryFee, setDeliveryFee] = useState(0);
+  const [doorDeliveryFee, setDoorDeliveryFee] = useState<number | null>(null);
+  const [deliveryMethod, setDeliveryMethod] = useState<"standard" | "door">("standard");
   const [cities, setCities] = useState<any[]>([]);
   const [couponInput, setCouponInput] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<any | null>(null);
@@ -103,7 +105,9 @@ export default function Checkout() {
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   const citySelected = !!city;
   // Delivery is always the selected city's fee — no subtotal-based free delivery.
-  const delivery = citySelected ? deliveryFee : 0;
+  const delivery = citySelected
+    ? (deliveryMethod === "door" && doorDeliveryFee !== null ? doorDeliveryFee : deliveryFee)
+    : 0;
 
   const discount = appliedCoupon
     ? appliedCoupon.discount_type === "percent"
@@ -461,6 +465,12 @@ export default function Checkout() {
                     setCity(value);
                     const selected = cities.find((c) => c.city === value);
                     setDeliveryFee(selected?.delivery_fee || 0);
+                    setDoorDeliveryFee(
+                      selected?.door_delivery_fee !== null && selected?.door_delivery_fee !== undefined
+                        ? selected.door_delivery_fee
+                        : null
+                    );
+                    setDeliveryMethod("standard");
                   }}
                   disabled={!state}
                   className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
@@ -475,6 +485,34 @@ export default function Checkout() {
                   ))}
                 </select>
               </div>
+
+              {citySelected && doorDeliveryFee !== null && (
+                <div className="space-y-1.5">
+                  <Label>Delivery method</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryMethod("standard")}
+                      className={`text-left p-3 rounded-xl border-2 transition-all ${
+                        deliveryMethod === "standard" ? "border-primary bg-primary/5" : "border-border"
+                      }`}
+                    >
+                      <p className="text-sm font-semibold">Standard</p>
+                      <p className="text-xs text-muted-foreground">{formatNaira(deliveryFee)}</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryMethod("door")}
+                      className={`text-left p-3 rounded-xl border-2 transition-all ${
+                        deliveryMethod === "door" ? "border-primary bg-primary/5" : "border-border"
+                      }`}
+                    >
+                      <p className="text-sm font-semibold">Door delivery</p>
+                      <p className="text-xs text-muted-foreground">{formatNaira(doorDeliveryFee)}</p>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -599,4 +637,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-      }
+    }
