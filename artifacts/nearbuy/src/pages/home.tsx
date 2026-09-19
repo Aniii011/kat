@@ -474,7 +474,7 @@ export default function Home() {
 
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs text-muted-foreground">
-            {loading ? "Loading..." : `${filteredListings.length} item${filteredListings.length !== 1 ? "s" : ""}`}
+            {loading ? "Loading..." : filteredListings.length === 0 ? "No items yet" : "\u00A0"}
           </p>
           <select
             value={sortBy}
@@ -556,4 +556,4 @@ export default function Home() {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
     </div>
   );
-  }
+            }
