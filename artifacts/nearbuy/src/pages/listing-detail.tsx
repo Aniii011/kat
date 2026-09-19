@@ -6,7 +6,7 @@ import { useCart } from "@/hooks/use-cart";
 import ThemeSwitcher from "@/components/theme-switcher";
 import {
   ArrowLeft, Star, ShoppingBag, Shield, RotateCcw,
-  Truck, BadgeCheck, ChevronLeft, ChevronRight, Minus, Plus,
+  Truck, BadgeCheck, ChevronLeft, ChevronRight, Minus, Plus, Check,
   Heart, Share2, Users, Clock, Ruler, Info, Package,
   MessageCircle, Flag, ChevronDown, ChevronUp, Play,
   CheckCircle2, Store, Tag, Zap,
@@ -175,6 +175,15 @@ export default function ListingDetail() {
   const allClothingSizes = listing.clothingSizes ?? [];
   const allShoeSizes = listing.shoeSizes ?? [];
   const hasVariants = allClothingSizes.length > 0 || allShoeSizes.length > 0 || (listing.colors && listing.colors.length > 0);
+  const hasColors = Boolean(listing.colors && listing.colors.length > 0);
+  const [variantError, setVariantError] = useState<string | null>(null);
+  // Matches the Temu/SHEIN pattern: Color and Size show together, not
+  // gated one behind the other. What's gated is the CTA itself — it
+  // reads "Select an option" until every required choice is made.
+  const needsSelection =
+    (hasColors && !selectedColor) ||
+    (allClothingSizes.length > 0 && !selectedSize) ||
+    (allShoeSizes.length > 0 && !selectedShoeSize);
   const isShoeSize = allShoeSizes.length > 0;
 
   const selectedVariantImage = selectedColor && listing.colorImages?.[selectedColor]
@@ -186,6 +195,19 @@ const handleAddToCart = () => {
     setShowAuth(true);
     return;
   }
+  if (hasColors && !selectedColor) {
+    setVariantError("Please select a colour");
+    return;
+  }
+  if (allClothingSizes.length > 0 && !selectedSize) {
+    setVariantError("Please select a size");
+    return;
+  }
+  if (allShoeSizes.length > 0 && !selectedShoeSize) {
+    setVariantError("Please select a shoe size");
+    return;
+  }
+  setVariantError(null);
   addItem({
     listingId: listing.id,
     title: listing.title,
@@ -439,17 +461,18 @@ const handleAddToCart = () => {
                 {listing.colors.map((c) => (
                   <button
                     key={c}
-                    onClick={() => setSelectedColor(selectedColor === c ? null : c)}
+                    onClick={() => { setSelectedColor(selectedColor === c ? null : c); setVariantError(null); }}
                     className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border-2 font-medium transition-all ${
                       selectedColor === c
-                        ? "border-primary text-primary bg-primary/10"
+                        ? "border-primary text-primary bg-primary/10 ring-2 ring-primary ring-offset-1"
                         : "border-border text-muted-foreground hover:border-primary/50"
                     }`}
                   >
                     {listing.colorImages?.[c] && (
-                      <img src={listing.colorImages[c]} alt={c} className="w-4 h-4 rounded-full object-cover shrink-0" />
+                      <img src={listing.colorImages[c]} alt={c} className="w-5 h-5 rounded-full object-cover shrink-0 border border-background" />
                     )}
                     {c}
+                    {selectedColor === c && <Check className="w-3 h-3" />}
                   </button>
                 ))}
               </div>
@@ -831,6 +854,9 @@ const handleAddToCart = () => {
       {/* Sticky bottom CTA */}
       <div className="fixed bottom-[62px] left-0 right-0 z-30 bg-background/98 backdrop-blur-md border-t border-border px-4 py-3 sm:hidden">
         <div className="max-w-lg mx-auto">
+          {variantError && (
+            <p className="text-xs text-destructive font-semibold text-center mb-2">{variantError}</p>
+          )}
           {listing.isThrift ? (
             <Button
               className="w-full rounded-full font-bold bg-purple-500 hover:bg-purple-600 border-0 h-12"
@@ -843,7 +869,11 @@ const handleAddToCart = () => {
               className="w-full rounded-full font-bold h-12 gap-2"
               onClick={handleAddToCart}
             >
-              <ShoppingBag className="w-4 h-4" /> Add to Cart — {formatNaira(listing.price * quantity)}
+              {needsSelection ? (
+                "Select an option"
+              ) : (
+                <><ShoppingBag className="w-4 h-4" /> Add to Cart — {formatNaira(listing.price * quantity)}</>
+              )}
             </Button>
           )}
         </div>
@@ -851,7 +881,11 @@ const handleAddToCart = () => {
 
       {/* Desktop sticky CTA */}
       <div className="hidden sm:block fixed bottom-0 left-0 right-0 z-30 bg-background/98 backdrop-blur-md border-t border-border px-4 py-3">
-        <div className="max-w-lg mx-auto flex gap-3">
+        <div className="max-w-lg mx-auto">
+        {variantError && (
+          <p className="text-xs text-destructive font-semibold text-center mb-2">{variantError}</p>
+        )}
+        <div className="flex gap-3">
           <Button
             variant="outline"
             className="rounded-full font-bold h-12 px-6 border-primary text-primary hover:bg-primary/10"
@@ -872,9 +906,14 @@ const handleAddToCart = () => {
               className="flex-1 rounded-full font-bold h-12 gap-2"
               onClick={handleAddToCart}
             >
-              <ShoppingBag className="w-4 h-4" /> Add to Cart — {formatNaira(listing.price * quantity)}
+              {needsSelection ? (
+                "Select an option"
+              ) : (
+                <><ShoppingBag className="w-4 h-4" /> Add to Cart — {formatNaira(listing.price * quantity)}</>
+              )}
             </Button>
           )}
+        </div>
         </div>
       </div>
 
@@ -991,4 +1030,4 @@ const handleAddToCart = () => {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
-}
+   }
