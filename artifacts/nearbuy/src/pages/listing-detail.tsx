@@ -3,6 +3,7 @@ import { useRoute, Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useListing, useListings } from "@/hooks/use-listings";
 import { useCart } from "@/hooks/use-cart";
+import { useInteractions } from "@/hooks/use-interactions";
 import ThemeSwitcher from "@/components/theme-switcher";
 import {
   ArrowLeft, Star, ShoppingBag, Shield, RotateCcw,
@@ -82,12 +83,25 @@ export default function ListingDetail() {
   const { listings: relatedAll } = useListings();
   const { addItem, saveForLater, removeSaved, isSaved, isInCart } = useCart();
   const { user } = useAuth();
+  const { logInteraction } = useInteractions(user?.id ?? null);
+
+  // Logs a view once per listing load. Placed here, alongside the other
+  // top-level hooks and before any early return in this component, so
+  // hook count/order never changes between the loading and loaded render.
+  useEffect(() => {
+    if (!listing) return;
+    logInteraction({
+      listingId: listing.id,
+      eventType: "view",
+      category: listing.category,
+      aesthetics: listing.aesthetics,
+    });
+  }, [listing?.id, user?.id]);
 
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedShoeSize, setSelectedShoeSize] = useState<string | null>(null);
-  const [variantError, setVariantError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [wishlisted, setWishlisted] = useState(false);
   const [showDeposit, setShowDeposit] = useState(false);
@@ -177,6 +191,7 @@ export default function ListingDetail() {
   const allShoeSizes = listing.shoeSizes ?? [];
   const hasVariants = allClothingSizes.length > 0 || allShoeSizes.length > 0 || (listing.colors && listing.colors.length > 0);
   const hasColors = Boolean(listing.colors && listing.colors.length > 0);
+  const [variantError, setVariantError] = useState<string | null>(null);
   // Matches the Temu/SHEIN pattern: Color and Size show together, not
   // gated one behind the other. What's gated is the CTA itself — it
   // reads "Select an option" until every required choice is made.
@@ -1030,4 +1045,4 @@ const handleAddToCart = () => {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
-    }
+      }
