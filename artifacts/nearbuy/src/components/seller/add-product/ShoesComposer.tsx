@@ -9,7 +9,8 @@ interface ShoesComposerProps {
   brand: string; onBrandChange: (v: string) => void;
   material: string; onMaterialChange: (v: string) => void;
   color: string; onColorChange: (v: string) => void;
-  size: string; onSizeChange: (v: string) => void;
+  colorImages?: Record<string, string>; setColorImages?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  uploadSingleImage?: (file: File) => Promise<string | null>;
 
   selectedColors: string[]; setSelectedColors: React.Dispatch<React.SetStateAction<string[]>>;
   selectedShoeSizes: string[]; setSelectedShoeSizes: React.Dispatch<React.SetStateAction<string[]>>;
@@ -33,13 +34,16 @@ export default function ShoesComposer(props: ShoesComposerProps) {
       <VariantsAccordion
         selectedColors={props.selectedColors}
         setSelectedColors={props.setSelectedColors}
+        colorImages={props.colorImages}
+        onColorImagesChange={props.setColorImages}
+        onUploadImage={props.uploadSingleImage}
         selectedShoeSizes={props.selectedShoeSizes}
         setSelectedShoeSizes={props.setSelectedShoeSizes}
         showShoeSizes
         useVariantPricing={props.useVariantPricing}
         setUseVariantPricing={props.setUseVariantPricing}
         variants={props.variants}
-        onGenerateVariants={props.onGenerateVariants}
+        onGenerate={props.onGenerateVariants}
         onUpdateVariant={props.onUpdateVariant}
       />
     </div>
