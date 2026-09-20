@@ -102,6 +102,7 @@ export default function ListingDetail() {
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedShoeSize, setSelectedShoeSize] = useState<string | null>(null);
+  const [variantError, setVariantError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [wishlisted, setWishlisted] = useState(false);
   const [showDeposit, setShowDeposit] = useState(false);
@@ -191,7 +192,6 @@ export default function ListingDetail() {
   const allShoeSizes = listing.shoeSizes ?? [];
   const hasVariants = allClothingSizes.length > 0 || allShoeSizes.length > 0 || (listing.colors && listing.colors.length > 0);
   const hasColors = Boolean(listing.colors && listing.colors.length > 0);
-  const [variantError, setVariantError] = useState<string | null>(null);
   // Matches the Temu/SHEIN pattern: Color and Size show together, not
   // gated one behind the other. What's gated is the CTA itself — it
   // reads "Select an option" until every required choice is made.
@@ -466,6 +466,118 @@ const handleAddToCart = () => {
 
           <Separator />
 
+          {/* Tabs (Description/Reviews/Shipping) — moved up so buyers can
+              read what the item actually is before choosing color/size. */}
+          <Tabs defaultValue="description">
+            <TabsList className="rounded-full bg-muted p-1 h-auto w-full">
+              <TabsTrigger value="description" className="rounded-full text-xs px-3 py-1.5 flex-1">Description</TabsTrigger>
+              <TabsTrigger value="reviews" className="rounded-full text-xs px-3 py-1.5 flex-1">
+                Reviews ({listing.reviews?.length ?? listing.reviewCount ?? 0})
+              </TabsTrigger>
+              <TabsTrigger value="shipping" className="rounded-full text-xs px-3 py-1.5 flex-1">Shipping</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="description" className="mt-3">
+              <div className="bg-card border border-card-border rounded-2xl p-4">
+                <div className={`text-sm text-muted-foreground leading-relaxed overflow-hidden transition-all ${descExpanded ? "" : "max-h-24"}`}>
+                  {listing.description || "No description provided."}
+                </div>
+                {listing.description && listing.description.length > 150 && (
+                  <button
+                    onClick={() => setDescExpanded(!descExpanded)}
+                    className="text-xs text-primary font-semibold mt-2 flex items-center gap-1"
+                  >
+                    {descExpanded ? <><ChevronUp className="w-3 h-3" /> Show less</> : <><ChevronDown className="w-3 h-3" /> Show more</>}
+                  </button>
+                )}
+                {listing.tags && listing.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {listing.tags.map((t) => (
+                      <span key={t} className="text-[11px] bg-muted text-muted-foreground px-2.5 py-1 rounded-full flex items-center gap-1">
+                        <Tag className="w-2.5 h-2.5" />#{t}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="reviews" className="mt-3 space-y-3">
+              {listing.reviews && listing.reviews.length > 0 ? (
+                listing.reviews.map((r) => (
+                  <div key={r.id} className="bg-card border border-card-border rounded-2xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <span className="text-xs font-black text-primary">
+                          {r.author.slice(0, 2).toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold">{r.author}</span>
+                          {r.verified && (
+                            <span className="flex items-center gap-0.5 text-[10px] text-emerald-600 font-medium">
+                              <BadgeCheck className="w-3 h-3" /> Verified
+                            </span>
+                          )}
+                          <span className="text-[11px] text-muted-foreground ml-auto">{r.date}</span>
+                        </div>
+                        <div className="flex mt-1 mb-1.5">
+                          {Array.from({ length: 5 }, (_, i) => (
+                            <Star key={i} className={`h-3.5 w-3.5 ${i < r.rating ? "fill-amber-400 text-amber-400" : "fill-muted text-muted"}`} />
+                          ))}
+                        </div>
+                        <p className="text-sm font-semibold">{r.title}</p>
+                        <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">{r.body}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-10 bg-card border border-card-border rounded-2xl">
+                  <Star className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm font-semibold">No reviews yet</p>
+                  <p className="text-xs text-muted-foreground mt-1">Be the first to review this item</p>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="shipping" className="mt-3">
+              <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3 text-sm">
+                <div className="flex items-start gap-3">
+                  <Truck className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold">{listing.freeShipping ? "Free Delivery" : "Standard Delivery"}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {listing.freeShipping ? "" : "Delivery fee is calculated at checkout based on your area. "}
+                      Estimated delivery: {deliveryEstimate}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <RotateCcw className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold">{listing.isThrift ? "No Returns" : "14-Day Returns"}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {listing.isThrift
+                        ? "Thrift items are sold as-is and cannot be returned once paid."
+                        : "Items must be unworn with original packaging and tags attached."}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Shield className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold">Buyer Protection</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Full refund if item is not as described.</p>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <Separator />
+
           {/* Color selector */}
           {listing.colors && listing.colors.length > 0 && (
             <div>
@@ -696,115 +808,6 @@ const handleAddToCart = () => {
               </div>
             ))}
           </div>
-
-          {/* Tabs */}
-          <Tabs defaultValue="description">
-            <TabsList className="rounded-full bg-muted p-1 h-auto w-full">
-              <TabsTrigger value="description" className="rounded-full text-xs px-3 py-1.5 flex-1">Description</TabsTrigger>
-              <TabsTrigger value="reviews" className="rounded-full text-xs px-3 py-1.5 flex-1">
-                Reviews ({listing.reviews?.length ?? listing.reviewCount ?? 0})
-              </TabsTrigger>
-              <TabsTrigger value="shipping" className="rounded-full text-xs px-3 py-1.5 flex-1">Shipping</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="description" className="mt-3">
-              <div className="bg-card border border-card-border rounded-2xl p-4">
-                <div className={`text-sm text-muted-foreground leading-relaxed overflow-hidden transition-all ${descExpanded ? "" : "max-h-24"}`}>
-                  {listing.description || "No description provided."}
-                </div>
-                {listing.description && listing.description.length > 150 && (
-                  <button
-                    onClick={() => setDescExpanded(!descExpanded)}
-                    className="text-xs text-primary font-semibold mt-2 flex items-center gap-1"
-                  >
-                    {descExpanded ? <><ChevronUp className="w-3 h-3" /> Show less</> : <><ChevronDown className="w-3 h-3" /> Show more</>}
-                  </button>
-                )}
-                {listing.tags && listing.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-3">
-                    {listing.tags.map((t) => (
-                      <span key={t} className="text-[11px] bg-muted text-muted-foreground px-2.5 py-1 rounded-full flex items-center gap-1">
-                        <Tag className="w-2.5 h-2.5" />#{t}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="reviews" className="mt-3 space-y-3">
-              {listing.reviews && listing.reviews.length > 0 ? (
-                listing.reviews.map((r) => (
-                  <div key={r.id} className="bg-card border border-card-border rounded-2xl p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                        <span className="text-xs font-black text-primary">
-                          {r.author.slice(0, 2).toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-semibold">{r.author}</span>
-                          {r.verified && (
-                            <span className="flex items-center gap-0.5 text-[10px] text-emerald-600 font-medium">
-                              <BadgeCheck className="w-3 h-3" /> Verified
-                            </span>
-                          )}
-                          <span className="text-[11px] text-muted-foreground ml-auto">{r.date}</span>
-                        </div>
-                        <div className="flex mt-1 mb-1.5">
-                          {Array.from({ length: 5 }, (_, i) => (
-                            <Star key={i} className={`h-3.5 w-3.5 ${i < r.rating ? "fill-amber-400 text-amber-400" : "fill-muted text-muted"}`} />
-                          ))}
-                        </div>
-                        <p className="text-sm font-semibold">{r.title}</p>
-                        <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">{r.body}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-10 bg-card border border-card-border rounded-2xl">
-                  <Star className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm font-semibold">No reviews yet</p>
-                  <p className="text-xs text-muted-foreground mt-1">Be the first to review this item</p>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="shipping" className="mt-3">
-              <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3 text-sm">
-                <div className="flex items-start gap-3">
-                  <Truck className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-semibold">{listing.freeShipping ? "Free Delivery" : "Standard Delivery"}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {listing.freeShipping ? "" : "Delivery fee is calculated at checkout based on your area. "}
-                      Estimated delivery: {deliveryEstimate}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <RotateCcw className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-semibold">{listing.isThrift ? "No Returns" : "14-Day Returns"}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {listing.isThrift
-                        ? "Thrift items are sold as-is and cannot be returned once paid."
-                        : "Items must be unworn with original packaging and tags attached."}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Shield className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-semibold">Buyer Protection</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Full refund if item is not as described.</p>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
 
           {/* Report */}
           <button
@@ -1045,4 +1048,4 @@ const handleAddToCart = () => {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
-      }
+   }
