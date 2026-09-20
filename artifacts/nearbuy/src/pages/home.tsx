@@ -244,7 +244,11 @@ export default function Home() {
       if (topCategory === "Thrift") return l.isThrift;
       if (topCategory === "Deals")  return !l.isThrift && (l.discount ?? 0) > 0;
 
+      const listingSubcategory = (l.attributes?.subcategory as string | undefined) ?? "";
       const matchesSub = !subCategory ||
+        listingSubcategory.toLowerCase() === subCategory.toLowerCase() ||
+        // Fallback for legacy seed data, which never had attributes.subcategory
+        // and instead stored the subcategory-style value directly on category.
         l.category === subCategory ||
         l.category.toLowerCase().includes(subCategory.toLowerCase());
 
@@ -602,4 +606,4 @@ export default function Home() {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
     </div>
   );
-        }
+                }
