@@ -251,6 +251,12 @@ export default function Home() {
       const matchesTop =
         topCategory === "All" ||
         (!l.isThrift && (
+          // Seller-added products store the literal top-level category
+          // (e.g. "Woman", "Shoes", "Jewelry & Accessories") directly on
+          // `category` — check that first, before falling back to the
+          // legacy subcategory-name-based mappings below (used by the
+          // older seed data, which stores things like "Co-ords"/"Heels").
+          l.category === topCategory ||
           CATEGORY_TO_TOP[l.category] === topCategory ||
           (SUBCATEGORIES[topCategory as TopCategory] ?? []).some(
             (s) => l.category.toLowerCase() === s.toLowerCase()
@@ -596,4 +602,4 @@ export default function Home() {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
     </div>
   );
-                             }
+        }
