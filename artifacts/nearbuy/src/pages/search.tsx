@@ -17,6 +17,40 @@ import { Slider } from "@/components/ui/slider";
 
 function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
 
+// Small edit-distance helper for typo-tolerant search fallback. Only used
+// on short words (product-title tokens), so this stays cheap — no need
+// for a real trigram/fuzzy library for that scale.
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+// True if the query is a near-match (typo-distance) of any word in the
+// product's title — e.g. "perfum" ~ "perfume", "shooz" ~ "shoes".
+function fuzzyTitleMatch(title: string, query: string): boolean {
+  const q = query.toLowerCase();
+  const words = title.toLowerCase().split(/\s+/);
+  // Allow more typo tolerance for longer queries, none for very short ones
+  // (a 1-2 char query fuzzy-matching against everything would be noise).
+  const maxDistance = q.length <= 3 ? 0 : q.length <= 6 ? 1 : 2;
+  return words.some((w) => {
+    if (w.includes(q) || q.includes(w)) return true;
+    if (Math.abs(w.length - q.length) > maxDistance) return false;
+    return levenshtein(w, q) <= maxDistance;
+  });
+}
+
 const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL", "36", "37", "38", "39", "40", "41", "42"];
 const COLOR_OPTIONS = ["Black", "White", "Red", "Blue", "Pink", "Green", "Beige", "Brown", "Gold", "Silver"];
 const TOP_CATEGORIES = ["Women", "Men", "Kids", "Shoes", "Jewelry & Accessories", "Beauty & Health", "Gym & Outdoor", "Home"];
@@ -223,7 +257,9 @@ export default function Search() {
     let queryBuilder = supabase.from("products").select("*").neq("status", "draft");
 
     if (q.trim()) {
-      queryBuilder = queryBuilder.or(`title.ilike.%${q}%,description.ilike.%${q}%,category.ilike.%${q}%,seller_name.ilike.%${q}%`);
+      queryBuilder = queryBuilder.or(
+        `title.ilike.%${q}%,description.ilike.%${q}%,category.ilike.%${q}%,seller_name.ilike.%${q}%`
+      );
     }
     if (selectedCategory) queryBuilder = queryBuilder.eq("category", selectedCategory);
     if (priceRange[0] > 0) queryBuilder = queryBuilder.gte("price", priceRange[0]);
@@ -234,14 +270,30 @@ export default function Search() {
     else queryBuilder = queryBuilder.order("created_at", { ascending: false });
 
     const { data } = await queryBuilder.limit(50);
-    setResults(data || []);
-    setLoading(false);
+    let finalResults = data || [];
 
-    if (q.trim()) {
-      logSearch(q);
-      addRecentSearch(q);
-      fetchPopularSearches();
+    // Typo-tolerant fallback: only kicks in when the exact match came up
+    // thin, and only for real search terms (not category/price filtering
+    // alone) — avoids the cost of a broad scan on every keystroke.
+    if (q.trim().length >= 3 && finalResults.length < 3) {
+      const { data: broad } = await supabase
+        .from("products")
+        .select("*")
+        .neq("status", "draft")
+        .order("created_at", { ascending: false })
+        .limit(300);
+
+      if (broad) {
+        const existingIds = new Set(finalResults.map((r: any) => r.id));
+        const fuzzyMatches = broad.filter(
+          (p: any) => !existingIds.has(p.id) && fuzzyTitleMatch(p.title || "", q.trim())
+        );
+        finalResults = [...finalResults, ...fuzzyMatches];
+      }
     }
+
+    setResults(finalResults);
+    setLoading(false);
   }, [selectedCategory, priceRange, sortBy]);
 
   useEffect(() => {
@@ -254,6 +306,24 @@ export default function Search() {
     }
     searchTimeout.current = setTimeout(() => searchProducts(query), 300);
   }, [query, selectedCategory, priceRange, sortBy, isImageSearch]);
+
+  // Recording a search as "popular" / "recent" is a SEPARATE, much longer
+  // debounce from showing live results above. Firing this on the same
+  // 300ms live-typing debounce logged every intermediate fragment a user
+  // typed through (e.g. "Per", "Perf", "Perfu" on the way to "Perfume").
+  // This only fires once the query has genuinely settled.
+  const logTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (logTimeout.current) clearTimeout(logTimeout.current);
+    const trimmed = query.trim();
+    if (trimmed.length < 3) return;
+    logTimeout.current = setTimeout(() => {
+      logSearch(trimmed);
+      addRecentSearch(trimmed);
+      fetchPopularSearches();
+    }, 1200);
+    return () => { if (logTimeout.current) clearTimeout(logTimeout.current); };
+  }, [query]);
 
   const handleImageSearch = async (file: File) => {
     setImageSearchLoading(true);
@@ -708,4 +778,4 @@ export default function Search() {
       </main>
     </div>
   );
-    }
+      }
