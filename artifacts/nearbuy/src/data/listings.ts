@@ -40,6 +40,8 @@ export interface Listing {
   shippingDays: number;
   sellerName: string;
   sellerId?: string;
+  storeId?: string;
+  videoUrl?: string;
   sellerAvatar?: string;
   sellerRating: number;
   sellerFollowers?: number;
