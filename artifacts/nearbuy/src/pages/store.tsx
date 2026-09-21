@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useSearch } from "wouter";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 import { useCart } from "@/hooks/use-cart";
 import {
   ArrowLeft, Star, BadgeCheck, Users, Package, ShoppingBag,
-  MessageCircle, Search, CheckCircle2, Store as StoreIcon,
+  MessageCircle, Search, CheckCircle2, Store as StoreIcon, Flag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,8 @@ type SortOption = "relevance" | "top-sales" | "recent" | "price-asc" | "price-de
 export default function Store() {
   const [, params] = useRoute("/store/:sellerId");
   const sellerId = params?.sellerId ?? null;
+  const locationSearch = useSearch();
+  const storeIdParam = new URLSearchParams(locationSearch).get("store");
   const { user } = useAuth();
   const { addItem } = useCart();
 
@@ -39,7 +41,7 @@ export default function Store() {
   useEffect(() => {
     if (!sellerId) return;
     fetchStoreData();
-  }, [sellerId, user]);
+  }, [sellerId, storeIdParam, user]);
 
   const fetchStoreData = async () => {
     setLoading(true);
@@ -49,6 +51,23 @@ export default function Store() {
       .select("*")
       .eq("id", sellerId)
       .single();
+
+    // When arriving from a specific listing that belongs to one of this
+    // seller's multiple stores, resolve that store's real name from the
+    // `stores` table instead of trusting `profiles.store_name` — which is
+    // the legacy single-store field and is typically empty/stale for a
+    // seller who has since set up multiple stores.
+    if (sellerData && storeIdParam) {
+      const { data: storeData } = await supabase
+        .from("stores")
+        .select("name, description")
+        .eq("id", storeIdParam)
+        .single();
+      if (storeData) {
+        sellerData.store_name = storeData.name;
+        if (storeData.description) sellerData.store_description = storeData.description;
+      }
+    }
 
     if (sellerData) setSeller(sellerData);
 
@@ -410,4 +429,4 @@ export default function Store() {
       </div>
     </div>
   );
-    }
+  }
