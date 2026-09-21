@@ -148,7 +148,11 @@ export default function ListingDetail() {
     if (selectedColor && listing.colorImages?.[selectedColor]) {
       const baseImages = listing.images.length > 0 ? listing.images : [listing.imageUrl];
       const idx = baseImages.indexOf(listing.colorImages[selectedColor]);
-      if (idx >= 0) setSelectedImage(idx);
+      // +1 offsets past the video slot, which is always first in `media`
+      // when the listing has one — selectedImage indexes into `media`,
+      // not `baseImages` directly.
+      const videoOffset = listing.videoUrl ? 1 : 0;
+      if (idx >= 0) setSelectedImage(idx + videoOffset);
     }
   }, [selectedColor, listing]);
 
@@ -187,6 +191,15 @@ export default function ListingDetail() {
     ? Object.values(listing.colorImages).filter((url) => !baseImages.includes(url))
     : [];
   const images = [...baseImages, ...colorOnlyImages];
+  // Video, when present, is always the first gallery item — the most
+  // common convention (Temu/SHEIN both lead with video) and it means a
+  // seller's uploaded video is now actually reachable, which it wasn't
+  // rendered anywhere before this.
+  const hasVideo = Boolean(listing.videoUrl);
+  const media: { type: "video" | "image"; url: string }[] = [
+    ...(hasVideo ? [{ type: "video" as const, url: listing.videoUrl! }] : []),
+    ...images.map((url) => ({ type: "image" as const, url })),
+  ];
 
   const allClothingSizes = listing.clothingSizes ?? [];
   const allShoeSizes = listing.shoeSizes ?? [];
@@ -344,21 +357,35 @@ const handleAddToCart = () => {
         <div className="relative bg-muted">
           <div className="aspect-square overflow-hidden relative bg-muted">
   <AnimatePresence mode="wait">
-    <motion.img
-      key={selectedImage}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
-      src={images[selectedImage]}
-      alt={listing.title}
-      className="w-full h-full object-contain"
-    />
+    {media[selectedImage]?.type === "video" ? (
+      <motion.video
+        key={selectedImage}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        src={media[selectedImage].url}
+        controls
+        playsInline
+        className="w-full h-full object-contain bg-black"
+      />
+    ) : (
+      <motion.img
+        key={selectedImage}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        src={media[selectedImage]?.url ?? listing.imageUrl}
+        alt={listing.title}
+        className="w-full h-full object-contain"
+      />
+    )}
   </AnimatePresence>
 
-            {/* Image counter */}
+            {/* Media counter */}
             <div className="absolute bottom-3 right-3 bg-black/60 text-white text-[10px] font-bold px-2 py-1 rounded-full">
-              {selectedImage + 1}/{images.length}
+              {selectedImage + 1}/{media.length}
             </div>
 
             {/* Badge */}
@@ -374,16 +401,16 @@ const handleAddToCart = () => {
             )}
 
             {/* Nav arrows */}
-            {images.length > 1 && (
+            {media.length > 1 && (
               <>
                 <button
-                  onClick={() => setSelectedImage((p) => (p - 1 + images.length) % images.length)}
+                  onClick={() => setSelectedImage((p) => (p - 1 + media.length) % media.length)}
                   className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-background/80 flex items-center justify-center shadow-md"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => setSelectedImage((p) => (p + 1) % images.length)}
+                  onClick={() => setSelectedImage((p) => (p + 1) % media.length)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-background/80 flex items-center justify-center shadow-md"
                 >
                   <ChevronRight className="w-4 h-4" />
@@ -393,17 +420,26 @@ const handleAddToCart = () => {
           </div>
 
           {/* Thumbnail strip */}
-          {images.length > 1 && (
+          {media.length > 1 && (
             <div className="flex gap-1.5 overflow-x-auto scrollbar-hide px-3 py-2">
-              {images.map((img, i) => (
+              {media.map((item, i) => (
                 <button
   key={i}
   onClick={() => setSelectedImage(i)}
-  className={`shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 bg-muted transition-all ${
+  className={`relative shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 bg-muted transition-all ${
     selectedImage === i ? "border-primary" : "border-transparent opacity-50 hover:opacity-80"
   }`}
 >
-  <img src={img} alt="" className="w-full h-full object-contain" />
+  {item.type === "video" ? (
+    <>
+      <video src={item.url} className="w-full h-full object-cover" muted playsInline />
+      <span className="absolute inset-0 flex items-center justify-center bg-black/30">
+        <Play className="w-5 h-5 text-white fill-white" />
+      </span>
+    </>
+  ) : (
+    <img src={item.url} alt="" className="w-full h-full object-contain" />
+  )}
 </button>
               ))}
             </div>
@@ -1051,4 +1087,4 @@ const handleAddToCart = () => {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
-    }
+                     }
