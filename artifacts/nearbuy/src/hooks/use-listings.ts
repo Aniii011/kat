@@ -24,6 +24,7 @@ function rowToListing(row: Record<string, unknown>): Listing {
     shippingDays: (row.shipping_days as number) ?? 3,
     sellerName: (row.seller_name as string) ?? "",
     sellerId: (row.seller_id as string) ?? undefined,
+    storeId: (row.store_id as string) ?? undefined,
     sellerAvatar: row.seller_avatar as string | undefined,
     sellerRating: Number(row.seller_rating) || 0,
     sellerFollowers: row.seller_followers as number | undefined,
@@ -37,6 +38,7 @@ function rowToListing(row: Record<string, unknown>): Listing {
     depositAmount: row.deposit_amount ? Number(row.deposit_amount) : undefined,
     isFeatured: (row.is_featured as boolean) ?? false,
     tags: (row.tags as string[]) ?? undefined,
+    videoUrl: (row.video_url as string) ?? undefined,
     colorImages: (row.color_images as Record<string, string>) ?? undefined,
     customSizeNote: (row.custom_size_note as string) ?? undefined,
         attributes: (row.attributes as Record<string, unknown>) ?? {},
@@ -55,6 +57,41 @@ function rowToReview(row: Record<string, unknown>): Review {
     body: row.body as string,
     verified: row.verified as boolean,
   };
+}
+
+// Corrects the seller/store display name at read time, for every listing,
+// regardless of what was baked into `seller_name` when the product was
+// created. `seller_name` is a denormalized snapshot written once at save
+// time — for a seller who owns multiple stores, that snapshot is their
+// personal account name, not the specific store's name, and it never gets
+// corrected later. This re-resolves the correct name for every listing in
+// one batch, without needing a backfill migration.
+async function resolveStoreNames(listings: Listing[]): Promise<void> {
+  const storeIds = [...new Set(listings.map((l) => l.storeId).filter(Boolean))] as string[];
+  const sellerIdsNeedingProfile = [
+    ...new Set(listings.filter((l) => !l.storeId && l.sellerId).map((l) => l.sellerId)),
+  ] as string[];
+
+  const [storesRes, profilesRes] = await Promise.all([
+    storeIds.length > 0
+      ? supabase.from("stores").select("id, name").in("id", storeIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    sellerIdsNeedingProfile.length > 0
+      ? supabase.from("profiles").select("id, store_name, full_name").in("id", sellerIdsNeedingProfile)
+      : Promise.resolve({ data: [] as { id: string; store_name: string | null; full_name: string | null }[] }),
+  ]);
+
+  const storeNameById = new Map((storesRes.data ?? []).map((s: any) => [s.id, s.name]));
+  const profileById = new Map((profilesRes.data ?? []).map((p: any) => [p.id, p]));
+
+  for (const listing of listings) {
+    if (listing.storeId && storeNameById.has(listing.storeId)) {
+      listing.sellerName = storeNameById.get(listing.storeId)!;
+    } else if (listing.sellerId && profileById.has(listing.sellerId)) {
+      const profile = profileById.get(listing.sellerId);
+      listing.sellerName = profile?.store_name || profile?.full_name || listing.sellerName;
+    }
+  }
 }
 
 export function useListings(filters?: {
@@ -107,7 +144,9 @@ export function useListings(filters?: {
       if (error) {
         setError(error.message);
       } else {
-        setListings((data ?? []).map(rowToListing));
+        const mapped = (data ?? []).map(rowToListing);
+        await resolveStoreNames(mapped);
+        setListings(mapped);
       }
       setLoading(false);
     }
@@ -156,6 +195,7 @@ export function useListing(id: string | null) {
       parsed.reviews = (reviewsRes.data ?? []).map((r) =>
         rowToReview(r as Record<string, unknown>)
       );
+      await resolveStoreNames([parsed]);
       setListing(parsed);
       setLoading(false);
     }
@@ -164,4 +204,4 @@ export function useListing(id: string | null) {
   }, [id]);
 
   return { listing, loading, error };
-        }
+          }
