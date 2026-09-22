@@ -41,7 +41,7 @@ export default function ThriftComposer({
       </div>
 
       <TagPicker label="Size" options={THRIFT_SIZE_OPTIONS} value={size} onChange={(v) => onSizeChange(v as string)} allowCustom />
-      <TagPicker label="Color" options={THRIFT_COLOR_OPTIONS} value={color} onChange={(v) => onColorChange(v as string)} allowCustom />
+      <TagPicker label="Colour / Design" options={THRIFT_COLOR_OPTIONS} value={color} onChange={(v) => onColorChange(v as string)} allowCustom />
       <Input placeholder="Brand (optional)" value={brand} onChange={(e) => onBrandChange(e.target.value)} className="rounded-xl h-11" />
     </div>
   );
