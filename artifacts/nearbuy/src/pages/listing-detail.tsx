@@ -205,13 +205,59 @@ export default function ListingDetail() {
   const allShoeSizes = listing.shoeSizes ?? [];
   const hasVariants = allClothingSizes.length > 0 || allShoeSizes.length > 0 || (listing.colors && listing.colors.length > 0);
   const hasColors = Boolean(listing.colors && listing.colors.length > 0);
+
+  // Per-combination stock, when the seller set individual stock per
+  // color/size (e.g. "Strawberry, size 42" out of stock while every other
+  // combination is still fine). Returns null when this axis isn't tracked
+  // per-variant at all, meaning stock isn't restricted at this level.
+  const trackedVariants = listing.variants ?? [];
+  const variantStockFor = (color: string | null, size: string | null, shoeSize: string | null): number | null => {
+    if (trackedVariants.length === 0) return null;
+    const match = trackedVariants.find((v) => {
+      const attrs = v.attributes || {};
+      if (hasColors && (attrs.color ?? null) !== color) return false;
+      if (allClothingSizes.length > 0 && (attrs.size ?? null) !== size) return false;
+      if (allShoeSizes.length > 0 && (attrs.shoeSize ?? null) !== shoeSize) return false;
+      return true;
+    });
+    return match ? (match.stock ?? null) : null;
+  };
+  // A color is fully sold out if every size combination under it (that
+  // the listing actually offers) is at 0 — used to grey out the whole
+  // swatch before the buyer even picks a size.
+  const isColorSoldOut = (color: string): boolean => {
+    if (trackedVariants.length === 0) return false;
+    const sizesToCheck = allShoeSizes.length > 0 ? allShoeSizes : allClothingSizes.length > 0 ? allClothingSizes : [null];
+    return sizesToCheck.every((sz) => {
+      const stock = allShoeSizes.length > 0 ? variantStockFor(color, null, sz) : variantStockFor(color, sz, null);
+      return stock === 0;
+    });
+  };
+  // A specific size button is unavailable for the currently selected
+  // color (or, with no colors, overall) once that exact combo hits 0.
+  const isSizeSoldOut = (size: string, isShoe: boolean): boolean => {
+    if (trackedVariants.length === 0) return false;
+    if (hasColors && !selectedColor) return false; // can't know yet — don't pre-grey before a color is picked
+    const stock = isShoe ? variantStockFor(selectedColor, null, size) : variantStockFor(selectedColor, size, null);
+    return stock === 0;
+  };
+  const selectedComboOutOfStock = (() => {
+    const allSelected =
+      (!hasColors || selectedColor) &&
+      (allClothingSizes.length === 0 || selectedSize) &&
+      (allShoeSizes.length === 0 || selectedShoeSize);
+    if (!allSelected) return false;
+    return variantStockFor(selectedColor, selectedSize, selectedShoeSize) === 0;
+  })();
+
   // Matches the Temu/SHEIN pattern: Color and Size show together, not
   // gated one behind the other. What's gated is the CTA itself — it
   // reads "Select an option" until every required choice is made.
   const needsSelection =
     (hasColors && !selectedColor) ||
     (allClothingSizes.length > 0 && !selectedSize) ||
-    (allShoeSizes.length > 0 && !selectedShoeSize);
+    (allShoeSizes.length > 0 && !selectedShoeSize) ||
+    selectedComboOutOfStock;
   const isShoeSize = allShoeSizes.length > 0;
 
   const selectedVariantImage = selectedColor && listing.colorImages?.[selectedColor]
@@ -225,6 +271,10 @@ const handleAddToCart = () => {
   }
   if (hasColors && !selectedColor) {
     setVariantError("Please select a colour");
+    return;
+  }
+  if (selectedComboOutOfStock) {
+    setVariantError("This combination is out of stock");
     return;
   }
   if (allClothingSizes.length > 0 && !selectedSize) {
@@ -509,23 +559,30 @@ const handleAddToCart = () => {
                 Colour{selectedColor && <span className="text-muted-foreground font-normal"> — {selectedColor}</span>}
               </p>
               <div className="flex flex-wrap gap-2">
-                {listing.colors.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => { setSelectedColor(selectedColor === c ? null : c); setVariantError(null); }}
-                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border-2 font-medium transition-all ${
-                      selectedColor === c
-                        ? "border-primary text-primary bg-primary/10 ring-2 ring-primary ring-offset-1"
-                        : "border-border text-muted-foreground hover:border-primary/50"
-                    }`}
-                  >
-                    {listing.colorImages?.[c] && (
-                      <img src={listing.colorImages[c]} alt={c} className="w-5 h-5 rounded-full object-cover shrink-0 border border-background" />
-                    )}
-                    {c}
-                    {selectedColor === c && <Check className="w-3 h-3" />}
-                  </button>
-                ))}
+                {listing.colors.map((c) => {
+                  const soldOut = isColorSoldOut(c);
+                  return (
+                    <button
+                      key={c}
+                      disabled={soldOut}
+                      onClick={() => { setSelectedColor(selectedColor === c ? null : c); setVariantError(null); }}
+                      className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border-2 font-medium transition-all ${
+                        soldOut
+                          ? "border-border text-muted-foreground/50 opacity-50 cursor-not-allowed"
+                          : selectedColor === c
+                          ? "border-primary text-primary bg-primary/10 ring-2 ring-primary ring-offset-1"
+                          : "border-border text-muted-foreground hover:border-primary/50"
+                      }`}
+                    >
+                      {listing.colorImages?.[c] && (
+                        <img src={listing.colorImages[c]} alt={c} className={`w-5 h-5 rounded-full object-cover shrink-0 border border-background ${soldOut ? "grayscale" : ""}`} />
+                      )}
+                      {c}
+                      {soldOut && <span className="text-[10px]">(Sold out)</span>}
+                      {!soldOut && selectedColor === c && <Check className="w-3 h-3" />}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -545,19 +602,25 @@ const handleAddToCart = () => {
                 </button>
               </div>
               <div className="flex flex-wrap gap-2">
-                {allClothingSizes.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setSelectedSize(selectedSize === s ? null : s)}
-                    className={`text-xs min-w-[44px] h-10 px-2 rounded-xl border-2 font-semibold transition-all ${
-                      selectedSize === s
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border text-foreground hover:border-primary"
-                    }`}
-                  >
-                    {s}
-                  </button>
-                ))}
+                {allClothingSizes.map((s) => {
+                  const soldOut = isSizeSoldOut(s, false);
+                  return (
+                    <button
+                      key={s}
+                      disabled={soldOut}
+                      onClick={() => { setSelectedSize(selectedSize === s ? null : s); setVariantError(null); }}
+                      className={`text-xs min-w-[44px] h-10 px-2 rounded-xl border-2 font-semibold transition-all relative ${
+                        soldOut
+                          ? "border-border text-muted-foreground/40 opacity-50 cursor-not-allowed line-through"
+                          : selectedSize === s
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border text-foreground hover:border-primary"
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
               </div>
               {listing.customSizeNote && (
                 <div className="flex items-start gap-2 mt-2 text-xs text-muted-foreground bg-muted rounded-xl p-2.5">
@@ -583,19 +646,25 @@ const handleAddToCart = () => {
                 </button>
               </div>
               <div className="flex flex-wrap gap-2">
-                {allShoeSizes.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setSelectedShoeSize(selectedShoeSize === s ? null : s)}
-                    className={`text-xs min-w-[44px] h-10 px-2 rounded-xl border-2 font-semibold transition-all ${
-                      selectedShoeSize === s
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border text-foreground hover:border-primary"
-                    }`}
-                  >
-                    {s}
-                  </button>
-                ))}
+                {allShoeSizes.map((s) => {
+                  const soldOut = isSizeSoldOut(s, true);
+                  return (
+                    <button
+                      key={s}
+                      disabled={soldOut}
+                      onClick={() => { setSelectedShoeSize(selectedShoeSize === s ? null : s); setVariantError(null); }}
+                      className={`text-xs min-w-[44px] h-10 px-2 rounded-xl border-2 font-semibold transition-all ${
+                        soldOut
+                          ? "border-border text-muted-foreground/40 opacity-50 cursor-not-allowed line-through"
+                          : selectedShoeSize === s
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border text-foreground hover:border-primary"
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1087,4 +1156,4 @@ const handleAddToCart = () => {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
-                     }
+                                         }
