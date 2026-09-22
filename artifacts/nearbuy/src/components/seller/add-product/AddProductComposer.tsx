@@ -70,7 +70,7 @@ interface AddProductComposerProps {
   // Variants
   selectedColors: string[]; setSelectedColors: React.Dispatch<React.SetStateAction<string[]>>;
   colorImages: Record<string, string>; setColorImages: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  uploadSingleImage: (file: File) => Promise<string | null>;
+  uploadSingleImage: (file: File) => Promise<{ url: string | null; error: string | null }>;
   selectedSizes: string[]; setSelectedSizes: React.Dispatch<React.SetStateAction<string[]>>;
   selectedShoeSizes: string[]; setSelectedShoeSizes: React.Dispatch<React.SetStateAction<string[]>>;
   useVariantPricing: boolean; setUseVariantPricing: (v: boolean) => void;
@@ -328,4 +328,4 @@ export default function AddProductComposer(props: AddProductComposerProps) {
       </div>
     </div>
   );
-            }
+}
