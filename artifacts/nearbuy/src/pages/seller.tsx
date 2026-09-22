@@ -559,12 +559,12 @@ export default function Seller() {
   // Single-file upload, reused for per-color variant photos. Returns null
   // on failure rather than throwing, so one failed upload doesn't block
   // the rest of the save.
-  const uploadSingleImage = async (file: File): Promise<string | null> => {
+  const uploadSingleImage = async (file: File): Promise<{ url: string | null; error: string | null }> => {
     const fileName = `${Date.now()}-${Math.random()}-${file.name}`;
     const { error } = await supabase.storage.from("product-images").upload(fileName, file);
-    if (error) return null;
+    if (error) return { url: null, error: error.message };
     const { data } = supabase.storage.from("product-images").getPublicUrl(fileName);
-    return data.publicUrl;
+    return { url: data.publicUrl, error: null };
   };
 
   const uploadVideo = async (): Promise<string> => {
@@ -2094,4 +2094,4 @@ function EmptyState({ icon, title, action }: any) {
       {action}
     </div>
   );
-  }
+}
