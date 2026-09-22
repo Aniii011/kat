@@ -11,7 +11,7 @@ import {
 interface FashionComposerProps {
   color: string; onColorChange: (v: string) => void;
   colorImages?: Record<string, string>; setColorImages?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  uploadSingleImage?: (file: File) => Promise<string | null>;
+  uploadSingleImage?: (file: File) => Promise<{ url: string | null; error: string | null }>;
   size: string; onSizeChange: (v: string) => void;
   fit: string; onFitChange: (v: string) => void;
   material: string; onMaterialChange: (v: string) => void;
@@ -30,7 +30,7 @@ interface FashionComposerProps {
 export default function FashionComposer(props: FashionComposerProps) {
   return (
     <div className="space-y-5">
-      <TagPicker label="Color" options={FASHION_COLOR_OPTIONS} value={props.color} onChange={(v) => props.onColorChange(v as string)} allowCustom />
+      <TagPicker label="Colour / Design" options={FASHION_COLOR_OPTIONS} value={props.color} onChange={(v) => props.onColorChange(v as string)} allowCustom />
       <TagPicker label="Size" options={FASHION_SIZE_OPTIONS} value={props.size} onChange={(v) => props.onSizeChange(v as string)} allowCustom />
       <TagPicker label="Fit" options={FASHION_FIT_OPTIONS} value={props.fit} onChange={(v) => props.onFitChange(v as string)} allowCustom />
       <TagPicker label="Material" options={FASHION_MATERIAL_OPTIONS} value={props.material} onChange={(v) => props.onMaterialChange(v as string)} allowCustom />
