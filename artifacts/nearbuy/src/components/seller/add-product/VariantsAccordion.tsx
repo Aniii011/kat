@@ -19,7 +19,7 @@ interface VariantsAccordionProps {
   // are provided by the parent composer.
   colorImages?: Record<string, string>;
   onColorImagesChange?: (next: Record<string, string>) => void;
-  onUploadImage?: (file: File) => Promise<string | null>;
+  onUploadImage?: (file: File) => Promise<{ url: string | null; error: string | null }>;
   selectedSizes?: string[];
   setSelectedSizes?: React.Dispatch<React.SetStateAction<string[]>>;
   selectedShoeSizes?: string[];
@@ -61,6 +61,7 @@ export default function VariantsAccordion({
   const [addingCustomShoeSize, setAddingCustomShoeSize] = useState(false);
   const [customShoeSizeInput, setCustomShoeSizeInput] = useState("");
   const [uploadingColor, setUploadingColor] = useState<string | null>(null);
+  const [colorPhotoError, setColorPhotoError] = useState<string | null>(null);
 
   const commitCustomColor = () => {
     const trimmed = customColorInput.trim();
@@ -92,10 +93,13 @@ export default function VariantsAccordion({
   const handleColorPhotoSelect = async (color: string, file: File | undefined) => {
     if (!file || !onUploadImage || !onColorImagesChange) return;
     setUploadingColor(color);
-    const url = await onUploadImage(file);
+    setColorPhotoError(null);
+    const { url, error } = await onUploadImage(file);
     setUploadingColor(null);
     if (url) {
       onColorImagesChange({ ...(colorImages || {}), [color]: url });
+    } else {
+      setColorPhotoError(error || "Upload failed — please try again.");
     }
   };
 
@@ -197,7 +201,7 @@ export default function VariantsAccordion({
               rendered when the parent composer supports it. */}
           {selectedColors.length > 0 && onUploadImage && onColorImagesChange && (
             <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-2">Photo per color (optional)</p>
+              <p className="text-xs font-semibold text-muted-foreground mb-2">Photo per design (optional)</p>
               <div className="flex flex-wrap gap-2">
                 {selectedColors.map((c) => (
                   <label key={c} className="flex flex-col items-center gap-1 cursor-pointer">
@@ -229,6 +233,9 @@ export default function VariantsAccordion({
                   </label>
                 ))}
               </div>
+              {colorPhotoError && (
+                <p className="text-xs text-destructive mt-2">{colorPhotoError}</p>
+              )}
             </div>
           )}
 
@@ -396,4 +403,4 @@ export default function VariantsAccordion({
       )}
     </div>
   );
-                  }
+  }
