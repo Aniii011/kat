@@ -178,6 +178,7 @@ export default function AddProductComposer(props: AddProductComposerProps) {
             shadeType={shadeType} onShadeTypeChange={onShadeTypeChange}
             volumeSize={volumeSize} onVolumeSizeChange={onVolumeSizeChange}
             selectedColors={selectedColors} setSelectedColors={setSelectedColors}
+            colorImages={colorImages} setColorImages={setColorImages} uploadSingleImage={uploadSingleImage}
             useVariantPricing={useVariantPricing} setUseVariantPricing={setUseVariantPricing}
             variants={variants} onGenerateVariants={onGenerateVariants} onUpdateVariant={onUpdateVariant}
           />
