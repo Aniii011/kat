@@ -8,6 +8,8 @@ interface BeautyComposerProps {
   volumeSize: string; onVolumeSizeChange: (v: string) => void;
 
   selectedColors: string[]; setSelectedColors: React.Dispatch<React.SetStateAction<string[]>>;
+  colorImages?: Record<string, string>; setColorImages?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  uploadSingleImage?: (file: File) => Promise<{ url: string | null; error: string | null }>;
   useVariantPricing: boolean; setUseVariantPricing: (v: boolean) => void;
   variants: ProductVariant[];
   onGenerateVariants: () => void;
@@ -25,6 +27,10 @@ export default function BeautyComposer(props: BeautyComposerProps) {
       <VariantsAccordion
         selectedColors={props.selectedColors}
         setSelectedColors={props.setSelectedColors}
+        axisLabel="Length / Shade / Type"
+        colorImages={props.colorImages}
+        onColorImagesChange={props.setColorImages}
+        onUploadImage={props.uploadSingleImage}
         useVariantPricing={props.useVariantPricing}
         setUseVariantPricing={props.setUseVariantPricing}
         variants={props.variants}
