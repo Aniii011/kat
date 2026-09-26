@@ -745,8 +745,23 @@ export default function Seller() {
 
     if (!editingProductId || categoryTouched) payload.category = resolvedCategory;
     if (!editingProductId || aestheticsTouched) payload.aesthetics = selectedAesthetics.length > 0 ? selectedAesthetics : null;
-    if (!editingProductId || colorTouched) payload.colors = color ? [color] : null;
-    if (!editingProductId || sizeTouched) payload.clothing_sizes = size ? [size] : null;
+    // Prefer the multi-select arrays from the Colour/Design + Size pickers
+    // (used by every category's variant grid) over the older single-value
+    // color/size fields — falling back to the singular ones only when the
+    // seller never touched the multi-select picker at all. Previously
+    // these arrays were written ONLY into the generated `variants` table,
+    // so a seller who picked several colors/sizes but never turned on
+    // "different price per variant" had none of that saved anywhere,
+    // and shoe_sizes was never written under any circumstance.
+    if (!editingProductId || colorTouched || selectedColors.length > 0) {
+      payload.colors = selectedColors.length > 0 ? selectedColors : (color ? [color] : null);
+    }
+    if (!editingProductId || sizeTouched || selectedSizes.length > 0) {
+      payload.clothing_sizes = selectedSizes.length > 0 ? selectedSizes : (size ? [size] : null);
+    }
+    if (!editingProductId || selectedShoeSizes.length > 0) {
+      payload.shoe_sizes = selectedShoeSizes.length > 0 ? selectedShoeSizes : null;
+    }
 
     if (editingProductId) {
       const { data, error } = await supabase.from("products").update(payload).eq("id", editingProductId).select().single();
