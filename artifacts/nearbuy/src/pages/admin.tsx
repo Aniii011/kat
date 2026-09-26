@@ -73,6 +73,7 @@ export default function Admin() {
   const [section, setSection] = useState<AdminSection>("home");
   const [sellers, setSellers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [storesById, setStoresById] = useState<Record<string, any>>({});
   const [orders, setOrders] = useState<any[]>([]);
   const [orderEvents, setOrderEvents] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -93,17 +94,25 @@ export default function Admin() {
   // ── UNCHANGED: same fetch, same four queries, same shape ──
   const fetchAll = async () => {
     setLoading(true);
-    const [{ data: profilesData }, { data: productsData }, { data: ordersData }, { data: eventsData }] = await Promise.all([
+    const [{ data: profilesData }, { data: productsData }, { data: ordersData }, { data: eventsData }, { data: storesData }] = await Promise.all([
       supabase.from("profiles").select("*").order("created_at", { ascending: false }),
       supabase.from("products").select("*").order("created_at", { ascending: false }),
       supabase.from("orders").select("*").order("created_at", { ascending: false }),
       supabase.from("order_events").select("*"),
+      supabase.from("stores").select("id, name, owner_id"),
     ]);
     if (profilesData) {
-      setSellers(profilesData.filter((p) => p.is_seller));
+      setSellers(profilesData.filter((p) => p.is_seller && !p.is_admin));
       setUsers(profilesData);
     }
-    if (productsData) setProducts(productsData);
+    if (storesData) {
+      const map: Record<string, any> = {};
+      storesData.forEach((s) => { map[s.id] = s; });
+      setStoresById(map);
+    }
+    // Admin manages the live catalog only — a seller's unpublished drafts
+    // are their own working space and aren't admin's to see.
+    if (productsData) setProducts(productsData.filter((p) => p.status !== "draft"));
     if (ordersData) setOrders(ordersData);
     if (eventsData) setOrderEvents(eventsData);
     setLoading(false);
@@ -200,7 +209,7 @@ export default function Admin() {
     if (!o.seller_id) return;
     const seller = users.find((u) => u.id === o.seller_id);
     const key = o.seller_id;
-    if (!revenueBySeller[key]) revenueBySeller[key] = { name: seller?.full_name || seller?.store_name || "Unknown seller", revenue: 0, orders: 0 };
+    if (!revenueBySeller[key]) revenueBySeller[key] = { name: seller?.store_name || seller?.full_name || "Unknown seller", revenue: 0, orders: 0 };
     revenueBySeller[key].revenue += o.total || o.amount || 0;
     revenueBySeller[key].orders += 1;
   });
@@ -273,6 +282,13 @@ export default function Admin() {
     setActionLoading(null);
   };
 
+  const toggleProductActive = async (id: string, currentlyActive: boolean) => {
+    setActionLoading(id);
+    await supabase.from("products").update({ is_active: !currentlyActive }).eq("id", id);
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, is_active: !currentlyActive } : p)));
+    setActionLoading(null);
+  };
+
   const banUser = async (id: string, banned: boolean) => {
     setActionLoading(id);
     await supabase.from("profiles").update({ is_banned: !banned }).eq("id", id);
@@ -337,7 +353,6 @@ export default function Admin() {
     const matchSearch = !search || p.title?.toLowerCase().includes(search.toLowerCase());
     const matchFilter = productFilter === "all"
       || (productFilter === "out_of_stock" && (p.in_stock === false || p.stock_count === 0))
-      || (productFilter === "draft" && p.status === "draft")
       || (productFilter === "thrift" && p.is_thrift);
     return matchSearch && matchFilter;
   });
@@ -650,7 +665,6 @@ export default function Admin() {
               <div className="flex gap-1 flex-wrap">
                 {[
                   { key: "all", label: `All (${products.length})` },
-                  { key: "draft", label: `Draft (${products.filter((p) => p.status === "draft").length})` },
                   { key: "thrift", label: `Thrift (${products.filter((p) => p.is_thrift).length})` },
                   { key: "out_of_stock", label: `Out of stock (${products.filter((p) => p.in_stock === false || p.stock_count === 0).length})` },
                 ].map((f) => (
@@ -693,12 +707,19 @@ export default function Admin() {
                                 <span className="truncate">{p.title}</span>
                               </div>
                             </td>
-                            <td className="p-2.5 text-xs">{seller?.full_name || seller?.store_name || "—"}</td>
+                            <td className="p-2.5 text-xs">{storesById[p.store_id]?.name || seller?.store_name || seller?.full_name || "—"}</td>
                             <td className="p-2.5 text-xs">{p.price ? formatNaira(p.price) : "—"}</td>
                             <td className="p-2.5 text-xs">{p.stock_count ?? "—"}</td>
-                            <td className="p-2.5 text-xs font-medium">{p.status === "draft" ? "Draft" : p.in_stock === false ? "Out of stock" : "Active"}</td>
+                            <td className="p-2.5 text-xs font-medium">{p.is_active === false ? "Off" : p.in_stock === false ? "Out of stock" : "Active"}</td>
                             <td className="p-2.5">
-                              <div className="flex gap-2 justify-end">
+                              <div className="flex gap-2 justify-end items-center">
+                                <button
+                                  onClick={() => toggleProductActive(p.id, p.is_active !== false)}
+                                  disabled={actionLoading === p.id}
+                                  title={p.is_active === false ? "Turn on" : "Turn off"}
+                                  className={`text-[10px] px-2 py-1 rounded-full border font-bold ${p.is_active === false ? "border-border text-muted-foreground" : "border-emerald-600 text-emerald-700 bg-emerald-50"}`}>
+                                  {p.is_active === false ? "Off" : "On"}
+                                </button>
                                 <Link href={`/listing/${p.id}`}><Eye className="w-3.5 h-3.5 text-muted-foreground" /></Link>
                                 <button onClick={() => deleteProduct(p.id)} disabled={actionLoading === p.id}><Trash2 className="w-3.5 h-3.5 text-destructive" /></button>
                               </div>
@@ -1091,4 +1112,4 @@ function TrendChart({ orders, rangeDays, metric, commissionRate }: { orders: any
       </div>
     </div>
   );
-   }
+                                                    }
