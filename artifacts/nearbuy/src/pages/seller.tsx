@@ -114,6 +114,7 @@ export default function Seller() {
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const [stores, setStores] = useState<any[]>([]);
+  const [myStoreId, setMyStoreId] = useState<string | null>(null);
   const [isMultiStore, setIsMultiStore] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [showAddStore, setShowAddStore] = useState(false);
@@ -218,6 +219,13 @@ export default function Seller() {
           if (o.store_id) counts[o.store_id] = (counts[o.store_id] || 0) + 1;
         });
         setStorePendingCounts(counts);
+      } else {
+        // Single-store sellers still have a row in `stores` — fetch it so new
+        // products can be tagged with a real store_id instead of null.
+        const { data: myStoreData, error: myStoreErr } = await supabase
+          .from("stores").select("id").eq("owner_id", user.id).order("created_at").limit(1).maybeSingle();
+        if (myStoreErr) throw new Error("store: " + myStoreErr.message);
+        setMyStoreId(myStoreData?.id ?? null);
       }
 
       const activeStoreId = multiStore ? selectedStoreId : null;
@@ -724,7 +732,7 @@ export default function Seller() {
       in_stock: true,
       seller_id: user.id,
       seller_name: user.name || user.email,
-      store_id: isMultiStore ? selectedStoreId : null,
+      store_id: isMultiStore ? selectedStoreId : myStoreId,
       status,
       attributes: {
         ...existingAttributes,
@@ -768,6 +776,16 @@ export default function Seller() {
       return;
     }
     setProducts((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const toggleProductActive = async (id: string, currentlyActive: boolean) => {
+    const { error } = await supabase.from("products").update({ is_active: !currentlyActive }).eq("id", id);
+    if (error) {
+      console.error("PRODUCT TOGGLE FAILED:", error);
+      alert(friendlyError(error, "Couldn't update this product. Please try again."));
+      return;
+    }
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, is_active: !currentlyActive } : p)));
   };
 
   // Duplicate product — approved as a launch-adjacent capability, trivial
@@ -1117,6 +1135,7 @@ export default function Seller() {
               products={products}
               onEdit={openEdit}
               onDelete={deleteProduct}
+              onToggleActive={toggleProductActive}
               onDuplicate={duplicateProduct}
               onAdd={openAddProduct}
             />
@@ -1379,7 +1398,7 @@ function SellerHomeSection(props: any) {
 }
 
 // ── PRODUCTS (All / Active / Draft / Thrift / Inventory) ──
-function SellerProductsSection({ products, onEdit, onDelete, onDuplicate, onAdd }: any) {
+function SellerProductsSection({ products, onEdit, onDelete, onToggleActive, onDuplicate, onAdd }: any) {
   const [activeTab, setActiveTab] = useState<"all" | "active" | "draft" | "thrift" | "inventory">("all");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -1513,10 +1532,18 @@ function SellerProductsSection({ products, onEdit, onDelete, onDuplicate, onAdd 
                   <td className="p-2.5 text-xs">{p.stock_count ?? "—"}</td>
                   <td className="p-2.5 text-xs">{completenessOf(p)}%</td>
                   <td className="p-2.5 text-xs font-medium">
-                    {p.status === "draft" ? "Draft" : p.is_thrift ? "Thrift" : p.in_stock === false ? "Out of stock" : "Active"}
+                    {p.status === "draft" ? "Draft" : p.is_active === false ? "Off" : p.is_thrift ? "Thrift" : p.in_stock === false ? "Out of stock" : "Active"}
                   </td>
                   <td className="p-2.5">
-                    <div className="flex gap-2 justify-end">
+                    <div className="flex gap-2 justify-end items-center">
+                      {p.status !== "draft" && (
+                        <button
+                          onClick={() => onToggleActive(p.id, p.is_active !== false)}
+                          title={p.is_active === false ? "Turn on" : "Turn off"}
+                          className={`text-[10px] px-2 py-1 rounded-full border font-bold ${p.is_active === false ? "border-border text-muted-foreground" : "border-emerald-600 text-emerald-700 bg-emerald-50"}`}>
+                          {p.is_active === false ? "Off" : "On"}
+                        </button>
+                      )}
                       <button onClick={() => onDuplicate(p)} title="Duplicate"><Copy className="w-3.5 h-3.5 text-muted-foreground" /></button>
                       <button onClick={() => onEdit(p)} title="Edit"><Pencil className="w-3.5 h-3.5 text-muted-foreground" /></button>
                       <button onClick={() => onDelete(p.id)} title="Delete"><Trash2 className="w-3.5 h-3.5 text-destructive" /></button>
@@ -2094,4 +2121,4 @@ function EmptyState({ icon, title, action }: any) {
       {action}
     </div>
   );
-}
+    }
