@@ -61,7 +61,7 @@ export default function ShopByStore() {
         .from("products")
         .select("*")
         .eq("store_id", storeId)
-        .neq("status", "draft")
+        .neq("status", "draft").eq("is_active", true)
         .order("created_at", { ascending: false });
       if (productsData) setProducts(productsData);
     }
@@ -336,4 +336,4 @@ export default function ShopByStore() {
       </div>
     </div>
   );
-        }
+}
