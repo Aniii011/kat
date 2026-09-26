@@ -11,7 +11,7 @@ import PurchaseCard from "@/components/orders/PurchaseCard";
 import PurchaseDetail from "@/components/orders/PurchaseDetail";
 
 const ORDER_COLUMNS =
-  "id, product_id, product_title, product_image, product_seller_name, seller_id, admin_status, admin_note, updated_at, buyer_address, total, amount, delivery_fee, discount_amount, created_at, quantity, variant, delivery_area, delivery_state, payment_ref";
+  "id, product_id, product_title, product_image, product_seller_name, seller_id, admin_status, admin_note, updated_at, buyer_address, buyer_phone, total, amount, delivery_fee, discount_amount, created_at, quantity, variant, delivery_area, delivery_state, payment_ref";
 
 type Filter = "all" | OrderStage;
 
@@ -210,4 +210,4 @@ export default function Orders() {
       </AnimatePresence>
     </div>
   );
-            }
+                }
