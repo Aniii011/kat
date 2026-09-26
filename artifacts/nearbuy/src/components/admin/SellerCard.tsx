@@ -35,7 +35,7 @@ return (
 
 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
 <span className="text-sm font-black text-primary">
-{(seller.full_name || seller.email || "?")
+{(seller.store_name || seller.full_name || seller.email || "?")
 .slice(0,2)
 .toUpperCase()}
 </span>
@@ -47,7 +47,7 @@ return (
 <div className="flex items-center gap-2">
 
 <p className="font-bold text-sm">
-{seller.full_name || "Unnamed"}
+{seller.store_name || "Unnamed store"}
 </p>
 
 
@@ -65,7 +65,7 @@ verified
 
 
 <p className="text-[11px] text-muted-foreground">
-{seller.email}
+{seller.full_name || seller.email}
 </p>
 
 
@@ -191,4 +191,4 @@ Store
 
 );
 
-  }
+}
