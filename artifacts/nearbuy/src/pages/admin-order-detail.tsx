@@ -36,6 +36,10 @@ export default function AdminOrderDetail() {
   const [noteDraft, setNoteDraft] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(false);
+  const [addressDraft, setAddressDraft] = useState("");
+  const [phoneDraft, setPhoneDraft] = useState("");
+  const [savingAddress, setSavingAddress] = useState(false);
 
   const isAdmin = user?.isAdmin;
 
@@ -45,6 +49,8 @@ export default function AdminOrderDetail() {
     const { data: o } = await supabase.from("orders").select("*").eq("id", orderId).maybeSingle();
     setOrder(o);
     setNoteDraft(o?.admin_note || "");
+    setAddressDraft(o?.buyer_address || "");
+    setPhoneDraft(o?.buyer_phone || "");
 
     if (o?.product_id) {
       const { data: p } = await supabase.from("products").select("*").eq("id", o.product_id).maybeSingle();
@@ -129,6 +135,21 @@ export default function AdminOrderDetail() {
     await supabase.from("orders").update({ admin_note: noteDraft.trim() }).eq("id", order.id);
     setOrder((prev: any) => ({ ...prev, admin_note: noteDraft.trim() }));
     setSavingNote(false);
+  };
+
+  const saveAddressEdit = async () => {
+    setSavingAddress(true);
+    const { error } = await supabase.from("orders").update({
+      buyer_address: addressDraft.trim(),
+      buyer_phone: phoneDraft.trim(),
+    }).eq("id", order.id);
+    setSavingAddress(false);
+    if (!error) {
+      setOrder((prev: any) => ({ ...prev, buyer_address: addressDraft.trim(), buyer_phone: phoneDraft.trim() }));
+      setEditingAddress(false);
+    } else {
+      alert("Failed to update delivery info: " + error.message);
+    }
   };
 
   const copyRef = () => {
@@ -235,8 +256,24 @@ export default function AdminOrderDetail() {
         </div>
 
         <div className="rounded-2xl bg-muted p-4">
-          <p className="text-xs text-muted-foreground">Delivery Address</p>
-          <p>{order.buyer_address}</p>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs text-muted-foreground">Delivery Address</p>
+            {status !== "out_for_delivery" && status !== "delivered" && status !== "completed" && status !== "cancelled" && !editingAddress && (
+              <button onClick={() => setEditingAddress(true)} className="text-[11px] font-bold text-primary">Edit</button>
+            )}
+          </div>
+          {editingAddress ? (
+            <div className="space-y-2 no-print">
+              <Textarea value={addressDraft} onChange={(e) => setAddressDraft(e.target.value)} className="rounded-xl min-h-[60px]" />
+              <input value={phoneDraft} onChange={(e) => setPhoneDraft(e.target.value)} placeholder="Phone" className="w-full h-9 rounded-xl border border-input bg-background px-3 text-sm" />
+              <div className="flex gap-2">
+                <Button size="sm" className="rounded-full" disabled={savingAddress} onClick={saveAddressEdit}>{savingAddress ? "Saving..." : "Save"}</Button>
+                <Button size="sm" variant="outline" className="rounded-full" onClick={() => setEditingAddress(false)}>Cancel</Button>
+              </div>
+            </div>
+          ) : (
+            <p>{order.buyer_address}</p>
+          )}
         </div>
 
         {/* Status actions */}
@@ -293,31 +330,82 @@ export default function AdminOrderDetail() {
           </div>
         </div>
 
-        {/* Printable packing slip */}
+        {/* Printable packing slip — Temu/Shein/Jumia-style layout */}
         <div id="packing-slip" className="hidden print-only">
-          <div style={{ padding: "24px", fontFamily: "sans-serif" }}>
-            <h1 style={{ fontSize: "20px", fontWeight: 900, marginBottom: "4px" }}>KAT Marketplace</h1>
-            <p style={{ fontSize: "12px", color: "#666", marginBottom: "16px" }}>Packing Slip</p>
-            <table style={{ width: "100%", marginBottom: "16px" }}>
-              <tbody>
-                <tr><td style={{ padding: "2px 0", fontWeight: 700 }}>Order ID:</td><td>#{order.id.slice(0, 8)}</td></tr>
-                <tr><td style={{ padding: "2px 0", fontWeight: 700 }}>Date:</td><td>{new Date(order.created_at).toLocaleDateString()}</td></tr>
-                <tr><td style={{ padding: "2px 0", fontWeight: 700 }}>Status:</td><td>{STATUS_META[status]?.label || status}</td></tr>
-              </tbody>
-            </table>
-            <div style={{ borderTop: "1px solid #ccc", borderBottom: "1px solid #ccc", padding: "12px 0", marginBottom: "16px" }}>
-              <p style={{ fontWeight: 700, marginBottom: "4px" }}>DELIVER TO:</p>
-              <p style={{ fontWeight: 700, fontSize: "16px" }}>{order.buyer_name}</p>
-              <p>{order.buyer_phone}</p>
-              <p>{order.buyer_address}</p>
-              <p>{order.delivery_area}{order.delivery_state ? `, ${order.delivery_state}` : ""}</p>
+          <div style={{ padding: "20px", fontFamily: "sans-serif", color: "#111", maxWidth: "480px" }}>
+
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "3px solid #111", paddingBottom: "10px", marginBottom: "12px" }}>
+              <div>
+                <h1 style={{ fontSize: "22px", fontWeight: 900, margin: 0, letterSpacing: "-0.5px" }}>KAT</h1>
+                <p style={{ fontSize: "10px", color: "#666", margin: 0 }}>kat.ng · support@kat.ng</p>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <p style={{ fontSize: "9px", color: "#666", margin: 0, textTransform: "uppercase", letterSpacing: "1px" }}>Packing Slip</p>
+                <p style={{ fontSize: "10px", color: "#666", margin: "2px 0 0" }}>{new Date(order.created_at).toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" })}</p>
+              </div>
             </div>
-            <p style={{ fontWeight: 700, marginBottom: "4px" }}>ITEM:</p>
-            <p>{product?.title || "Product"}</p>
-            {(color || size) && <p>{color ? `Color: ${color}` : ""}{color && size ? " · " : ""}{size ? `Size: ${size}` : ""}</p>}
-            <p>Qty: {order.quantity}</p>
-            <p style={{ fontWeight: 700, marginTop: "8px" }}>Total: {formatNaira(order.total)}</p>
-            <p style={{ marginTop: "24px", fontSize: "11px", color: "#999", textAlign: "center" }}>Thank you for shopping with KAT</p>
+
+            {/* Fake barcode strip + order number, like Temu/Shein slips */}
+            <div style={{ textAlign: "center", marginBottom: "14px" }}>
+              <div style={{
+                height: "36px",
+                backgroundImage: "repeating-linear-gradient(90deg, #111 0px, #111 2px, transparent 2px, transparent 5px)",
+                margin: "0 auto 4px",
+                maxWidth: "260px",
+              }} />
+              <p style={{ fontSize: "14px", fontWeight: 900, letterSpacing: "2px", margin: 0, fontFamily: "monospace" }}>
+                #{order.id.slice(0, 8).toUpperCase()}
+              </p>
+              <p style={{ fontSize: "9px", color: "#999", margin: "2px 0 0" }}>Payment ref: {order.payment_ref}</p>
+            </div>
+
+            {/* Ship to */}
+            <div style={{ border: "1.5px solid #111", borderRadius: "6px", padding: "10px 12px", marginBottom: "12px" }}>
+              <p style={{ fontSize: "9px", fontWeight: 700, color: "#666", margin: "0 0 4px", textTransform: "uppercase", letterSpacing: "1px" }}>Ship To</p>
+              <p style={{ fontWeight: 800, fontSize: "15px", margin: "0 0 2px" }}>{order.buyer_name}</p>
+              <p style={{ margin: "0 0 2px", fontSize: "13px" }}>{order.buyer_phone}</p>
+              <p style={{ margin: "0 0 2px", fontSize: "13px" }}>{order.buyer_address}</p>
+              <p style={{ margin: 0, fontSize: "13px", fontWeight: 600 }}>{order.delivery_area}{order.delivery_state ? `, ${order.delivery_state}` : ""}</p>
+            </div>
+
+            {/* Item row, with thumbnail like Temu/Shein/Jumia slips */}
+            <div style={{ display: "flex", gap: "10px", border: "1px solid #ddd", borderRadius: "6px", padding: "10px", marginBottom: "12px" }}>
+              {product?.image_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={product.image_url} alt="" style={{ width: "56px", height: "56px", objectFit: "cover", borderRadius: "4px", border: "1px solid #eee" }} />
+              )}
+              <div style={{ flex: 1 }}>
+                <p style={{ fontWeight: 700, fontSize: "13px", margin: "0 0 2px" }}>{product?.title || "Product"}</p>
+                {(color || size) && (
+                  <p style={{ fontSize: "11px", color: "#666", margin: "0 0 2px" }}>
+                    {color ? `Color: ${color}` : ""}{color && size ? " · " : ""}{size ? `Size: ${size}` : ""}
+                  </p>
+                )}
+                <p style={{ fontSize: "11px", color: "#666", margin: 0 }}>Sold by {seller?.store_name || seller?.full_name || "KAT seller"}</p>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <p style={{ fontSize: "11px", color: "#666", margin: 0 }}>Qty</p>
+                <p style={{ fontWeight: 800, fontSize: "15px", margin: 0 }}>{order.quantity}</p>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: "14px", borderTop: "1.5px solid #111", paddingTop: "8px", marginBottom: "16px" }}>
+              <span>TOTAL</span>
+              <span>{formatNaira(order.total)}</span>
+            </div>
+
+            {/* QC / handling checklist, like fulfillment-center slips */}
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "#444", borderTop: "1px dashed #ccc", paddingTop: "10px", marginBottom: "14px" }}>
+              <span>Packed by: ________________</span>
+              <span>Checked by: ________________</span>
+            </div>
+
+            <p style={{ fontSize: "10px", color: "#999", textAlign: "center", lineHeight: 1.5, margin: 0 }}>
+              Please inspect your item(s) before signing for delivery.<br />
+              Questions or issues? Reach us at support@kat.ng<br />
+              <strong>Thank you for shopping with KAT 💜</strong>
+            </p>
           </div>
         </div>
 
@@ -332,4 +420,4 @@ export default function AdminOrderDetail() {
       </main>
     </div>
   );
-    }
+      }
