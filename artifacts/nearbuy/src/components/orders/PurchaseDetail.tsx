@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Package, MessageCircle, Copy, Check, RotateCcw } from "lucide-react";
+import { ArrowLeft, Package, MessageCircle, Copy, Check, RotateCcw, Pencil } from "lucide-react";
 import { Link } from "wouter";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { resolveProduct, type PurchaseGroup } from "@/lib/order-groups";
+import { Input } from "@/components/ui/input";
+import { resolveProduct, orderStage, type PurchaseGroup } from "@/lib/order-groups";
 import { STATUS_META, normalizeStatus, deliveryExpectationCopy } from "@/lib/order-status";
 import Timeline from "./Timeline";
 
@@ -21,6 +22,28 @@ interface PurchaseDetailProps {
 export default function PurchaseDetail({ group, productsById, onClose }: PurchaseDetailProps) {
   const [eventsByOrder, setEventsByOrder] = useState<Record<string, { status: string; created_at: string }[]>>({});
   const [copied, setCopied] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(false);
+  const [addressDraft, setAddressDraft] = useState(group.lines[0]?.buyer_address || "");
+  const [phoneDraft, setPhoneDraft] = useState((group.lines[0] as any)?.buyer_phone || "");
+  const [savingAddress, setSavingAddress] = useState(false);
+
+  const canEditDelivery = orderStage(group.headlineStatus) === "processing";
+
+  const saveAddress = async () => {
+    setSavingAddress(true);
+    const ids = group.lines.map((l) => l.id);
+    const { error } = await supabase
+      .from("orders")
+      .update({ buyer_address: addressDraft.trim(), buyer_phone: phoneDraft.trim() })
+      .in("id", ids);
+    setSavingAddress(false);
+    if (!error) {
+      group.lines.forEach((l: any) => { l.buyer_address = addressDraft.trim(); l.buyer_phone = phoneDraft.trim(); });
+      setEditingAddress(false);
+    } else {
+      alert("Couldn't update your delivery info. Please try again, or message support.");
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -161,10 +184,37 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
         {/* ── Where it's going ── */}
         {firstLine.buyer_address && (
           <section>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Delivering to</p>
-            <p className="text-sm font-semibold">{firstLine.buyer_address}</p>
-            {firstLine.delivery_area && (
-              <p className="text-xs text-muted-foreground">{firstLine.delivery_area}, {firstLine.delivery_state}</p>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Delivering to</p>
+              {canEditDelivery && !editingAddress && (
+                <button onClick={() => setEditingAddress(true)} className="flex items-center gap-1 text-[11px] font-semibold text-primary">
+                  <Pencil className="w-3 h-3" /> Edit
+                </button>
+              )}
+            </div>
+            {editingAddress ? (
+              <div className="space-y-2">
+                <Input value={addressDraft} onChange={(e) => setAddressDraft(e.target.value)} placeholder="Delivery address" className="rounded-xl" />
+                <Input value={phoneDraft} onChange={(e) => setPhoneDraft(e.target.value)} placeholder="Phone number" className="rounded-xl" />
+                <div className="flex gap-2">
+                  <Button size="sm" className="rounded-full" disabled={savingAddress} onClick={saveAddress}>
+                    {savingAddress ? "Saving..." : "Save"}
+                  </Button>
+                  <Button size="sm" variant="outline" className="rounded-full" onClick={() => setEditingAddress(false)}>Cancel</Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm font-semibold">{firstLine.buyer_address}</p>
+                {firstLine.delivery_area && (
+                  <p className="text-xs text-muted-foreground">{firstLine.delivery_area}, {firstLine.delivery_state}</p>
+                )}
+              </>
+            )}
+            {!canEditDelivery && (
+              <p className="text-xs text-muted-foreground mt-1">
+                This order is already with logistics, so the address can no longer be self-edited — message support if something needs fixing.
+              </p>
             )}
           </section>
         )}
@@ -286,4 +336,4 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
       </main>
     </motion.div>
   );
-        }
+                                           }
