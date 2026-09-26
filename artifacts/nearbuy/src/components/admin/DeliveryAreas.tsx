@@ -62,10 +62,14 @@ export default function DeliveryAreas() {
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
   const [fee, setFee] = useState("");
+  const [doorFee, setDoorFee] = useState("");
+  const [note, setNote] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
 const [editState, setEditState] = useState("");
 const [editCity, setEditCity] = useState("");
 const [editFee, setEditFee] = useState("");
+const [editDoorFee, setEditDoorFee] = useState("");
+const [editNote, setEditNote] = useState("");
 
   const fetchAreas = async () => {
     setLoading(true);
@@ -91,11 +95,15 @@ const [editFee, setEditFee] = useState("");
       state,
       city,
       delivery_fee: Number(fee),
+      door_delivery_fee: doorFee ? Number(doorFee) : null,
+      delivery_note: note.trim() || null,
     });
 
     setState("");
     setCity("");
     setFee("");
+    setDoorFee("");
+    setNote("");
 
     fetchAreas();
   };
@@ -131,6 +139,8 @@ const [editFee, setEditFee] = useState("");
       state: editState,
       city: editCity,
       delivery_fee: Number(editFee),
+      door_delivery_fee: editDoorFee ? Number(editDoorFee) : null,
+      delivery_note: editNote.trim() || null,
     })
     .eq("id", editingId);
 
@@ -168,7 +178,7 @@ const [editFee, setEditFee] = useState("");
     <SelectValue placeholder="Select State" />
   </SelectTrigger>
 
-  <SelectContent>
+  <SelectContent className="max-h-64 overflow-y-auto">
     {NIGERIAN_STATES.map((s) => (
       <SelectItem key={s} value={s}>
         {s}
@@ -185,12 +195,25 @@ const [editFee, setEditFee] = useState("");
 
 
         <Input
-          placeholder="Delivery Fee"
+          placeholder="Standard/Park Delivery Fee"
           type="number"
           value={fee}
           onChange={(e)=>setFee(e.target.value)}
         />
 
+        <Input
+          placeholder="Door Delivery Fee (optional)"
+          type="number"
+          value={doorFee}
+          onChange={(e)=>setDoorFee(e.target.value)}
+        />
+
+        <textarea
+          placeholder="Delivery-time note shown to buyers (e.g. 'East delivery: 5–8 days after handoff to logistics due to distance')"
+          value={note}
+          onChange={(e)=>setNote(e.target.value)}
+          className="w-full min-h-[70px] rounded-xl border border-input bg-background px-3 py-2 text-sm"
+        />
 
         <Button
           onClick={addArea}
@@ -215,7 +238,7 @@ const [editFee, setEditFee] = useState("");
     <SelectValue placeholder="Select State" />
   </SelectTrigger>
 
-  <SelectContent>
+  <SelectContent className="max-h-64 overflow-y-auto">
     {NIGERIAN_STATES.map((s) => (
       <SelectItem key={s} value={s}>
         {s}
@@ -234,7 +257,21 @@ const [editFee, setEditFee] = useState("");
       type="number"
       value={editFee}
       onChange={(e) => setEditFee(e.target.value)}
-      placeholder="Delivery Fee"
+      placeholder="Standard/Park Delivery Fee"
+    />
+
+    <Input
+      type="number"
+      value={editDoorFee}
+      onChange={(e) => setEditDoorFee(e.target.value)}
+      placeholder="Door Delivery Fee (optional)"
+    />
+
+    <textarea
+      value={editNote}
+      onChange={(e) => setEditNote(e.target.value)}
+      placeholder="Delivery-time note shown to buyers"
+      className="w-full min-h-[70px] rounded-xl border border-input bg-background px-3 py-2 text-sm"
     />
 
     <div className="flex gap-2">
@@ -275,7 +312,11 @@ const [editFee, setEditFee] = useState("");
 
               <p className="text-sm text-muted-foreground">
                 {area.state} · {formatNaira(area.delivery_fee)}
+                {area.door_delivery_fee ? ` · Door: ${formatNaira(area.door_delivery_fee)}` : ""}
               </p>
+              {area.delivery_note && (
+                <p className="text-xs text-muted-foreground mt-1 italic">{area.delivery_note}</p>
+              )}
 
             </div>
 <Button
@@ -286,6 +327,8 @@ const [editFee, setEditFee] = useState("");
     setEditState(area.state);
     setEditCity(area.city);
     setEditFee(String(area.delivery_fee));
+    setEditDoorFee(area.door_delivery_fee != null ? String(area.door_delivery_fee) : "");
+    setEditNote(area.delivery_note || "");
   }}
 >
   <Pencil className="w-4 h-4" />
