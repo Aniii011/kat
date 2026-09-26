@@ -19,6 +19,7 @@ import SellerCard from "@/components/admin/SellerCard";
 import DeliveryAreas from "@/components/admin/DeliveryAreas";
 import Coupons from "@/components/admin/Coupons";
 import OrderDetailsDialog from "@/components/admin/OrderDetailsDialog"; // kept for reference; superseded by /admin/orders/:id full-page view
+import Announcements from "@/components/admin/Announcements";
 
 function formatNaira(n: number) { return "₦" + Number(n || 0).toLocaleString("en-NG"); }
 
@@ -339,7 +340,7 @@ export default function Admin() {
     const q = search.toLowerCase();
     const product = products.find((p) => p.id === o.product_id);
     const seller = users.find((u) => u.id === o.seller_id);
-    const matchSearch = [o.id, o.buyer_name, o.buyer_phone, o.buyer_address, o.delivery_area, o.delivery_state, product?.title, seller?.full_name].some((f) => f?.toLowerCase().includes(q));
+    const matchSearch = [o.id, o.payment_ref, o.buyer_name, o.buyer_phone, o.buyer_address, o.delivery_area, o.delivery_state, product?.title, seller?.full_name].some((f) => f?.toLowerCase().includes(q));
     return matchFilter && matchSearch;
   });
 
@@ -1061,6 +1062,8 @@ export default function Admin() {
               <p className="text-xs text-muted-foreground">
                 Commission rate is currently a fixed value used throughout the codebase, not a configurable setting. Category, delivery, and marketplace-rule configuration are not yet editable from Admin.
               </p>
+
+              <Announcements />
             </div>
           )}
 
@@ -1111,4 +1114,4 @@ function TrendChart({ orders, rangeDays, metric, commissionRate }: { orders: any
       </div>
     </div>
   );
-  }
+}
