@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
@@ -18,7 +18,7 @@ import NeedsAttention from "@/components/admin/NeedsAttention";
 import SellerCard from "@/components/admin/SellerCard";
 import DeliveryAreas from "@/components/admin/DeliveryAreas";
 import Coupons from "@/components/admin/Coupons";
-import OrderDetailsDialog from "@/components/admin/OrderDetailsDialog";
+import OrderDetailsDialog from "@/components/admin/OrderDetailsDialog"; // kept for reference; superseded by /admin/orders/:id full-page view
 
 function formatNaira(n: number) { return "₦" + Number(n || 0).toLocaleString("en-NG"); }
 
@@ -90,6 +90,7 @@ export default function Admin() {
   const [analyticsRange, setAnalyticsRange] = useState<7 | 30 | 90>(30);
 
   const isAdmin = user?.isAdmin;
+  const [, navigate] = useLocation();
 
   // ── UNCHANGED: same fetch, same four queries, same shape ──
   const fetchAll = async () => {
@@ -769,8 +770,16 @@ export default function Admin() {
                         {rows.map((order) => {
                           const status = order.admin_status || "pending";
                           const isAging = ["pending", "accepted", "preparing"].includes(status) && !isSameDayOrAfter(order.created_at, 2);
+                          const orderProduct = products.find((p) => p.id === order.product_id);
                           return (
-                            <div key={order.id} className="bg-card border border-border rounded-2xl p-3 flex items-center gap-3 cursor-pointer hover:bg-muted/30" onClick={() => setSelectedOrder(order)}>
+                            <div key={order.id} className="bg-card border border-border rounded-2xl p-3 flex items-center gap-3 cursor-pointer hover:bg-muted/30" onClick={() => navigate(`/admin/orders/${order.id}`)}>
+                              {orderProduct?.image_url ? (
+                                <img src={orderProduct.image_url} alt={orderProduct.title} className="w-10 h-10 rounded-xl object-cover shrink-0" />
+                              ) : (
+                                <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                                  <Package className="w-4 h-4 text-muted-foreground" />
+                                </div>
+                              )}
                               <div className="flex-1 min-w-0">
                                 <p className="font-mono text-[11px] text-muted-foreground">#{order.id.slice(0, 8)}</p>
                                 <p className="font-bold text-sm truncate">{order.buyer_name || "Unknown buyer"}</p>
@@ -1058,16 +1067,6 @@ export default function Admin() {
         </div>
       </main>
 
-      {/* ── UNCHANGED ── */}
-      <OrderDetailsDialog
-        open={!!selectedOrder}
-        order={selectedOrder}
-        product={selectedOrder ? products.find((p) => p.id === selectedOrder.product_id) : null}
-        seller={selectedOrder ? users.find((u) => u.id === selectedOrder.seller_id) : null}
-        onClose={() => setSelectedOrder(null)}
-        onUpdateStatus={updateOrderStatus}
-        onUpdateNote={updateOrderNote}
-      />
     </div>
   );
 }
@@ -1112,4 +1111,4 @@ function TrendChart({ orders, rangeDays, metric, commissionRate }: { orders: any
       </div>
     </div>
   );
-                                                    }
+  }
