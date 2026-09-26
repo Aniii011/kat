@@ -25,6 +25,7 @@ export default function AdminSellers() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>("sellers");
   const [sellers, setSellers] = useState<any[]>([]);
+  const [storesBySeller, setStoresBySeller] = useState<Record<string, any[]>>({});
   const [products, setProducts] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,7 +48,7 @@ export default function AdminSellers() {
 
   const fetchAll = async () => {
     setLoading(true);
-    await Promise.all([fetchSellers(), fetchProducts(), fetchUsers()]);
+    await Promise.all([fetchSellers(), fetchProducts(), fetchUsers(), fetchStores()]);
     setLoading(false);
   };
 
@@ -57,12 +58,26 @@ export default function AdminSellers() {
       .select("*")
       .order("created_at", { ascending: false });
     if (data) {
-      setSellers(data);
+      // Admin accounts aren't sellers, even if is_seller got set on them at some point.
+      const realSellers = data.filter((s) => !s.is_admin);
+      setSellers(realSellers);
       setStats((prev) => ({
         ...prev,
-        totalSellers: data.filter((s) => s.is_seller).length,
-        pendingSellers: data.filter((s) => s.is_seller && !s.seller_verified).length,
+        totalSellers: realSellers.filter((s) => s.is_seller).length,
+        pendingSellers: realSellers.filter((s) => s.is_seller && !s.seller_verified).length,
       }));
+    }
+  };
+
+  const fetchStores = async () => {
+    const { data } = await supabase.from("stores").select("id, name, owner_id");
+    if (data) {
+      const grouped: Record<string, any[]> = {};
+      data.forEach((s) => {
+        if (!grouped[s.owner_id]) grouped[s.owner_id] = [];
+        grouped[s.owner_id].push(s);
+      });
+      setStoresBySeller(grouped);
     }
   };
 
@@ -72,8 +87,10 @@ export default function AdminSellers() {
       .select("*")
       .order("created_at", { ascending: false });
     if (data) {
-      setProducts(data);
-      setStats((prev) => ({ ...prev, totalProducts: data.length }));
+      // Drafts are a seller's own unpublished working space, not admin's to see.
+      const published = data.filter((p) => p.status !== "draft");
+      setProducts(published);
+      setStats((prev) => ({ ...prev, totalProducts: published.length }));
     }
   };
 
@@ -154,8 +171,9 @@ export default function AdminSellers() {
   }
 
   const filteredSellers = sellers.filter((s) => {
+    const myStoreNames = (storesBySeller[s.id] || []).map((st) => st.name);
     const matchSearch = !search ||
-      [s.full_name, s.email].some((f) => f?.toLowerCase().includes(search.toLowerCase()));
+      [s.full_name, s.email, s.store_name, ...myStoreNames].some((f) => f?.toLowerCase().includes(search.toLowerCase()));
     const status = s.seller_verified ? "approved" : s.is_seller ? "pending" : "rejected";
     const matchFilter = filter === "all" || status === filter;
     return matchSearch && matchFilter && s.is_seller;
@@ -290,6 +308,13 @@ export default function AdminSellers() {
                   : seller.is_seller
                   ? "pending"
                   : "rejected";
+                const myStores = storesBySeller[seller.id] || [];
+                const storeLabel =
+                  myStores.length === 0
+                    ? seller.store_name || seller.full_name || "Unnamed"
+                    : myStores.length === 1
+                    ? myStores[0].name
+                    : `${myStores.length} stores`;
                 return (
                   <motion.div
                     key={seller.id}
@@ -304,12 +329,20 @@ export default function AdminSellers() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-bold text-sm">{seller.full_name || "Unnamed"}</p>
+                          <p className="font-bold text-sm">{storeLabel}</p>
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_CONFIG[status].className}`}>
                             {STATUS_CONFIG[status].label}
                           </span>
                         </div>
+                        {myStores.length > 1 && (
+                          <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                            {myStores.map((st) => st.name).join(", ")}
+                          </p>
+                        )}
                         <div className="flex items-center gap-3 mt-1 flex-wrap">
+                          <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                            {seller.full_name || "Unnamed"}
+                          </span>
                           <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
                             <Mail className="w-3 h-3" /> {seller.email}
                           </span>
@@ -485,4 +518,4 @@ export default function AdminSellers() {
       </main>
     </div>
   );
-}
+    }
