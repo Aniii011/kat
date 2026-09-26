@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useListings } from "@/hooks/use-listings";
+import { supabase } from "@/lib/supabase";
 import {
   listings as staticListings, AESTHETICS, TOP_CATEGORIES, SUBCATEGORIES,
   CATEGORY_TO_TOP, type Listing, type TopCategory,
@@ -30,7 +31,7 @@ const BADGE_STYLES: Record<string, string> = {
   "Limited":     "bg-purple-600 text-white",
 };
 
-const ANNOUNCEMENT_ITEMS = [
+const DEFAULT_ANNOUNCEMENT_ITEMS = [
   "🛍️ Shop the latest drops",
   "✨ New arrivals daily",
   "🔒 Secure checkout",
@@ -210,6 +211,21 @@ export default function Home() {
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [announcementIndex, setAnnouncementIndex] = useState(0);
+  const [announcementItems, setAnnouncementItems] = useState<string[]>(DEFAULT_ANNOUNCEMENT_ITEMS);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from("site_announcements")
+      .select("text")
+      .eq("active", true)
+      .order("created_at", { ascending: true })
+      .then(({ data }) => {
+        if (cancelled) return;
+        if (data && data.length > 0) setAnnouncementItems(data.map((a: any) => a.text));
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const { user } = useAuth();
   const { listings: remoteListings, loading } = useListings();
@@ -312,10 +328,10 @@ export default function Home() {
 
   React.useEffect(() => {
     const timer = setInterval(() => {
-      setAnnouncementIndex((prev) => (prev + 1) % ANNOUNCEMENT_ITEMS.length);
+      setAnnouncementIndex((prev) => (prev + 1) % announcementItems.length);
     }, 3000);
     return () => clearInterval(timer);
-  }, []);
+  }, [announcementItems.length]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -331,7 +347,7 @@ export default function Home() {
             transition={{ duration: 0.3 }}
             className="block"
           >
-            {ANNOUNCEMENT_ITEMS[announcementIndex]}
+            {announcementItems[announcementIndex % announcementItems.length]}
           </motion.span>
         </AnimatePresence>
       </div>
@@ -606,4 +622,4 @@ export default function Home() {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
     </div>
   );
-                }
+  }
