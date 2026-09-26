@@ -75,7 +75,7 @@ export default function Store() {
       .from("products")
       .select("*")
       .eq("seller_id", sellerId)
-      .neq("status", "draft")
+      .neq("status", "draft").eq("is_active", true)
       .order("created_at", { ascending: false });
 
     if (productsData) setProducts(productsData);
@@ -429,4 +429,4 @@ export default function Store() {
       </div>
     </div>
   );
-  }
+        }
