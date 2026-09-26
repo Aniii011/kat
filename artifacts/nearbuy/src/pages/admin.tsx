@@ -75,6 +75,7 @@ export default function Admin() {
   const [sellers, setSellers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [storesById, setStoresById] = useState<Record<string, any>>({});
+  const [financeSearch, setFinanceSearch] = useState("");
   const [orders, setOrders] = useState<any[]>([]);
   const [orderEvents, setOrderEvents] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -182,6 +183,35 @@ export default function Admin() {
   const gmv = totalRevenue;
   const katCommissionRevenue = gmv * COMMISSION_RATE;
   const netToSellers = gmv - katCommissionRevenue;
+
+  // Payout-accurate figures: cancelled orders are never payable, and an order
+  // isn't actually owed to a seller until it's delivered/completed — a
+  // pending or in-transit order could still be cancelled or returned.
+  const payableOrders = orders.filter((o) => o.admin_status === "delivered" || o.admin_status === "completed");
+  const inProgressOrders = orders.filter((o) => o.admin_status !== "cancelled" && o.admin_status !== "delivered" && o.admin_status !== "completed");
+  const payableGmv = payableOrders.reduce((s, o) => s + (o.total || o.amount || 0), 0);
+  const payableCommission = payableGmv * COMMISSION_RATE;
+  const payableNetToSellers = payableGmv - payableCommission;
+  const inProgressGmv = inProgressOrders.reduce((s, o) => s + (o.total || o.amount || 0), 0);
+
+  // Payouts grouped by STORE, not by seller account — a seller with several
+  // stores gets a separate, correct line per store instead of one blended
+  // total. Falls back to seller_id only for products/orders with no
+  // store_id at all (pre-fix legacy rows).
+  const payoutsByStore: Record<string, { name: string; revenue: number; orders: number }> = {};
+  payableOrders.forEach((o) => {
+    const product = products.find((p) => p.id === o.product_id);
+    const key = product?.store_id || o.seller_id;
+    if (!key) return;
+    if (!payoutsByStore[key]) {
+      const store = storesById[product?.store_id];
+      const seller = users.find((u) => u.id === o.seller_id);
+      payoutsByStore[key] = { name: store?.name || seller?.store_name || seller?.full_name || "Unknown store", revenue: 0, orders: 0 };
+    }
+    payoutsByStore[key].revenue += o.total || o.amount || 0;
+    payoutsByStore[key].orders += 1;
+  });
+  const allStorePayouts = Object.values(payoutsByStore).sort((a, b) => b.revenue - a.revenue);
 
   const gmvInRange = orders.filter((o) => isSameDayOrAfter(o.created_at, analyticsRange)).reduce((s, o) => s + (o.total || o.amount || 0), 0);
   const gmvPrevRange = orders.filter((o) => !isSameDayOrAfter(o.created_at, analyticsRange) && isSameDayOrAfter(o.created_at, analyticsRange * 2)).reduce((s, o) => s + (o.total || o.amount || 0), 0);
@@ -812,10 +842,13 @@ export default function Admin() {
             <div className="space-y-5">
               <h2 className="text-lg font-black">Finance</h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <Metric label="GMV (all time)" value={formatNaira(gmv)} />
-                <Metric label="KAT commission earned" value={formatNaira(katCommissionRevenue)} />
-                <Metric label="Owed to sellers (net)" value={formatNaira(netToSellers)} />
+                <Metric label="Payable GMV (delivered/completed)" value={formatNaira(payableGmv)} />
+                <Metric label="KAT commission earned" value={formatNaira(payableCommission)} />
+                <Metric label="Owed to sellers now (net)" value={formatNaira(payableNetToSellers)} />
               </div>
+              <p className="text-xs text-muted-foreground -mt-2">
+                Only orders marked Delivered/Completed count here — cancelled orders are excluded, and orders still in progress ({formatNaira(inProgressGmv)} across {inProgressOrders.length} order{inProgressOrders.length === 1 ? "" : "s"}) aren't counted as owed yet since they could still be cancelled or returned.
+              </p>
 
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Commission trend</p>
@@ -823,18 +856,29 @@ export default function Admin() {
               </div>
 
               <div>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Amount owed by seller</p>
-                {topSellers.length === 0 ? <p className="text-xs text-muted-foreground">No sales yet.</p> : (
-                  <div className="border border-border rounded-2xl overflow-x-auto">
+                <div className="flex items-center justify-between mb-2 gap-3">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Amount owed per store ({allStorePayouts.length})</p>
+                  <input
+                    value={financeSearch}
+                    onChange={(e) => setFinanceSearch(e.target.value)}
+                    placeholder="Search store..."
+                    className="h-8 w-40 rounded-full border border-input bg-background px-3 text-xs"
+                  />
+                </div>
+                {allStorePayouts.length === 0 ? <p className="text-xs text-muted-foreground">No completed sales yet.</p> : (
+                  <div className="border border-border rounded-2xl overflow-x-auto max-h-96 overflow-y-auto">
                     <table className="w-full text-sm min-w-[480px]">
-                      <thead><tr className="text-left text-xs text-muted-foreground border-b border-border"><th className="p-2.5 font-medium">Seller</th><th className="p-2.5 font-medium">Gross sales</th><th className="p-2.5 font-medium">Commission</th><th className="p-2.5 font-medium">Net owed</th></tr></thead>
+                      <thead className="sticky top-0 bg-background"><tr className="text-left text-xs text-muted-foreground border-b border-border"><th className="p-2.5 font-medium">Store</th><th className="p-2.5 font-medium">Orders</th><th className="p-2.5 font-medium">Gross sales</th><th className="p-2.5 font-medium">Commission</th><th className="p-2.5 font-medium">Net owed</th></tr></thead>
                       <tbody>
-                        {topSellers.map((s, i) => (
+                        {allStorePayouts
+                          .filter((s) => !financeSearch || s.name.toLowerCase().includes(financeSearch.toLowerCase()))
+                          .map((s, i) => (
                           <tr key={i} className="border-b border-border last:border-0">
                             <td className="p-2.5">{s.name}</td>
+                            <td className="p-2.5 text-xs text-muted-foreground">{s.orders}</td>
                             <td className="p-2.5">{formatNaira(s.revenue)}</td>
                             <td className="p-2.5">{formatNaira(s.revenue * COMMISSION_RATE)}</td>
-                            <td className="p-2.5 font-medium">{formatNaira(s.revenue * (1 - COMMISSION_RATE))}</td>
+                            <td className="p-2.5 font-bold">{formatNaira(s.revenue * (1 - COMMISSION_RATE))}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -846,7 +890,7 @@ export default function Admin() {
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Recent transactions</p>
                 <div className="divide-y divide-border border-t border-b border-border">
-                  {orders.slice(0, 10).map((o) => (
+                  {orders.filter((o) => o.admin_status !== "cancelled").slice(0, 10).map((o) => (
                     <div key={o.id} className="flex items-center justify-between py-2 text-sm">
                       <span>#{o.id.slice(0, 8)} · {new Date(o.created_at).toLocaleDateString()}</span>
                       <span className="text-xs text-muted-foreground">{formatNaira(o.total || o.amount)} gross · {formatNaira((o.total || o.amount || 0) * COMMISSION_RATE)} commission</span>
