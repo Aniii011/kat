@@ -121,14 +121,14 @@ export function useListings(filters?: {
         // hook (Home, and anything else built on useListings/useListing),
         // rather than patching it per-screen after the fact.
         //
-        // Using .neq("status", "draft") rather than .eq("status", "published")
+        // Using .neq("status", "draft").eq("is_active", true) rather than .eq("status", "published")
         // deliberately: Seller.tsx's saveProduct() only ever writes "draft"
         // or "published" to this column, but if a null/undefined status
         // value exists on any older row (e.g. rows created before this
         // field existed), .eq("status","published") would incorrectly hide
         // it from buyers too. .neq() only excludes rows explicitly marked
         // draft and lets everything else through unchanged.
-        .neq("status", "draft")
+        .neq("status", "draft").eq("is_active", true)
         .order("created_at", { ascending: false });
 
       if (filters?.isThrift !== undefined) {
@@ -176,7 +176,7 @@ export function useListing(id: string | null) {
         // surface too (product detail pages, and anything that links
         // directly to a listing by id rather than going through the list
         // query above).
-        supabase.from("products").select("*").eq("id", id).neq("status", "draft").single(),
+        supabase.from("products").select("*").eq("id", id).neq("status", "draft").eq("is_active", true).single(),
         supabase.from("reviews").select("*").eq("product_id", id).order("id"),
       ]);
 
@@ -204,4 +204,4 @@ export function useListing(id: string | null) {
   }, [id]);
 
   return { listing, loading, error };
-          }
+}
