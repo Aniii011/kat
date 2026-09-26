@@ -15,6 +15,7 @@ import Search from "@/pages/search";
 import Me from "@/pages/me";
 import Seller from "@/pages/seller";
 import Admin from "@/pages/admin";
+import AdminOrderDetail from "@/pages/admin-order-detail";
 import ResetPassword from "@/pages/reset-password";
 import BottomNav from "@/components/bottom-nav";
 import AiAssistant from "@/components/ai-assistant";
@@ -56,6 +57,7 @@ function Router() {
       <Route path="/reviews" component={Reviews} />
       <Route path="/following" component={Following} />
       <Route path="/admin" component={Admin} />
+      <Route path="/admin/orders/:id" component={AdminOrderDetail} />
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/auth/callback" component={AuthCallback} />
       <Route component={NotFound} />
