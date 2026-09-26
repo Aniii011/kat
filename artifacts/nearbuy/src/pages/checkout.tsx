@@ -57,6 +57,7 @@ export default function Checkout() {
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [doorDeliveryFee, setDoorDeliveryFee] = useState<number | null>(null);
   const [deliveryMethod, setDeliveryMethod] = useState<"standard" | "door">("standard");
+  const [deliveryNote, setDeliveryNote] = useState<string | null>(null);
   const [cities, setCities] = useState<any[]>([]);
   const [couponInput, setCouponInput] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<any | null>(null);
@@ -471,6 +472,7 @@ export default function Checkout() {
                         : null
                     );
                     setDeliveryMethod("standard");
+                    setDeliveryNote(selected?.delivery_note || null);
                   }}
                   disabled={!state}
                   className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
@@ -485,6 +487,10 @@ export default function Checkout() {
                   ))}
                 </select>
               </div>
+
+              {deliveryNote && (
+                <p className="text-xs text-amber-700 bg-amber-50 rounded-xl px-3 py-2">{deliveryNote}</p>
+              )}
 
               {citySelected && doorDeliveryFee !== null && (
                 <div className="space-y-1.5">
@@ -637,4 +643,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-    }
+  }
