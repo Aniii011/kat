@@ -7,7 +7,7 @@ import { useInteractions } from "@/hooks/use-interactions";
 import { useAuth } from "@/context/auth-context";
 import {
   Search as SearchIcon, X, SlidersHorizontal, Star, BadgeCheck,
-  ArrowLeft, Camera, Image, ShoppingBag, CheckCircle2, Loader2,
+  ArrowLeft, Camera, Image, ShoppingBag, CheckCircle2, Loader2, Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -119,7 +119,14 @@ function ProductCard({
       >
         <div className="relative aspect-[3/4] overflow-hidden bg-muted">
           {product.image_url ? (
-            <img src={product.image_url} alt={product.title} className="w-full h-full object-contain transition-transform duration-400 group-hover:scale-105" loading="lazy" />
+            <>
+              <img src={product.image_url} alt={product.title} className="w-full h-full object-contain transition-transform duration-400 group-hover:scale-105" loading="lazy" />
+              {product.video_url && (
+                <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center">
+                  <Play className="w-3 h-3 text-white fill-white" />
+                </div>
+              )}
+            </>
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <ShoppingBag className="w-8 h-8 text-muted-foreground" />
@@ -778,4 +785,4 @@ export default function Search() {
       </main>
     </div>
   );
-  }
+      }
