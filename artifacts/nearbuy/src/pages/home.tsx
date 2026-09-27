@@ -16,7 +16,7 @@ import SaveToBoardModal from "@/components/save-to-board-modal";
 import AuthModal from "@/components/auth-modal";
 import {
   Search, ShoppingBag, ShoppingBasket, Plus, Star, BadgeCheck, Flame, Sparkles,
-  ChevronRight, Bookmark, Heart, LogIn, CheckCircle2,
+  ChevronRight, Bookmark, Heart, LogIn, CheckCircle2, Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -95,6 +95,11 @@ function ProductCard({
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               loading="lazy"
             />
+            {listing.videoUrl && (
+              <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center">
+                <Play className="w-3 h-3 text-white fill-white" />
+              </div>
+            )}
             <div className="absolute top-2 left-2 flex flex-col gap-1">
               {listing.isThrift && (
                 <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-purple-500 text-white leading-tight">
@@ -622,4 +627,4 @@ export default function Home() {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
     </div>
   );
-  }
+      }
