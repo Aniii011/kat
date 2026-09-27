@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useRoute, Link, useSearch } from "wouter";
+import { useRoute, Link, useSearch, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
@@ -26,6 +26,7 @@ export default function Store() {
   const storeIdParam = new URLSearchParams(locationSearch).get("store");
   const { user } = useAuth();
   const { addItem } = useCart();
+  const [, navigate] = useLocation();
 
   const [seller, setSeller] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
@@ -51,6 +52,23 @@ export default function Store() {
       .select("*")
       .eq("id", sellerId)
       .single();
+
+    // Some links pass a store id (from the `stores` table) where this page
+    // expects a seller/profile id — this happens for a seller with multiple
+    // stores, where a link built from a store record instead of the owning
+    // profile lands here with the wrong kind of id. Rather than dead-end,
+    // resolve it as a store id and redirect to the correct canonical URL.
+    if (!sellerData) {
+      const { data: storeAsId } = await supabase
+        .from("stores")
+        .select("id, owner_id")
+        .eq("id", sellerId)
+        .maybeSingle();
+      if (storeAsId) {
+        navigate(`/store/${storeAsId.owner_id}?store=${storeAsId.id}`, { replace: true });
+        return;
+      }
+    }
 
     // When arriving from a specific listing that belongs to one of this
     // seller's multiple stores, resolve that store's real name from the
@@ -429,4 +447,4 @@ export default function Store() {
       </div>
     </div>
   );
-        }
+          }
