@@ -13,16 +13,12 @@ function toggle(list: string[], value: string) {
 interface VariantsAccordionProps {
   selectedColors: string[];
   setSelectedColors: React.Dispatch<React.SetStateAction<string[]>>;
-  // Lets a composer rename this axis — e.g. "Length / Shade / Type" for
-  // wigs, instead of the default "Colour / Design", which doesn't fit
-  // every product category (Beauty & Health has no real "color" concept).
-  axisLabel?: string;
-  // Optional: lets the seller attach one reference photo per color, so
+  // Optional: lets the seller attach a small gallery of photos per color, so
   // buyers can visually tell variants apart (e.g. yellow vs maroon dress)
-  // instead of relying on the color name alone. Only rendered when both
-  // are provided by the parent composer.
-  colorImages?: Record<string, string>;
-  onColorImagesChange?: (next: Record<string, string>) => void;
+  // instead of relying on the color name alone, and see more than one angle.
+  // Only rendered when both are provided by the parent composer.
+  colorImages?: Record<string, string[]>;
+  onColorImagesChange?: (next: Record<string, string[]>) => void;
   onUploadImage?: (file: File) => Promise<{ url: string | null; error: string | null }>;
   selectedSizes?: string[];
   setSelectedSizes?: React.Dispatch<React.SetStateAction<string[]>>;
@@ -34,14 +30,13 @@ interface VariantsAccordionProps {
   setUseVariantPricing: (v: boolean) => void;
   variants: ProductVariant[];
   onGenerate: () => void;
-  onUpdateVariant: (id: string, field: "price" | "stock", value: number | undefined) => void;
+  onUpdateVariant: (id: string, field: "price" | "stock" | "sku", value: number | string | undefined) => void;
   defaultOpen?: boolean;
 }
 
 export default function VariantsAccordion({
   selectedColors,
   setSelectedColors,
-  axisLabel = "Colour / Design",
   colorImages,
   onColorImagesChange,
   onUploadImage,
@@ -69,15 +64,9 @@ export default function VariantsAccordion({
   const [colorPhotoError, setColorPhotoError] = useState<string | null>(null);
 
   const commitCustomColor = () => {
-    // Splitting on commas lets a seller add many values in one go —
-    // e.g. "10 inch, 12 inch, 14 inch" for a wig with 8 lengths, instead
-    // of repeating the add-one-at-a-time flow eight separate times.
-    const values = customColorInput
-      .split(",")
-      .map((v) => v.trim())
-      .filter((v) => v.length > 0 && !selectedColors.includes(v));
-    if (values.length > 0) {
-      setSelectedColors((prev) => [...prev, ...values]);
+    const trimmed = customColorInput.trim();
+    if (trimmed && !selectedColors.includes(trimmed)) {
+      setSelectedColors((prev) => [...prev, trimmed]);
     }
     setCustomColorInput("");
     setAddingCustomColor(false);
@@ -108,22 +97,27 @@ export default function VariantsAccordion({
     const { url, error } = await onUploadImage(file);
     setUploadingColor(null);
     if (url) {
-      onColorImagesChange({ ...(colorImages || {}), [color]: url });
+      const existing = colorImages?.[color] || [];
+      onColorImagesChange({ ...(colorImages || {}), [color]: [...existing, url] });
     } else {
       setColorPhotoError(error || "Upload failed — please try again.");
     }
   };
 
-  const removeColorPhoto = (color: string) => {
+  // Removes one photo from a color's gallery (by position), not the whole
+  // gallery — a color can keep its other photos.
+  const removeColorPhoto = (color: string, index: number) => {
     if (!onColorImagesChange || !colorImages) return;
     const next = { ...colorImages };
-    delete next[color];
+    const remaining = (next[color] || []).filter((_, i) => i !== index);
+    if (remaining.length > 0) next[color] = remaining;
+    else delete next[color];
     onColorImagesChange(next);
   };
 
-  // Note: selectedColors may include values not in the COLORS preset list
-  // (custom-typed ones) — the grid below renders all of selectedColors
-  // directly, so no separate filtering is needed here.
+  // A previously-added custom color won't be in the preset COLORS list —
+  // still needs to render as a removable chip.
+  const customSelectedColors = selectedColors.filter((c) => !COLORS.includes(c));
 
   const hasAnySelection =
     selectedColors.length > 0 ||
@@ -149,8 +143,8 @@ export default function VariantsAccordion({
       {open && (
         <div className="px-4 pb-4 space-y-4">
           <div>
-            <p className="text-xs font-semibold text-muted-foreground mb-2">{axisLabel}</p>
-            <div className="flex flex-wrap gap-1.5 mb-1">
+            <p className="text-xs font-semibold text-muted-foreground mb-2">Colors</p>
+            <div className="flex flex-wrap gap-1.5">
               {COLORS.map((c) => (
                 <button
                   key={c}
@@ -166,13 +160,25 @@ export default function VariantsAccordion({
                 </button>
               ))}
 
+              {customSelectedColors.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setSelectedColors((prev) => toggle(prev, c))}
+                  className="text-xs pl-2.5 pr-1.5 py-1 rounded-full border border-primary bg-primary text-primary-foreground font-medium flex items-center gap-1"
+                >
+                  {c}
+                  <X className="w-3 h-3" />
+                </button>
+              ))}
+
               {!addingCustomColor && (
                 <button
                   type="button"
                   onClick={() => setAddingCustomColor(true)}
                   className="text-xs px-2.5 py-1 rounded-full border border-dashed border-border text-muted-foreground hover:border-primary/50 hover:text-foreground transition-all flex items-center gap-1"
                 >
-                  <Plus className="w-3 h-3" /> Add {axisLabel.split(" / ")[0].toLowerCase()}
+                  <Plus className="w-3 h-3" /> Custom
                 </button>
               )}
 
@@ -187,74 +193,64 @@ export default function VariantsAccordion({
                     if (e.key === "Escape") { setAddingCustomColor(false); setCustomColorInput(""); }
                   }}
                   onBlur={commitCustomColor}
-                  placeholder="e.g. 10 inch, 12 inch, 14 inch"
-                  className="text-xs px-2.5 py-1 rounded-full border border-primary bg-background outline-none w-56"
+                  placeholder="e.g. Olive Green"
+                  className="text-xs px-2.5 py-1 rounded-full border border-primary bg-background outline-none w-28"
                 />
               )}
             </div>
-            {addingCustomColor && (
-              <p className="text-[10px] text-muted-foreground mb-2">
-                Adding several? Separate with commas — e.g. "10 inch, 12 inch, 14 inch" adds all three at once.
-              </p>
-            )}
-
-            {/* Each variant is a photo tile with its name as a caption
-                directly underneath, matching how SHEIN/Temu show color
-                and print variants — the photo IS the variant, not a
-                separate thing you have to cross-reference. */}
-            {selectedColors.length > 0 && (
-              <div className="grid grid-cols-3 gap-2 border-t border-border pt-3">
-                {selectedColors.map((c) => (
-                  <div key={c} className="relative">
-                    <label className="block cursor-pointer">
-                      <div className="aspect-square rounded-lg border border-border bg-muted overflow-hidden flex items-center justify-center relative">
-                        {uploadingColor === c ? (
-                          <span className="text-[10px] text-muted-foreground text-center px-2">Uploading...</span>
-                        ) : colorImages?.[c] ? (
-                          <img src={colorImages[c]} alt={c} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="flex flex-col items-center gap-1 text-muted-foreground">
-                            <Plus className="w-5 h-5" />
-                            <span className="text-[9px]">Add photo</span>
-                          </div>
-                        )}
-                      </div>
-                      {onUploadImage && onColorImagesChange && (
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => handleColorPhotoSelect(c, e.target.files?.[0])}
-                        />
-                      )}
-                    </label>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-[11px] font-medium truncate">{c}</span>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedColors((prev) => toggle(prev, c))}
-                        className="shrink-0 text-muted-foreground"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                    {colorImages?.[c] && onColorImagesChange && (
-                      <button
-                        type="button"
-                        onClick={() => removeColorPhoto(c)}
-                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-background/90 flex items-center justify-center"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            {colorPhotoError && (
-              <p className="text-xs text-destructive mt-2">{colorPhotoError}</p>
-            )}
           </div>
+
+          {/* Reference photo per color — helps buyers tell variants apart
+              at a glance (e.g. yellow vs maroon), and shows on the product
+              page as tappable color swatches with a real thumbnail. Only
+              rendered when the parent composer supports it. */}
+          {selectedColors.length > 0 && onUploadImage && onColorImagesChange && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-2">
+                Photos per design (optional) — buyers see this color's own gallery when they select it
+              </p>
+              <div className="space-y-3">
+                {selectedColors.map((c) => {
+                  const photos = colorImages?.[c] || [];
+                  return (
+                    <div key={c}>
+                      <p className="text-[11px] font-medium mb-1">{c}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {photos.map((url, i) => (
+                          <div key={i} className="w-14 h-14 rounded-lg border border-border bg-muted overflow-hidden relative shrink-0">
+                            <img src={url} alt={`${c} ${i + 1}`} className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removeColorPhoto(c, i)}
+                              className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-background/90 flex items-center justify-center"
+                            >
+                              <X className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
+                        ))}
+                        <label className="w-14 h-14 rounded-lg border border-dashed border-border bg-muted overflow-hidden flex items-center justify-center shrink-0 cursor-pointer">
+                          {uploadingColor === c ? (
+                            <span className="text-[9px] text-muted-foreground px-1 text-center">Uploading...</span>
+                          ) : (
+                            <Plus className="w-4 h-4 text-muted-foreground" />
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleColorPhotoSelect(c, e.target.files?.[0])}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {colorPhotoError && (
+                <p className="text-xs text-destructive mt-2">{colorPhotoError}</p>
+              )}
+            </div>
+          )}
 
           {showClothingSizes && setSelectedSizes && (
             <div>
@@ -391,13 +387,26 @@ export default function VariantsAccordion({
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {variants.map((v) => (
                 <div key={v.id} className="bg-background rounded-xl p-2.5 space-y-2">
-                  <p className="text-xs font-semibold">
-                    {Object.values(v.attributes).filter(Boolean).join(" / ") || "Default"}
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold">
+                      {Object.values(v.attributes).filter(Boolean).join(" / ") || "Default"}
+                    </p>
+                    {(v.stock === undefined || v.stock === null) && (
+                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full shrink-0">
+                        Needs stock
+                      </span>
+                    )}
+                  </div>
+                  <Input
+                    placeholder="SKU"
+                    value={v.sku ?? ""}
+                    onChange={(e) => onUpdateVariant(v.id, "sku", e.target.value)}
+                    className="rounded-lg h-8 text-xs"
+                  />
                   <div className="grid grid-cols-2 gap-2">
                     {useVariantPricing && (
                       <Input
-                        placeholder="Price (₦)"
+                        placeholder="Price (₦) — optional"
                         type="number"
                         value={v.price ?? ""}
                         onChange={(e) => onUpdateVariant(v.id, "price", e.target.value === "" ? undefined : Number(e.target.value))}
@@ -405,7 +414,7 @@ export default function VariantsAccordion({
                       />
                     )}
                     <Input
-                      placeholder="Stock qty"
+                      placeholder="Stock qty *"
                       type="number"
                       value={v.stock ?? ""}
                       onChange={(e) => onUpdateVariant(v.id, "stock", e.target.value === "" ? undefined : Number(e.target.value))}
@@ -420,4 +429,4 @@ export default function VariantsAccordion({
       )}
     </div>
   );
-              }
+          }
