@@ -11,7 +11,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { ProductVariant } from "@/lib/product-variants";
+import {
+  type ProductVariant,
+  type VariantOption,
+  generateVariantCombinations,
+  findRemovedVariants,
+  hasIncompleteVariants,
+  variantNeedsStock,
+  deriveOptionsFromVariants,
+  suggestSku,
+  normalizeVariants,
+} from "@/lib/product-variants";
 import { NATIVE_ATTRIBUTE_COLUMNS } from "@/lib/product-attributes";
 import { THRIFT_DEFAULT_STOCK } from "@/lib/thrift-config";
 import { SELLER_CATEGORY_TO_TOP_CATEGORIES, SELLER_CATEGORIES, type SellerCategoryId } from "@/lib/seller-categories";
@@ -141,7 +151,8 @@ export default function Seller() {
   const [occasion, setOccasion] = useState("");
   const [color, setColor] = useState("");
   const [colorTouched, setColorTouched] = useState(false);
-  const [colorImages, setColorImages] = useState<Record<string, string>>({});
+  // One color can now have several photos (a gallery), not just one.
+  const [colorImages, setColorImages] = useState<Record<string, string[]>>({});
   const [size, setSize] = useState("");
   const [sizeTouched, setSizeTouched] = useState(false);
   const [brand, setBrand] = useState("");
@@ -501,7 +512,18 @@ export default function Seller() {
     setAudience(p.audience || ""); setFit(p.fit || ""); setMaterial(p.material || ""); setOccasion(p.occasion || "");
     setColor((p.colors && p.colors[0]) || p.attributes?.color || "");
     setColorTouched(false);
-    setColorImages((p.color_images as Record<string, string>) || {});
+    // Read both shapes: an old product has { color: "url" } (one photo),
+    // a product saved under the new gallery format has { color: ["url", ...] }.
+    // Either way this normalizes to { color: string[] } so the rest of the
+    // form only ever deals with one shape.
+    {
+      const rawColorImages = (p.color_images as Record<string, string | string[]>) || {};
+      const normalized: Record<string, string[]> = {};
+      for (const [c, v] of Object.entries(rawColorImages)) {
+        normalized[c] = Array.isArray(v) ? v : (v ? [v] : []);
+      }
+      setColorImages(normalized);
+    }
     setSize((p.clothing_sizes && p.clothing_sizes[0]) || p.attributes?.size || "");
     setSizeTouched(false);
     setBrand(p.attributes?.brand || "");
@@ -520,24 +542,26 @@ export default function Seller() {
     setImageFiles([]); setImagePreviews([]);
     setExistingVideoUrl(p.video_url || ""); setVideoFile(null); setVideoPreview("");
 
-    const rawVariants: any[] = Array.isArray(p.variants) ? p.variants : [];
-    const normalizedVariants: ProductVariant[] = rawVariants.map((v: any) =>
-      v.attributes
-        ? { id: v.id || Math.random().toString(36).slice(2), attributes: v.attributes, price: v.price, stock: v.stock }
-        : {
-            id: v.id || Math.random().toString(36).slice(2),
-            attributes: Object.fromEntries(
-              Object.entries({ color: v.color, size: v.size, shoeSize: v.shoeSize }).filter(([, val]) => val)
-            ) as Record<string, string>,
-            price: v.price !== undefined && v.price !== "" ? Number(v.price) : undefined,
-            stock: v.stock !== undefined && v.stock !== "" ? Number(v.stock) : undefined,
-          }
-    );
+    // products.variants is the source of truth — normalizeVariants (Stage 1)
+    // reads both the current {attributes:{...}} shape and older flat shapes
+    // the same way, so there's one place that understands "what a saved
+    // variant looks like", not a second hand-rolled copy of that logic here.
+    const normalizedVariants: ProductVariant[] = normalizeVariants(p.variants);
+    if (normalizedVariants.length > 0) {
+      const derived = deriveOptionsFromVariants(normalizedVariants);
+      setSelectedColors(derived.find((o) => o.name === "color")?.values || []);
+      setSelectedSizes(derived.find((o) => o.name === "size")?.values || []);
+      setSelectedShoeSizes(derived.find((o) => o.name === "shoeSize")?.values || []);
+    } else {
+      // No variants saved at all — fall back to the legacy columns, so an
+      // old product that only ever had colors/clothing_sizes/shoe_sizes
+      // (never generated variants) still reopens with those ticked.
+      setSelectedColors(Array.isArray(p.colors) && p.colors.length > 1 ? p.colors : []);
+      setSelectedSizes(Array.isArray(p.clothing_sizes) && p.clothing_sizes.length > 1 ? p.clothing_sizes : []);
+      setSelectedShoeSizes(Array.isArray(p.shoe_sizes) ? p.shoe_sizes : []);
+    }
     setVariants(normalizedVariants);
     setUseVariantPricing(Boolean(p.use_variant_pricing));
-    setSelectedColors(Array.from(new Set(normalizedVariants.map((v) => v.attributes.color).filter(Boolean))) as string[]);
-    setSelectedSizes(Array.from(new Set(normalizedVariants.map((v) => v.attributes.size).filter(Boolean))) as string[]);
-    setSelectedShoeSizes(Array.from(new Set(normalizedVariants.map((v) => v.attributes.shoeSize).filter(Boolean))) as string[]);
 
     setExistingAttributes(p.attributes || {});
     setUploadError(null);
@@ -575,46 +599,55 @@ export default function Seller() {
     return { url: data.publicUrl, error: null };
   };
 
-  const uploadVideo = async (): Promise<string> => {
-    if (!videoFile) return "";
-    const fileName = `videos/${Date.now()}-${videoFile.name}`;
-    const { error } = await supabase.storage.from("product-images").upload(fileName, videoFile);
-    if (error) return "";
+  // Returns the error instead of swallowing it — previously a failed upload
+  // (file too big, unsupported type, odd filename) silently saved the product
+  // with no video and the seller was never told.
+  const uploadVideo = async (): Promise<{ url: string; error: string | null }> => {
+    if (!videoFile) return { url: "", error: null };
+    const safeName = videoFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const fileName = `videos/${Date.now()}-${safeName}`;
+    const { error } = await supabase.storage
+      .from("product-images")
+      .upload(fileName, videoFile, { contentType: videoFile.type || "video/mp4" });
+    if (error) return { url: "", error: error.message };
     const { data } = supabase.storage.from("product-images").getPublicUrl(fileName);
-    return data.publicUrl;
+    return { url: data.publicUrl, error: null };
   };
 
+  // The single implementation of "generate combinations" — see
+  // src/lib/product-variants.ts. This used to be a separate hand-written
+  // triple loop here that defaulted every new variant's stock to 10; that's
+  // gone now. A brand-new combination gets price: undefined (falls back to
+  // the product's base price via resolveVariantPrice) and stock: undefined
+  // (incomplete — must be set before the product can be published).
   const generateVariants = () => {
-    const newVariants: ProductVariant[] = [];
-    const colors = selectedColors.length > 0 ? selectedColors : [undefined];
-    const sizes = selectedSizes.length > 0 ? selectedSizes : [undefined];
-    const shoeSizes = selectedShoeSizes.length > 0 ? selectedShoeSizes : [undefined];
-    for (const c of colors) {
-      for (const s of sizes) {
-        for (const ss of shoeSizes) {
-          if (c || s || ss) {
-            const attrs = Object.fromEntries(
-              Object.entries({ color: c, size: s, shoeSize: ss }).filter(([, v]) => v)
-            ) as Record<string, string>;
-            const existing = variants.find(
-              (v) => v.attributes.color === c && v.attributes.size === s && v.attributes.shoeSize === ss
-            );
-            newVariants.push(
-              existing || {
-                id: Math.random().toString(36).slice(2),
-                attributes: attrs,
-                price: basePrice ? Number(basePrice) : undefined,
-                stock: 10,
-              }
-            );
-          }
-        }
-      }
+    const options: VariantOption[] = [
+      { name: "color", values: selectedColors },
+      { name: "size", values: selectedSizes },
+      { name: "shoeSize", values: selectedShoeSizes },
+    ];
+    const skuPrefix = (title || "PRD").trim().split(/\s+/)[0].toUpperCase().replace(/[^A-Z0-9]+/g, "").slice(0, 8) || "PRD";
+    const regenerated = generateVariantCombinations(options, variants, skuPrefix);
+
+    // Block removing any combination that still has stock on it — per your
+    // decision, no hiding stocked inventory. Find what WOULD be removed,
+    // and if any of those still carry stock, refuse and tell the seller
+    // exactly which ones and what to do.
+    const removed = findRemovedVariants(variants, regenerated);
+    const blockedRemovals = removed.filter((v) => v.stock !== undefined && v.stock !== null && v.stock > 0);
+    if (blockedRemovals.length > 0) {
+      const list = blockedRemovals
+        .map((v) => `${Object.values(v.attributes).join(" / ")} has ${v.stock} in stock`)
+        .join("; ");
+      setUploadError(`${list}. Set stock to 0 before removing ${blockedRemovals.length > 1 ? "these combinations" : "this combination"}.`);
+      return;
     }
-    setVariants(newVariants);
+
+    setUploadError(null);
+    setVariants(regenerated);
   };
 
-  const updateVariant = (id: string, field: "price" | "stock", value: number | undefined) => {
+  const updateVariant = (id: string, field: "price" | "stock" | "sku", value: number | string | undefined) => {
     setVariants((prev) => prev.map((v) => (v.id === id ? { ...v, [field]: value } : v)));
   };
 
@@ -664,6 +697,11 @@ export default function Seller() {
       if (!title.trim() || !basePrice) { setUploadError("Please fill in title and price."); return; }
       if (!stockCount) { setUploadError("Please enter stock quantity."); return; }
       if (sellerCategory === "Thrift" && !thriftCondition) { setUploadError("Please select the item's condition."); return; }
+      if (hasIncompleteVariants(variants)) {
+        const missing = variants.filter(variantNeedsStock).map((v) => Object.values(v.attributes).join(" / "));
+        setUploadError(`Please set stock for: ${missing.join(", ")} before publishing.`);
+        return;
+      }
     } else {
       if (!title.trim()) { setUploadError("Give your draft a name first."); return; }
     }
@@ -673,7 +711,15 @@ export default function Seller() {
     const newImageUrls = await uploadImages();
     const allImages = [...existingImages, ...newImageUrls];
     let videoUrl = existingVideoUrl;
-    if (videoFile) videoUrl = await uploadVideo();
+    if (videoFile) {
+      const videoResult = await uploadVideo();
+      if (videoResult.error) {
+        setUploadError("Your video couldn't be uploaded (" + videoResult.error + "). It may be too large or in an unsupported format — try a shorter MP4, or remove the video to publish without it.");
+        setUploading(false);
+        return;
+      }
+      videoUrl = videoResult.url;
+    }
 
     let imageEmbedding = null;
     if (allImages[0]) {
@@ -745,22 +791,22 @@ export default function Seller() {
 
     if (!editingProductId || categoryTouched) payload.category = resolvedCategory;
     if (!editingProductId || aestheticsTouched) payload.aesthetics = selectedAesthetics.length > 0 ? selectedAesthetics : null;
-    // Prefer the multi-select arrays from the Colour/Design + Size pickers
-    // (used by every category's variant grid) over the older single-value
-    // color/size fields — falling back to the singular ones only when the
-    // seller never touched the multi-select picker at all. Previously
-    // these arrays were written ONLY into the generated `variants` table,
-    // so a seller who picked several colors/sizes but never turned on
-    // "different price per variant" had none of that saved anywhere,
-    // and shoe_sizes was never written under any circumstance.
-    if (!editingProductId || colorTouched || selectedColors.length > 0) {
-      payload.colors = selectedColors.length > 0 ? selectedColors : (color ? [color] : null);
-    }
-    if (!editingProductId || sizeTouched || selectedSizes.length > 0) {
-      payload.clothing_sizes = selectedSizes.length > 0 ? selectedSizes : (size ? [size] : null);
-    }
-    if (!editingProductId || selectedShoeSizes.length > 0) {
-      payload.shoe_sizes = selectedShoeSizes.length > 0 ? selectedShoeSizes : null;
+    if (!editingProductId || colorTouched) payload.colors = color ? [color] : null;
+    if (!editingProductId || sizeTouched) payload.clothing_sizes = size ? [size] : null;
+
+    // When the product has variants, colors/clothing_sizes/shoe_sizes are
+    // derived FROM variants — a one-way, read-only fallback for pages that
+    // haven't been updated yet to read variants directly (that's Stage 3).
+    // They are never a second, independently-edited source of truth: the
+    // seller never types into these fields separately for a variant product.
+    if (variants.length > 0) {
+      const derived = deriveOptionsFromVariants(variants);
+      const dColors = derived.find((o) => o.name === "color")?.values;
+      const dSizes = derived.find((o) => o.name === "size")?.values;
+      const dShoe = derived.find((o) => o.name === "shoeSize")?.values;
+      if (dColors && dColors.length > 0) payload.colors = dColors;
+      if (dSizes && dSizes.length > 0) payload.clothing_sizes = dSizes;
+      payload.shoe_sizes = dShoe && dShoe.length > 0 ? dShoe : null;
     }
 
     if (editingProductId) {
@@ -863,7 +909,18 @@ export default function Seller() {
         onRemoveNewImage={(i) => { setImageFiles((prev) => prev.filter((_, idx) => idx !== i)); setImagePreviews((prev) => prev.filter((_, idx) => idx !== i)); }}
         videoPreview={videoPreview}
         existingVideoUrl={existingVideoUrl}
-        onAddVideo={(f) => { setVideoFile(f); setVideoPreview(URL.createObjectURL(f)); setExistingVideoUrl(""); }}
+        onAddVideo={(f) => {
+          // Check size up front so the seller finds out right away, not after
+          // filling the whole form. Matches Supabase's default 50MB upload cap;
+          // raise MAX_VIDEO_MB if you raise the limit in Supabase Storage settings.
+          const MAX_VIDEO_MB = 50;
+          if (f.size > MAX_VIDEO_MB * 1024 * 1024) {
+            setUploadError(`That video is ${(f.size / 1024 / 1024).toFixed(0)}MB — the limit is ${MAX_VIDEO_MB}MB. Trim it to about 15–30 seconds or compress it, then add it again.`);
+            return;
+          }
+          setUploadError(null);
+          setVideoFile(f); setVideoPreview(URL.createObjectURL(f)); setExistingVideoUrl("");
+        }}
         onRemoveVideo={() => { setVideoFile(null); setVideoPreview(""); setExistingVideoUrl(""); }}
         title={title} onTitleChange={setTitle}
         description={description} onDescriptionChange={setDescription}
@@ -2136,4 +2193,4 @@ function EmptyState({ icon, title, action }: any) {
       {action}
     </div>
   );
-    }
+                                     }
