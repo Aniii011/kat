@@ -55,7 +55,7 @@ export interface Listing {
   depositAmount?: number;
   isFeatured?: boolean;
   tags?: string[];
-  colorImages?: Record<string, string>;
+  colorImages?: Record<string, string[]>; // one or more photos per colour
 customSizeNote?: string;
     attributes?: Record<string, unknown>;
   variants?: Array<{ id: string; attributes: Record<string, string>; sku?: string; price?: number; stock?: number }>;
