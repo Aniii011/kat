@@ -2,6 +2,20 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Listing, Review, Aesthetic } from "@/data/listings";
 
+// Reads both shapes: an older product has { color: "url" } (one photo),
+// a product saved after the Stage 2 gallery change has
+// { color: ["url", ...] }. Either way this normalizes to { color: string[] }
+// so every consumer of `colorImages` only ever deals with one shape.
+function normalizeColorImages(raw: unknown): Record<string, string[]> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const result: Record<string, string[]> = {};
+  for (const [color, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (Array.isArray(value)) result[color] = value as string[];
+    else if (typeof value === "string" && value) result[color] = [value];
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
 function rowToListing(row: Record<string, unknown>): Listing {
   return {
     id: row.id as string,
@@ -39,7 +53,7 @@ function rowToListing(row: Record<string, unknown>): Listing {
     isFeatured: (row.is_featured as boolean) ?? false,
     tags: (row.tags as string[]) ?? undefined,
     videoUrl: (row.video_url as string) ?? undefined,
-    colorImages: (row.color_images as Record<string, string>) ?? undefined,
+    colorImages: normalizeColorImages(row.color_images),
     customSizeNote: (row.custom_size_note as string) ?? undefined,
         attributes: (row.attributes as Record<string, unknown>) ?? {},
     variants: (row.variants as any[]) ?? undefined,
