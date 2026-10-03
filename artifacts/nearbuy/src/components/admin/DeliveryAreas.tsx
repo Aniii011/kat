@@ -90,8 +90,15 @@ const [editNote, setEditNote] = useState("");
   }, []);
 
   const addArea = async () => {
-    if (!state || !city || !fee) return;
     setSaveError(null);
+    const missing: string[] = [];
+    if (!state) missing.push("State");
+    if (!city) missing.push("City / Area");
+    if (!fee) missing.push("Standard/Park Delivery Fee");
+    if (missing.length > 0) {
+      setSaveError(`Please fill in: ${missing.join(", ")}`);
+      return;
+    }
 
     const { error } = await supabase.from("delivery_areas").insert({
       state,
