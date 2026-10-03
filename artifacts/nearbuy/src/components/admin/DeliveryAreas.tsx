@@ -94,7 +94,10 @@ const [editNote, setEditNote] = useState("");
     const missing: string[] = [];
     if (!state) missing.push("State");
     if (!city) missing.push("City / Area");
-    if (!fee) missing.push("Standard/Park Delivery Fee");
+    // Some areas are doorstep-delivery-only — park/standard pickup isn't
+    // always offered there. So only require that AT LEAST ONE of the two
+    // fees is set, not specifically the standard one.
+    if (!fee && !doorFee) missing.push("either a Standard/Park fee or a Door Delivery fee");
     if (missing.length > 0) {
       setSaveError(`Please fill in: ${missing.join(", ")}`);
       return;
@@ -103,7 +106,7 @@ const [editNote, setEditNote] = useState("");
     const { error } = await supabase.from("delivery_areas").insert({
       state,
       city,
-      delivery_fee: Number(fee),
+      delivery_fee: fee ? Number(fee) : null,
       door_delivery_fee: doorFee ? Number(doorFee) : null,
       delivery_note: note.trim() || null,
     });
@@ -148,12 +151,17 @@ const [editNote, setEditNote] = useState("");
   if (!editingId) return;
   setSaveError(null);
 
+  if (!editFee && !editDoorFee) {
+    setSaveError("Please fill in either a Standard/Park fee or a Door Delivery fee");
+    return;
+  }
+
   const { error } = await supabase
     .from("delivery_areas")
     .update({
       state: editState,
       city: editCity,
-      delivery_fee: Number(editFee),
+      delivery_fee: editFee ? Number(editFee) : null,
       door_delivery_fee: editDoorFee ? Number(editDoorFee) : null,
       delivery_note: editNote.trim() || null,
     })
@@ -339,7 +347,8 @@ const [editNote, setEditNote] = useState("");
               </p>
 
               <p className="text-sm text-muted-foreground">
-                {area.state} · {formatNaira(area.delivery_fee)}
+                {area.state}
+                {area.delivery_fee != null ? ` · ${formatNaira(area.delivery_fee)}` : " · Doorstep only"}
                 {area.door_delivery_fee ? ` · Door: ${formatNaira(area.door_delivery_fee)}` : ""}
               </p>
               {area.delivery_note && (
@@ -387,4 +396,4 @@ const [editNote, setEditNote] = useState("");
 
     </div>
   );
-}
+                }
