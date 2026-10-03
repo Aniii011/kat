@@ -380,4 +380,4 @@ const [editNote, setEditNote] = useState("");
 
     </div>
   );
-    }
+}
