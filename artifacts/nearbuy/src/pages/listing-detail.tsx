@@ -143,18 +143,14 @@ export default function ListingDetail() {
   }
 }, [listing?.id]);
   
+  // Switching colour swaps which photo set the gallery shows (see `media`
+  // below), so jump back to the first photo of that set every time the
+  // colour changes. This does NOT run on size changes — selecting a
+  // different size within the same colour (e.g. Black/38 -> Black/39) must
+  // not touch the gallery at all.
   useEffect(() => {
-    if (!listing) return;
-    if (selectedColor && listing.colorImages?.[selectedColor]) {
-      const baseImages = listing.images.length > 0 ? listing.images : [listing.imageUrl];
-      const idx = baseImages.indexOf(listing.colorImages[selectedColor]);
-      // +1 offsets past the video slot, which is always first in `media`
-      // when the listing has one — selectedImage indexes into `media`,
-      // not `baseImages` directly.
-      const videoOffset = listing.videoUrl ? 1 : 0;
-      if (idx >= 0) setSelectedImage(idx + videoOffset);
-    }
-  }, [selectedColor, listing]);
+    setSelectedImage(0);
+  }, [selectedColor]);
 
   if (loading) {
     return (
@@ -187,14 +183,17 @@ export default function ListingDetail() {
   }
 
   const baseImages = listing.images.length > 0 ? listing.images : [listing.imageUrl];
-  const colorOnlyImages = listing.colorImages
-    ? Object.values(listing.colorImages).filter((url) => !baseImages.includes(url))
-    : [];
-  const images = [...baseImages, ...colorOnlyImages];
+  // Picking a colour swaps the gallery to that colour's own photos. A colour
+  // with no photos of its own falls back to the product's general gallery —
+  // never a dead end. Size is never part of this: Black/38 and Black/39
+  // both show the Black gallery.
+  const selectedColorPhotos = selectedColor ? listing.colorImages?.[selectedColor] : undefined;
+  const images = selectedColorPhotos && selectedColorPhotos.length > 0 ? selectedColorPhotos : baseImages;
   // Video, when present, is always the first gallery item — the most
   // common convention (Temu/SHEIN both lead with video) and it means a
   // seller's uploaded video is now actually reachable, which it wasn't
-  // rendered anywhere before this.
+  // rendered anywhere before this. Video is general, not colour-specific,
+  // so it stays regardless of which colour's photos are showing.
   const hasVideo = Boolean(listing.videoUrl);
   const media: { type: "video" | "image"; url: string }[] = [
     ...(hasVideo ? [{ type: "video" as const, url: listing.videoUrl! }] : []),
@@ -260,8 +259,8 @@ export default function ListingDetail() {
     selectedComboOutOfStock;
   const isShoeSize = allShoeSizes.length > 0;
 
-  const selectedVariantImage = selectedColor && listing.colorImages?.[selectedColor]
-    ? listing.colorImages[selectedColor]
+  const selectedVariantImage = selectedColor && listing.colorImages?.[selectedColor]?.[0]
+    ? listing.colorImages[selectedColor][0]
     : undefined;
 
 const handleAddToCart = () => {
@@ -574,8 +573,8 @@ const handleAddToCart = () => {
                           : "border-border text-muted-foreground hover:border-primary/50"
                       }`}
                     >
-                      {listing.colorImages?.[c] && (
-                        <img src={listing.colorImages[c]} alt={c} className={`w-5 h-5 rounded-full object-cover shrink-0 border border-background ${soldOut ? "grayscale" : ""}`} />
+                      {listing.colorImages?.[c]?.[0] && (
+                        <img src={listing.colorImages[c][0]} alt={c} className={`w-5 h-5 rounded-full object-cover shrink-0 border border-background ${soldOut ? "grayscale" : ""}`} />
                       )}
                       {c}
                       {soldOut && <span className="text-[10px]">(Sold out)</span>}
@@ -1156,4 +1155,4 @@ const handleAddToCart = () => {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
-                                         }
+}
