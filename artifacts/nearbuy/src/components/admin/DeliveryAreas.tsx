@@ -65,6 +65,7 @@ export default function DeliveryAreas() {
   const [doorFee, setDoorFee] = useState("");
   const [note, setNote] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 const [editState, setEditState] = useState("");
 const [editCity, setEditCity] = useState("");
 const [editFee, setEditFee] = useState("");
@@ -90,14 +91,20 @@ const [editNote, setEditNote] = useState("");
 
   const addArea = async () => {
     if (!state || !city || !fee) return;
+    setSaveError(null);
 
-    await supabase.from("delivery_areas").insert({
+    const { error } = await supabase.from("delivery_areas").insert({
       state,
       city,
       delivery_fee: Number(fee),
       door_delivery_fee: doorFee ? Number(doorFee) : null,
       delivery_note: note.trim() || null,
     });
+
+    if (error) {
+      setSaveError(error.message);
+      return; // don't clear the form or refetch — nothing was actually saved
+    }
 
     setState("");
     setCity("");
@@ -132,8 +139,9 @@ const [editNote, setEditNote] = useState("");
 
     const updateArea = async () => {
   if (!editingId) return;
+  setSaveError(null);
 
-  await supabase
+  const { error } = await supabase
     .from("delivery_areas")
     .update({
       state: editState,
@@ -143,6 +151,11 @@ const [editNote, setEditNote] = useState("");
       delivery_note: editNote.trim() || null,
     })
     .eq("id", editingId);
+
+  if (error) {
+    setSaveError(error.message);
+    return; // keep the edit form open so nothing looks silently lost
+  }
 
   setEditingId(null);
   fetchAreas();
@@ -215,6 +228,10 @@ const [editNote, setEditNote] = useState("");
           className="w-full min-h-[70px] rounded-xl border border-input bg-background px-3 py-2 text-sm"
         />
 
+        {saveError && (
+          <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">{saveError}</p>
+        )}
+
         <Button
           onClick={addArea}
           className="rounded-full"
@@ -273,6 +290,10 @@ const [editNote, setEditNote] = useState("");
       placeholder="Delivery-time note shown to buyers"
       className="w-full min-h-[70px] rounded-xl border border-input bg-background px-3 py-2 text-sm"
     />
+
+    {saveError && (
+      <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">{saveError}</p>
+    )}
 
     <div className="flex gap-2">
       <Button
@@ -359,4 +380,4 @@ const [editNote, setEditNote] = useState("");
 
     </div>
   );
-}
+    }
