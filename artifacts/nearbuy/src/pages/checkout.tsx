@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { NIGERIAN_STATES } from "@/lib/nigeriaStates";
 
 function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
@@ -437,23 +438,25 @@ export default function Checkout() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="state">State</Label>
-                <select
-                  id="state"
+                <Select
                   value={state}
-                  onChange={(e) => {
-                    setState(e.target.value);
+                  onValueChange={(value) => {
+                    setState(value);
                     setCity("");
                     setDeliveryFee(0);
                   }}
-                  className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <option value="">Select state</option>
-                  {NIGERIAN_STATES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id="state" className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                    <SelectValue placeholder="Select state" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64 overflow-y-auto">
+                    {NIGERIAN_STATES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-1.5">
@@ -643,4 +646,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-  }
+         }
