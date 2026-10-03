@@ -56,6 +56,11 @@ export default function Checkout() {
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
   const [deliveryFee, setDeliveryFee] = useState(0);
+  // Separate from deliveryFee: whether standard/park delivery is even
+  // offered for the chosen area at all. Some areas are doorstep-only —
+  // this is what tells us that, since deliveryFee alone can't (0 could
+  // mean "free standard delivery" or "not offered").
+  const [standardAvailable, setStandardAvailable] = useState(true);
   const [doorDeliveryFee, setDoorDeliveryFee] = useState<number | null>(null);
   const [deliveryMethod, setDeliveryMethod] = useState<"standard" | "door">("standard");
   const [deliveryNote, setDeliveryNote] = useState<string | null>(null);
@@ -468,13 +473,16 @@ export default function Checkout() {
                     const value = e.target.value;
                     setCity(value);
                     const selected = cities.find((c) => c.city === value);
-                    setDeliveryFee(selected?.delivery_fee || 0);
-                    setDoorDeliveryFee(
-                      selected?.door_delivery_fee !== null && selected?.door_delivery_fee !== undefined
-                        ? selected.door_delivery_fee
-                        : null
-                    );
-                    setDeliveryMethod("standard");
+                    const hasStandard = selected?.delivery_fee !== null && selected?.delivery_fee !== undefined;
+                    const hasDoor = selected?.door_delivery_fee !== null && selected?.door_delivery_fee !== undefined;
+                    setStandardAvailable(hasStandard);
+                    setDeliveryFee(hasStandard ? selected.delivery_fee : 0);
+                    setDoorDeliveryFee(hasDoor ? selected.door_delivery_fee : null);
+                    // Default to whichever method this area actually offers —
+                    // some areas are doorstep-only, so defaulting to "standard"
+                    // unconditionally would silently offer a delivery option
+                    // that doesn't exist there.
+                    setDeliveryMethod(hasStandard ? "standard" : "door");
                     setDeliveryNote(selected?.delivery_note || null);
                   }}
                   disabled={!state}
@@ -495,7 +503,8 @@ export default function Checkout() {
                 <p className="text-xs text-amber-700 bg-amber-50 rounded-xl px-3 py-2">{deliveryNote}</p>
               )}
 
-              {citySelected && doorDeliveryFee !== null && (
+              {citySelected && standardAvailable && doorDeliveryFee !== null && (
+                // Both methods offered here — let the buyer choose.
                 <div className="space-y-1.5">
                   <Label>Delivery method</Label>
                   <div className="grid grid-cols-2 gap-2">
@@ -520,6 +529,16 @@ export default function Checkout() {
                       <p className="text-xs text-muted-foreground">{formatNaira(doorDeliveryFee)}</p>
                     </button>
                   </div>
+                </div>
+              )}
+
+              {citySelected && !standardAvailable && doorDeliveryFee !== null && (
+                // Doorstep-only area — nothing to choose between, so just
+                // state it plainly instead of showing a toggle with a fake
+                // "Standard" option that was never actually offered here.
+                <div className="rounded-xl border-2 border-primary bg-primary/5 p-3">
+                  <p className="text-sm font-semibold">Door delivery (only option for this area)</p>
+                  <p className="text-xs text-muted-foreground">{formatNaira(doorDeliveryFee)}</p>
                 </div>
               )}
             </div>
@@ -646,4 +665,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-         }
+    }
