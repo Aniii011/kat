@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import HeaderCartButton from "@/components/header-cart-button";
 import { useRoute, Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useListing, useListings } from "@/hooks/use-listings";
@@ -400,6 +401,7 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
           >
             <Share2 className="w-4 h-4" />
           </button>
+          <HeaderCartButton />
         </div>
       </header>
 
@@ -1171,4 +1173,4 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
-    }
+               }
