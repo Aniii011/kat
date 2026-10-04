@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
+import { flyToCart } from "@/lib/cart-feedback";
 import { supabase } from "@/lib/supabase";
 import { useCart } from "@/hooks/use-cart";
 import { useInteractions } from "@/hooks/use-interactions";
@@ -136,7 +137,7 @@ function ProductCard({
             <span className="absolute bottom-2 left-2 text-[9px] px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground font-bold">-{product.discount}%</span>
           )}
           <button
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAddToCart(product); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); flyToCart(e.currentTarget, product.image_url); onAddToCart(product); }}
             className={`absolute bottom-2 right-2 w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all ${added ? "bg-emerald-500" : "bg-primary opacity-0 group-hover:opacity-100 sm:opacity-100"}`}
           >
             {added ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : <ShoppingBag className="w-3.5 h-3.5 text-primary-foreground" />}
@@ -785,4 +786,4 @@ export default function Search() {
       </main>
     </div>
   );
-      }
+          }
