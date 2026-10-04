@@ -206,7 +206,7 @@ export default function Cart() {
 
             {recommended.length > 0 && (
               <section className="pt-4">
-                <p className="text-sm font-bold mb-3">You might like to fill it with ✨</p>
+                <p className="text-sm font-bold mb-3">You might like to fill it with</p>
                 <div className="grid grid-cols-2 gap-3">
                   {recommended.map((item) => (
                     <Link key={item.id} href={`/listing/${item.id}`}>
@@ -245,4 +245,4 @@ export default function Cart() {
       )}
     </div>
   );
-                          }
+                                                                                        }
