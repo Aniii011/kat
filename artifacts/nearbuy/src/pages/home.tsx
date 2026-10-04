@@ -20,6 +20,7 @@ import {
   ChevronRight, Bookmark, Heart, LogIn, CheckCircle2, Play,
   Gem, Crown, Leaf, Flower, TreePalm, Check, type LucideIcon,
 } from "lucide-react";
+import { Recycle } from "lucide-react";
 
 const VIBE_ICONS: Record<string, LucideIcon> = {
   "Old Money": Gem,
@@ -44,13 +45,16 @@ const BADGE_STYLES: Record<string, string> = {
   "Limited":     "bg-purple-600 text-white",
 };
 
+// Announcement text can come from the database, so strip any emoji at render time.
+const stripEmoji = (s: string) => s.replace(/[\p{Extended_Pictographic}\uFE0F\u200d]+\s*/gu, "").trim();
+
 const DEFAULT_ANNOUNCEMENT_ITEMS = [
-  "🛍️ Shop the latest drops",
-  "✨ New arrivals daily",
-  "🔒 Secure checkout",
-  "💜 Verified sellers only",
-  "📦 Fast delivery across Nigeria",
-  "🌟 Trusted by thousands",
+  "Shop the latest drops",
+  "New arrivals daily",
+  "Secure checkout",
+  "Verified sellers only",
+  "Fast delivery across Nigeria",
+  "Trusted by thousands",
 ];
 
 function ProductCard({
@@ -117,7 +121,7 @@ function ProductCard({
             <div className="absolute top-2 left-2 flex flex-col gap-1">
               {listing.isThrift && (
                 <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-purple-500 text-white leading-tight">
-                  Thrift 💜
+                  Thrift
                 </span>
               )}
               {listing.badge && !listing.isThrift && (
@@ -367,7 +371,7 @@ export default function Home() {
             transition={{ duration: 0.3 }}
             className="block"
           >
-            {announcementItems[announcementIndex % announcementItems.length]}
+            {stripEmoji(announcementItems[announcementIndex % announcementItems.length])}
           </motion.span>
         </AnimatePresence>
       </div>
@@ -452,7 +456,7 @@ export default function Home() {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {cat === "Thrift" ? "💜 Thrift" : cat}
+                {cat}
               </button>
             ))}
           </div>
@@ -512,20 +516,20 @@ export default function Home() {
                 </Button>
                 <Link href="/thrift-drops">
                   <Button variant="outline" size="sm" className="rounded-full font-semibold border-primary/50 text-primary hover:bg-primary/10">
-                    💜 Thrift Drops
+                    <Recycle className="w-3.5 h-3.5 mr-1.5" /> Thrift Drops
                   </Button>
                 </Link>
               </div>
             </div>
             <div className="absolute right-6 top-1/2 -translate-y-1/2 text-[72px] opacity-10 pointer-events-none hidden sm:block select-none">
-              ✨
+              <Sparkles className="w-[72px] h-[72px]" />
             </div>
           </motion.div>
         )}
 
         {topCategory === "Deals" && (
           <div className="mt-4 mb-5 rounded-3xl bg-gradient-to-r from-rose-500 to-orange-400 p-5 text-white">
-            <p className="text-2xl font-black">🔥 Deals & Offers</p>
+            <p className="text-2xl font-black flex items-center gap-2"><Flame className="w-6 h-6" /> Deals & Offers</p>
             <p className="text-sm opacity-90 mt-1">Up to 35% off selected items</p>
           </div>
         )}
@@ -584,7 +588,7 @@ export default function Home() {
           </div>
         ) : filteredListings.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-5xl mb-4">🔍</p>
+            <Search className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <p className="font-bold text-base">No items found</p>
             <Button variant="outline" size="sm" className="mt-5 rounded-full" onClick={() => { selectTop("All"); setSelectedAesthetic(null); }}>
               Clear filters
@@ -608,7 +612,7 @@ export default function Home() {
           <section className="mt-12 mb-4">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-base font-black">💜 Thrift Drops</h2>
+                <h2 className="text-base font-black flex items-center gap-1.5"><Recycle className="w-4 h-4 text-purple-500" /> Thrift Drops</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   One-of-one vintage & pre-loved — deposit to hold
                 </p>
