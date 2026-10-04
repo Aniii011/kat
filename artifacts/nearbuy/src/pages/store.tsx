@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useRoute, Link, useSearch, useLocation } from "wouter";
 import { motion } from "framer-motion";
+import { flyToCart } from "@/lib/cart-feedback";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 import { useCart } from "@/hooks/use-cart";
@@ -152,6 +153,7 @@ export default function Store() {
       sellerName: seller?.store_name || seller?.full_name || "Seller",
       quantity: 1,
     });
+    flyToCart(e.currentTarget as Element, product.image_url);
     setAddedId(product.id);
     setTimeout(() => setAddedId(null), 1500);
   };
@@ -447,4 +449,4 @@ export default function Store() {
       </div>
     </div>
   );
-          }
+        }
