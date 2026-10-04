@@ -1,13 +1,15 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Settings, X, Check, Palette, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DARK_MODE_ENABLED } from "@/context/theme-context";
 
 const BASE_OPTIONS = [
-  { value: "white" as const, label: "White", bg: "#ffffff" },
+  { value: "white" as const, label: "Cream", bg: "#faf6ef" },
   { value: "black" as const, label: "Black", bg: "#0d0d0d" },
 ];
 
 const ACCENT_OPTIONS = [
+  { value: "mulberry" as const, label: "Mulberry", color: "#7f2550" },
   { value: "pink" as const, label: "Pink", color: "#e0508a" },
   { value: "beige" as const, label: "Beige", color: "#b8966a" },
   { value: "purple" as const, label: "Purple", color: "#9b59d6" },
@@ -17,7 +19,7 @@ const ACCENT_OPTIONS = [
 
 interface Theme {
   base: "white" | "black";
-  accent: "pink" | "beige" | "purple" | "sage" | "blue";
+  accent: "mulberry" | "pink" | "beige" | "purple" | "sage" | "blue";
 }
 
 interface SettingsSheetProps {
@@ -84,6 +86,7 @@ export default function SettingsSheet({
               <p className="font-bold text-sm flex items-center gap-2">
                 <Palette className="w-4 h-4 text-primary" /> App Theme
               </p>
+              {DARK_MODE_ENABLED && (
               <div>
                 <p className="text-xs text-muted-foreground mb-2">Background</p>
                 <div className="grid grid-cols-2 gap-2">
@@ -102,9 +105,10 @@ export default function SettingsSheet({
                   ))}
                 </div>
               </div>
+              )}
               <div>
                 <p className="text-xs text-muted-foreground mb-2">Accent Color</p>
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {ACCENT_OPTIONS.map((a) => (
                     <button
                       key={a.value}
@@ -122,8 +126,8 @@ export default function SettingsSheet({
               </div>
               <div className="bg-muted rounded-xl p-3 flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Current:</span>
-                <span className="w-4 h-4 rounded-full border border-border shrink-0" style={{ background: theme.base === "white" ? "#ffffff" : "#0d0d0d" }} />
-                <span className="text-xs font-medium capitalize">{theme.base}</span>
+                <span className="w-4 h-4 rounded-full border border-border shrink-0" style={{ background: theme.base === "white" ? "#faf6ef" : "#0d0d0d" }} />
+                <span className="text-xs font-medium capitalize">{theme.base === "white" ? "Cream" : "Black"}</span>
                 <span className="text-muted-foreground text-xs mx-1">+</span>
                 <span className="w-4 h-4 rounded-full shrink-0" style={{ background: currentAccent?.color }} />
                 <span className="text-xs font-medium capitalize">{theme.accent}</span>
