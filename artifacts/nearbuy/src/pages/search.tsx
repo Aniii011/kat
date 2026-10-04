@@ -10,6 +10,7 @@ import {
   Search as SearchIcon, X, SlidersHorizontal, Star, BadgeCheck,
   ArrowLeft, Camera, Image, ShoppingBag, CheckCircle2, Loader2, Play,
 } from "lucide-react";
+import { Sparkles, Flame, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
@@ -569,7 +570,7 @@ export default function Search() {
               </div>
 
               <p className="text-[11px] text-muted-foreground text-center mt-5">
-                KAT will find visually similar products for you ✨
+                KAT will find visually similar products for you
               </p>
             </motion.div>
           </motion.div>
@@ -618,7 +619,7 @@ export default function Search() {
                 </div>
               )}
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold text-primary flex items-center gap-1">✨ Visual search</p>
+                <p className="text-xs font-bold text-primary flex items-center gap-1"><Sparkles className="w-3 h-3" /> Visual search</p>
                 <p className="text-[11px] text-muted-foreground truncate">
                   {loading ? "Matching products..." : `${results.length} similar product${results.length !== 1 ? "s" : ""} found`}
                 </p>
@@ -633,7 +634,7 @@ export default function Search() {
 
             {imageSearchTags.length > 0 && (
               <div>
-                <p className="text-xs font-bold mb-1.5">✨ We found these styles</p>
+                <p className="text-xs font-bold mb-1.5 flex items-center gap-1"><Sparkles className="w-3 h-3 text-primary" /> We found these styles</p>
                 <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1">
                   {imageSearchTags.map((tag) => (
                     <span key={tag} className="shrink-0 text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-medium whitespace-nowrap">
@@ -670,7 +671,7 @@ export default function Search() {
 
             {popularSearches.length > 0 && (
               <div>
-                <p className="text-sm font-bold mb-3">🔥 Popular searches</p>
+                <p className="text-sm font-bold mb-3 flex items-center gap-1.5"><Flame className="w-4 h-4 text-primary" /> Popular searches</p>
                 <div className="flex flex-wrap gap-2">
                   {popularSearches.map((term) => (
                     <button key={term} onClick={() => setQuery(term)}
@@ -716,7 +717,7 @@ export default function Search() {
           isImageSearch ? (
             !imageSearchError && results.length > 0 && (
               <div className="mb-3">
-                <p className="text-sm font-black">Similar finds ✨</p>
+                <p className="text-sm font-black">Similar finds</p>
                 <p className="text-xs text-muted-foreground">
                   Based on your photo · {results.length} similar product{results.length !== 1 ? "s" : ""}
                 </p>
@@ -749,7 +750,7 @@ export default function Search() {
         {!loading && !imageSearchLoading && isSearching && results.length === 0 && (
           isImageSearch ? (
             <div className="text-center py-16">
-              <p className="text-4xl mb-3">📷</p>
+              <Camera className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
               <p className="font-semibold">No close matches yet</p>
               <p className="text-sm text-muted-foreground mt-1 max-w-[260px] mx-auto">
                 We couldn't find products that look very similar to this photo.
@@ -760,7 +761,7 @@ export default function Search() {
             </div>
           ) : (
             <div className="text-center py-16">
-              <p className="text-4xl mb-3">🔍</p>
+              <Search className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
               <p className="font-semibold">No results found</p>
               <p className="text-sm text-muted-foreground mt-1">Try a different search term or remove filters</p>
               <button onClick={clearAll} className="mt-3 text-xs text-primary font-semibold">Clear filters</button>
@@ -772,7 +773,7 @@ export default function Search() {
         {!loading && !imageSearchLoading && (
           <div className="space-y-3">
             {!isSearching && featured.length > 0 && (
-              <p className="text-sm font-bold">New Arrivals ✨</p>
+              <p className="text-sm font-bold">New Arrivals</p>
             )}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {displayProducts.map((product, i) => (
@@ -786,4 +787,4 @@ export default function Search() {
       </main>
     </div>
   );
-          }
+      }
