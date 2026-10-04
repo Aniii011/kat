@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Trash2, Pencil, Plus, Power } from "lucide-react";
+import { Trash2, Pencil, Plus, Power, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { NIGERIAN_STATES } from "@/lib/nigeriaStates";
 import {
   Select,
@@ -66,6 +66,17 @@ export default function DeliveryAreas() {
   const [note, setNote] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [areaSearch, setAreaSearch] = useState("");
+  const [expandedStates, setExpandedStates] = useState<Set<string>>(new Set());
+
+  const toggleStateExpanded = (s: string) => {
+    setExpandedStates((prev) => {
+      const next = new Set(prev);
+      if (next.has(s)) next.delete(s);
+      else next.add(s);
+      return next;
+    });
+  };
 const [editState, setEditState] = useState("");
 const [editCity, setEditCity] = useState("");
 const [editFee, setEditFee] = useState("");
@@ -260,140 +271,148 @@ const [editNote, setEditNote] = useState("");
 
       {/* List */}
 
+      <div className="relative">
+        <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+        <Input
+          value={areaSearch}
+          onChange={(e) => setAreaSearch(e.target.value)}
+          placeholder="Search by state or area..."
+          className="pl-9 rounded-full"
+        />
+      </div>
+
       <div className="space-y-3">
-        {editingId && (
-  <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
-    <h3 className="font-bold">Edit Delivery Area</h3>
-
-<Select value={editState} onValueChange={setEditState}>
-  <SelectTrigger>
-    <SelectValue placeholder="Select State" />
-  </SelectTrigger>
-
-  <SelectContent className="max-h-64 overflow-y-auto">
-    {NIGERIAN_STATES.map((s) => (
-      <SelectItem key={s} value={s}>
-        {s}
-      </SelectItem>
-    ))}
-  </SelectContent>
-</Select>
-    
-    <Input
-      value={editCity}
-      onChange={(e) => setEditCity(e.target.value)}
-      placeholder="City / Area"
-    />
-
-    <Input
-      type="number"
-      value={editFee}
-      onChange={(e) => setEditFee(e.target.value)}
-      placeholder="Standard/Park Delivery Fee"
-    />
-
-    <Input
-      type="number"
-      value={editDoorFee}
-      onChange={(e) => setEditDoorFee(e.target.value)}
-      placeholder="Door Delivery Fee (optional)"
-    />
-
-    <textarea
-      value={editNote}
-      onChange={(e) => setEditNote(e.target.value)}
-      placeholder="Delivery-time note shown to buyers"
-      className="w-full min-h-[70px] rounded-xl border border-input bg-background px-3 py-2 text-sm"
-    />
-
-    {saveError && (
-      <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">{saveError}</p>
-    )}
-
-    <div className="flex gap-2">
-      <Button
-        onClick={updateArea}
-        className="rounded-full"
-      >
-        Save
-      </Button>
-
-      <Button
-        variant="outline"
-        onClick={() => setEditingId(null)}
-        className="rounded-full"
-      >
-        Cancel
-      </Button>
-    </div>
-  </div>
-)}
-
         {loading ? (
           <p className="text-sm text-muted-foreground">
             Loading...
           </p>
-        ) : areas.map((area)=>(
-          
-          <div
-            key={area.id}
-            className="bg-card border border-card-border rounded-2xl p-4 flex items-center gap-3"
-          >
+        ) : (() => {
+          const q = areaSearch.trim().toLowerCase();
+          const filtered = q
+            ? areas.filter((a) => a.state?.toLowerCase().includes(q) || a.city?.toLowerCase().includes(q))
+            : areas;
 
-            <div className="flex-1">
+          // Grouped by state so adding many areas under one state (e.g. 10
+          // under Oyo) doesn't turn into one long flat list to scroll
+          // through — each state is its own collapsible section.
+          const byState: Record<string, any[]> = {};
+          filtered.forEach((a) => {
+            if (!byState[a.state]) byState[a.state] = [];
+            byState[a.state].push(a);
+          });
+          const stateNames = Object.keys(byState).sort();
 
-              <p className="font-bold">
-                {area.city}
-              </p>
+          if (stateNames.length === 0) {
+            return <p className="text-sm text-muted-foreground">No delivery areas match "{areaSearch}".</p>;
+          }
 
-              <p className="text-sm text-muted-foreground">
-                {area.state}
-                {area.delivery_fee != null ? ` · ${formatNaira(area.delivery_fee)}` : " · Doorstep only"}
-                {area.door_delivery_fee ? ` · Door: ${formatNaira(area.door_delivery_fee)}` : ""}
-              </p>
-              {area.delivery_note && (
-                <p className="text-xs text-muted-foreground mt-1 italic">{area.delivery_note}</p>
-              )}
+          return stateNames.map((stateName) => {
+            // While searching, every matching state auto-expands so results
+            // are visible immediately without also having to tap each one.
+            const isExpanded = q.length > 0 || expandedStates.has(stateName);
+            const stateAreas = byState[stateName];
 
-            </div>
-<Button
-  size="icon"
-  variant="outline"
-  onClick={() => {
-    setEditingId(area.id);
-    setEditState(area.state);
-    setEditCity(area.city);
-    setEditFee(String(area.delivery_fee));
-    setEditDoorFee(area.door_delivery_fee != null ? String(area.door_delivery_fee) : "");
-    setEditNote(area.delivery_note || "");
-  }}
->
-  <Pencil className="w-4 h-4" />
-</Button>
+            return (
+              <div key={stateName} className="bg-card border border-card-border rounded-2xl overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => toggleStateExpanded(stateName)}
+                  className="w-full flex items-center justify-between p-4"
+                >
+                  <span className="font-bold">{stateName} <span className="text-muted-foreground font-normal">({stateAreas.length})</span></span>
+                  {isExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                </button>
 
-            <Button
-              size="icon"
-              variant="outline"
-              onClick={()=>toggleArea(area.id, area.active)}
-            >
-              <Power className="w-4 h-4" />
-            </Button>
+                {isExpanded && (
+                  <div className="border-t border-card-border divide-y divide-card-border">
+                    {stateAreas.map((area) => {
+                      const isEditing = editingId === area.id;
+                      return (
+                        <div key={area.id} className="p-4">
+                          {isEditing ? (
+                            // Editing happens right here, in place of the row —
+                            // not in a separate form elsewhere on the page,
+                            // which was easy to miss in a long list.
+                            <div className="space-y-3">
+                              <Select value={editState} onValueChange={setEditState}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select State" />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-64 overflow-y-auto">
+                                  {NIGERIAN_STATES.map((s) => (
+                                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
 
+                              <Input value={editCity} onChange={(e) => setEditCity(e.target.value)} placeholder="City / Area" />
+                              <Input type="number" value={editFee} onChange={(e) => setEditFee(e.target.value)} placeholder="Standard/Park Delivery Fee" />
+                              <Input type="number" value={editDoorFee} onChange={(e) => setEditDoorFee(e.target.value)} placeholder="Door Delivery Fee (optional)" />
+                              <textarea
+                                value={editNote}
+                                onChange={(e) => setEditNote(e.target.value)}
+                                placeholder="Delivery-time note shown to buyers"
+                                className="w-full min-h-[70px] rounded-xl border border-input bg-background px-3 py-2 text-sm"
+                              />
 
-            <Button
-              size="icon"
-              variant="outline"
-              onClick={()=>deleteArea(area.id)}
-            >
-              <Trash2 className="w-4 h-4 text-destructive" />
-            </Button>
+                              {saveError && (
+                                <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">{saveError}</p>
+                              )}
 
-          </div>
+                              <div className="flex gap-2">
+                                <Button onClick={updateArea} className="rounded-full">Save</Button>
+                                <Button variant="outline" onClick={() => { setEditingId(null); setSaveError(null); }} className="rounded-full">Cancel</Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-3">
+                              <div className="flex-1">
+                                <p className="font-bold">{area.city}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {area.delivery_fee != null ? formatNaira(area.delivery_fee) : "Doorstep only"}
+                                  {area.door_delivery_fee ? ` · Door: ${formatNaira(area.door_delivery_fee)}` : ""}
+                                </p>
+                                {area.delivery_note && (
+                                  <p className="text-xs text-muted-foreground mt-1 italic">{area.delivery_note}</p>
+                                )}
+                              </div>
 
-        ))}
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => {
+                                  setSaveError(null);
+                                  setEditingId(area.id);
+                                  setEditState(area.state);
+                                  setEditCity(area.city);
+                                  setEditFee(area.delivery_fee != null ? String(area.delivery_fee) : "");
+                                  setEditDoorFee(area.door_delivery_fee != null ? String(area.door_delivery_fee) : "");
+                                  setEditNote(area.delivery_note || "");
+                                }}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
 
+                              <Button size="icon" variant="outline" onClick={() => toggleArea(area.id, area.active)}>
+                                <Power className="w-4 h-4" />
+                              </Button>
+
+                              <Button size="icon" variant="outline" onClick={() => deleteArea(area.id)}>
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          });
+        })()}
       </div>
 
     </div>
   );
-                }
+          }
