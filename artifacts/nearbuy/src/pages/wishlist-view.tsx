@@ -7,6 +7,7 @@ import { useAuth } from "@/context/auth-context";
 import {
   ArrowLeft, Heart, ShoppingBag, CheckCircle2, Gift, Lock,
 } from "lucide-react";
+import { Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -135,7 +136,7 @@ export default function WishlistView() {
         {giftingItem && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center px-4 pb-4 sm:pb-0">
             <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-card border border-card-border rounded-3xl p-6 max-w-sm w-full shadow-xl space-y-4">
-              <h3 className="font-black text-base">🎁 Buy as a Gift</h3>
+              <h3 className="font-black text-base flex items-center gap-2"><Gift className="w-4 h-4 text-primary" /> Buy as a Gift</h3>
               <div className="flex gap-3 items-center bg-muted rounded-xl p-3">
                 <img src={giftingItem.image_url} alt={giftingItem.title} className="w-12 h-12 rounded-xl object-contain bg-background shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -148,7 +149,7 @@ export default function WishlistView() {
                 <Input placeholder="Your name" value={gifterName} onChange={(e) => setGifterName(e.target.value)} className="rounded-xl h-11" autoFocus />
               </div>
               <div className="bg-primary/5 border border-primary/20 rounded-xl p-3">
-                <p className="text-xs font-semibold text-primary">📦 Delivery to:</p>
+                <p className="text-xs font-semibold text-primary flex items-center gap-1"><Package className="w-3.5 h-3.5" /> Delivery to:</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{wishlist.delivery_name} · {wishlist.delivery_address}</p>
               </div>
               <Button className="w-full rounded-full font-bold h-12 gap-2" onClick={() => handleGiftItem(giftingItem)} disabled={!gifterName.trim() || purchasing}>
@@ -167,7 +168,7 @@ export default function WishlistView() {
             {wishlist.delivery_name}'s wishlist · {availableItems.length} item{availableItems.length !== 1 ? "s" : ""} available
           </p>
           <p className="text-xs text-muted-foreground mt-3 bg-background/60 rounded-xl px-3 py-2">
-            🎁 Pick an item below and buy it as a gift — it'll be delivered directly to them!
+            Pick an item below and buy it as a gift — it'll be delivered directly to them!
           </p>
         </div>
 
@@ -228,4 +229,4 @@ export default function WishlistView() {
       </div>
     </div>
   );
-                }
+            }
