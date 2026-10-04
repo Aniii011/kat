@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useAnimationControls } from "framer-motion";
 import { useCart } from "@/hooks/use-cart";
 import { useAuth } from "@/context/auth-context";
+import { CART_ADDED_EVENT } from "@/lib/cart-feedback";
 import {
   Home, Recycle, Search, ShoppingBag, User,
   ShieldCheck, Store, Menu, X,
@@ -21,6 +22,19 @@ export default function BottomNav() {
   const { totalItems } = useCart();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  const cartBounce = useAnimationControls();
+  const menuBounce = useAnimationControls();
+
+  // Bounce the cart icon whenever something is added (see lib/cart-feedback.ts)
+  useEffect(() => {
+    const onAdded = () => {
+      const bump = { scale: [1, 1.45, 0.9, 1.1, 1], rotate: [0, -14, 10, -4, 0], transition: { duration: 0.55 } };
+      cartBounce.start(bump);
+      menuBounce.start(bump);
+    };
+    window.addEventListener(CART_ADDED_EVENT, onAdded);
+    return () => window.removeEventListener(CART_ADDED_EVENT, onAdded);
+  }, [cartBounce, menuBounce]);
 
   const allTabs = [
     ...TABS,
@@ -63,14 +77,18 @@ export default function BottomNav() {
                   animate={{ scale: active ? 1.08 : 1, y: active ? -1 : 0 }}
                   transition={{ type: "spring", stiffness: 450, damping: 25 }}
                   className="relative flex items-center justify-center"
+                  {...(isCart ? { "data-cart-target": "" } : {})}
                 >
-                  <Icon
-                    className={`transition-colors duration-200 ${thrift && !active ? "text-primary/70" : active ? "text-primary" : "text-muted-foreground"}`}
-                    style={{ width: 22, height: 22 }}
-                    strokeWidth={active ? 2.4 : 1.9}
-                  />
+                  <motion.span animate={isCart ? cartBounce : undefined} className="flex">
+                    <Icon
+                      className={`transition-colors duration-200 ${thrift && !active ? "text-primary/70" : active ? "text-primary" : "text-muted-foreground"}`}
+                      style={{ width: 22, height: 22 }}
+                      strokeWidth={active ? 2.4 : 1.9}
+                    />
+                  </motion.span>
                   {isCart && totalItems > 0 && (
                     <motion.span
+                      key={totalItems}
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       className="absolute -top-[5px] -right-[5px] min-w-[16px] h-[16px] bg-primary text-primary-foreground text-[9px] font-bold rounded-full flex items-center justify-center px-[3px]"
@@ -91,9 +109,22 @@ export default function BottomNav() {
       {/* ── Desktop hamburger button ── */}
       <button
         onClick={() => setOpen(true)}
+        data-cart-target=""
         className="hidden sm:flex fixed top-4 left-4 z-50 w-10 h-10 rounded-xl bg-background border border-border shadow-sm items-center justify-center hover:bg-muted transition-colors"
       >
-        <Menu className="w-5 h-5 text-foreground" />
+        <motion.span animate={menuBounce} className="flex">
+          <Menu className="w-5 h-5 text-foreground" />
+        </motion.span>
+        {totalItems > 0 && (
+          <motion.span
+            key={totalItems}
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] bg-primary text-primary-foreground text-[9px] font-bold rounded-full flex items-center justify-center px-[3px]"
+          >
+            {totalItems > 9 ? "9+" : totalItems}
+          </motion.span>
+        )}
       </button>
 
       {/* ── Desktop sidebar drawer ── */}
@@ -211,4 +242,4 @@ export default function BottomNav() {
       </AnimatePresence>
     </>
   );
-}
+              }
