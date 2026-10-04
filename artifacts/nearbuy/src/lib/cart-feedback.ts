@@ -5,13 +5,12 @@
 export const CART_ADDED_EVENT = "kat:cart-added";
 
 function findCartTarget(): HTMLElement | null {
-  const nodes = Array.from(document.querySelectorAll<HTMLElement>("[data-cart-target]"));
-  return (
-    nodes.find((el) => {
-      const r = el.getBoundingClientRect();
-      return r.width > 0 && r.height > 0;
-    }) ?? null
-  );
+  const visible = Array.from(document.querySelectorAll<HTMLElement>("[data-cart-target]")).filter((el) => {
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  });
+  // Prefer the top-right header cart; fall back to the bottom-nav / menu button.
+  return visible.find((el) => el.dataset.cartTarget === "primary") ?? visible[0] ?? null;
 }
 
 /**
@@ -75,7 +74,8 @@ export function flyToCart(source?: Element | null, imageUrl?: string) {
       [
         { transform: "translate(0,0) scale(1)", opacity: 1, offset: 0 },
         { transform: `translate(${dx * 0.45}px, ${Math.min(dy * 0.45, 0) - 70}px) scale(0.85)`, opacity: 1, offset: 0.45 },
-        { transform: `translate(${dx}px, ${dy}px) scale(0.2)`, opacity: 0.4, offset: 1 },
+        { transform: `translate(${dx}px, ${dy}px) scale(0.25)`, opacity: 1, offset: 0.9 },
+        { transform: `translate(${dx}px, ${dy}px) scale(0.1)`, opacity: 0, offset: 1 },
       ],
       { duration: 750, easing: "cubic-bezier(0.4, 0, 0.2, 1)" },
     );
@@ -88,4 +88,4 @@ export function flyToCart(source?: Element | null, imageUrl?: string) {
   } catch {
     notify();
   }
-      }
+}
