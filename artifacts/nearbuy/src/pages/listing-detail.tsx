@@ -5,6 +5,7 @@ import { useListing, useListings } from "@/hooks/use-listings";
 import { useCart } from "@/hooks/use-cart";
 import { useInteractions } from "@/hooks/use-interactions";
 import ThemeSwitcher from "@/components/theme-switcher";
+import { flyToCart } from "@/lib/cart-feedback";
 import {
   ArrowLeft, Star, ShoppingBag, Shield, RotateCcw,
   Truck, BadgeCheck, ChevronLeft, ChevronRight, Minus, Plus, Check,
@@ -263,7 +264,7 @@ export default function ListingDetail() {
     ? listing.colorImages[selectedColor][0]
     : undefined;
 
-const handleAddToCart = () => {
+const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
   if (!user) {
     setShowAuth(true);
     return;
@@ -296,6 +297,7 @@ const handleAddToCart = () => {
     selectedColor: selectedColor || undefined,
     variantImage: selectedVariantImage,
   });
+  flyToCart(document.querySelector("[data-product-image]") ?? e?.currentTarget ?? null, selectedVariantImage || listing.imageUrl);
   setShowAddedToCart(true);
   if (cartToastRef.current) clearTimeout(cartToastRef.current);
   cartToastRef.current = setTimeout(() => setShowAddedToCart(false), 2500);
@@ -432,6 +434,7 @@ const handleAddToCart = () => {
         transition={{ duration: 0.15 }}
         src={media[selectedImage]?.url ?? listing.imageUrl}
         alt={listing.title}
+        data-product-image=""
         className="w-full h-full object-contain"
       />
     )}
@@ -1167,4 +1170,4 @@ const handleAddToCart = () => {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
-  }
+}
