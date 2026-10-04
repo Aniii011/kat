@@ -54,8 +54,18 @@
 /* ── ACCENT COLOR VARIABLES ── */
 /* Each accent defines: primary hue/sat/light values */
 
-/* Pink accent (default) */
+/* Mulberry accent (default) */
 :root {
+  --accent-h: 335;
+  --accent-s: 55%;
+  --accent-l: 32%;
+  --accent-l-dark: 62%;
+  --accent-soft-l: 95%;
+  --accent-soft-l-dark: 18%;
+}
+
+/* Pink accent */
+.accent-pink {
   --accent-h: 328;
   --accent-s: 75%;
   --accent-l: 55%;
@@ -112,30 +122,30 @@
   --elevate-1: rgba(0,0,0,.03);
   --elevate-2: rgba(0,0,0,.08);
 
-  --background: 0 0% 100%;
+  --background: 38 40% 97%;
   --foreground: 0 0% 7%;
-  --border: 0 0% 90%;
-  --input: 0 0% 90%;
+  --border: 36 20% 88%;
+  --input: 36 20% 88%;
   --ring: var(--accent-h) var(--accent-s) var(--accent-l);
   --card: 0 0% 100%;
   --card-foreground: 0 0% 7%;
-  --card-border: 0 0% 93%;
+  --card-border: 36 20% 91%;
   --popover: 0 0% 100%;
   --popover-foreground: 0 0% 7%;
   --popover-border: 0 0% 93%;
   --primary: var(--accent-h) var(--accent-s) var(--accent-l);
   --primary-foreground: 0 0% 100%;
-  --secondary: 0 0% 96%;
+  --secondary: 36 25% 94%;
   --secondary-foreground: 0 0% 12%;
-  --muted: 0 0% 96%;
+  --muted: 36 25% 94%;
   --muted-foreground: 0 0% 46%;
   --accent: var(--accent-h) 60% var(--accent-soft-l);
   --accent-foreground: var(--accent-h) var(--accent-s) calc(var(--accent-l) - 10%);
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
-  --sidebar: 0 0% 98%;
+  --sidebar: 38 30% 96%;
   --sidebar-foreground: 0 0% 7%;
-  --sidebar-border: 0 0% 90%;
+  --sidebar-border: 36 20% 88%;
   --sidebar-primary: var(--accent-h) var(--accent-s) var(--accent-l);
   --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 0 0% 96%;
