@@ -404,7 +404,7 @@ export default function AdminOrderDetail() {
             <p style={{ fontSize: "10px", color: "#999", textAlign: "center", lineHeight: 1.5, margin: 0 }}>
               Please inspect your item(s) before signing for delivery.<br />
               Questions or issues? Reach us at support@kat.ng<br />
-              <strong>Thank you for shopping with KAT 💜</strong>
+              <strong>Thank you for shopping with KAT</strong>
             </p>
           </div>
         </div>
@@ -420,4 +420,4 @@ export default function AdminOrderDetail() {
       </main>
     </div>
   );
-               }
+      }
