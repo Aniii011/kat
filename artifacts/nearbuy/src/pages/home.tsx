@@ -12,12 +12,13 @@ import { useAuth } from "@/context/auth-context";
 import { useCart } from "@/hooks/use-cart";
 import { useInteractions } from "@/hooks/use-interactions";
 import ThemeSwitcher from "@/components/theme-switcher";
+import { flyToCart } from "@/lib/cart-feedback";
 import SaveToBoardModal from "@/components/save-to-board-modal";
 import AuthModal from "@/components/auth-modal";
 import {
-  Search, ShoppingBag, ShoppingBasket, Plus, Star, BadgeCheck, Flame, Sparkles,
+  Search, ShoppingBag, Plus, Star, BadgeCheck, Flame, Sparkles,
   ChevronRight, Bookmark, Heart, LogIn, CheckCircle2, Play,
-  Gem, Crown, Leaf, Flower, TreePalm, type LucideIcon,
+  Gem, Crown, Leaf, Flower, TreePalm, Check, type LucideIcon,
 } from "lucide-react";
 
 const VIBE_ICONS: Record<string, LucideIcon> = {
@@ -88,6 +89,7 @@ function ProductCard({
       sellerName: listing.sellerName,
       quantity: 1,
     });
+    flyToCart(e.currentTarget as Element, listing.imageUrl);
     setAddedToCart(true);
     setTimeout(() => setAddedToCart(false), 1500);
   };
@@ -179,16 +181,17 @@ function ProductCard({
                 <motion.button
                   onClick={handleAddToCart}
                   whileTap={{ scale: 0.85 }}
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                    addedToCart ? "border-emerald-500 bg-emerald-500" : "border-primary bg-transparent"
+                  aria-label="Add to cart"
+                  className={`w-8 h-8 rounded-full flex items-center justify-center shadow-sm transition-all ${
+                    addedToCart ? "bg-emerald-500" : "bg-primary"
                   }`}
                 >
                   {addedToCart ? (
-                    <CheckCircle2 className="w-3 h-3 text-white" />
+                    <Check className="w-4 h-4 text-white" strokeWidth={3} />
                   ) : (
                     <div className="relative">
-                      <ShoppingBasket className="w-3 h-3 text-primary" />
-                      <Plus className="w-1.5 h-1.5 text-primary-foreground absolute -top-0.5 -right-0.5 bg-primary rounded-full" strokeWidth={4} />
+                      <ShoppingBag className="w-4 h-4 text-primary-foreground" />
+                      <Plus className="w-2.5 h-2.5 text-primary bg-primary-foreground rounded-full absolute -top-1 -right-1.5" strokeWidth={4} />
                     </div>
                   )}
                 </motion.button>
@@ -642,4 +645,4 @@ export default function Home() {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
     </div>
   );
-        }
+                }
