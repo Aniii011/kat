@@ -17,7 +17,19 @@ import AuthModal from "@/components/auth-modal";
 import {
   Search, ShoppingBag, ShoppingBasket, Plus, Star, BadgeCheck, Flame, Sparkles,
   ChevronRight, Bookmark, Heart, LogIn, CheckCircle2, Play,
+  Gem, Crown, Leaf, Flower, TreePalm, type LucideIcon,
 } from "lucide-react";
+
+const VIBE_ICONS: Record<string, LucideIcon> = {
+  "Old Money": Gem,
+  "Baddie": Crown,
+  "Boho": Leaf,
+  "90s African Aunty": Flower,
+  "Clean Girl": Sparkles,
+  "Streetwear": Flame,
+  "Vacay": TreePalm,
+  "Soft Girl": Heart,
+};
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -518,7 +530,7 @@ export default function Home() {
         {topCategory === "All" && (
           <section className="mb-4">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-bold">✨ Shop by Vibe</h2>
+              <h2 className="text-sm font-bold flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-primary" /> Shop by Vibe</h2>
               {selectedAesthetic && (
                 <button onClick={() => setSelectedAesthetic(null)} className="text-xs text-primary font-semibold">
                   Clear
@@ -526,7 +538,9 @@ export default function Home() {
               )}
             </div>
             <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-              {AESTHETICS.map(({ label, emoji }) => (
+              {AESTHETICS.map(({ label }) => {
+                const VibeIcon = VIBE_ICONS[label];
+                return (
                 <button
                   key={label}
                   onClick={() => setSelectedAesthetic(selectedAesthetic === label ? null : label)}
@@ -536,9 +550,10 @@ export default function Home() {
                       : "bg-card border-border hover:border-primary hover:text-primary"
                   }`}
                 >
-                  <span>{emoji}</span> {label}
+                  {VibeIcon && <VibeIcon className="w-3.5 h-3.5" aria-hidden="true" />} {label}
                 </button>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}
@@ -627,4 +642,4 @@ export default function Home() {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
     </div>
   );
-      }
+        }
