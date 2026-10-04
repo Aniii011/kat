@@ -402,8 +402,13 @@ const handleAddToCart = () => {
 
       <div className="max-w-5xl mx-auto">
 
-        {/* Image Gallery */}
-        <div className="relative bg-muted">
+        {/* Two-column on tablet/desktop (md+): gallery left, buy box right.
+            Below md (phones) the grid is a no-op and everything stacks as before. */}
+        <div className="md:grid md:grid-cols-2 md:gap-8 lg:gap-12 md:px-4 md:pt-6 md:items-start">
+
+        {/* Image Gallery (sticks while the buy box scrolls on desktop) */}
+        <div className="md:sticky md:top-20">
+        <div className="relative bg-muted md:rounded-3xl md:overflow-hidden">
           <div className="aspect-square overflow-hidden relative bg-muted">
   <AnimatePresence mode="wait">
     {media[selectedImage]?.type === "video" ? (
@@ -494,9 +499,10 @@ const handleAddToCart = () => {
             </div>
           )}
         </div>
+        </div>
 
-        {/* Product Info */}
-        <div className="px-4 py-4 space-y-4">
+        {/* Product Info — right column on md+ */}
+        <div className="px-4 py-4 space-y-4 md:px-0 md:pt-0">
 
           {/* Title + sold count */}
           <div>
@@ -772,6 +778,12 @@ const handleAddToCart = () => {
               </Link>
             </div>
           </div>
+
+        </div>
+        </div>
+
+        {/* Details below the fold — full width on every screen size */}
+        <div className="px-4 pb-4 space-y-4 md:pt-8">
 
           <Separator />
 
@@ -1155,4 +1167,4 @@ const handleAddToCart = () => {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
-}
+  }
