@@ -13,6 +13,7 @@ import {
   MessageCircle, Flag, ChevronDown, ChevronUp, Play,
   CheckCircle2, Store, Tag, Zap,
 } from "lucide-react";
+import { Frown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -174,7 +175,7 @@ export default function ListingDetail() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center p-6">
-          <p className="text-5xl mb-4">😕</p>
+          <Frown className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
           <p className="font-bold text-lg">Item not found</p>
           <p className="text-sm text-muted-foreground mt-1">This product may have been removed.</p>
           <Link href="/"><Button variant="outline" size="sm" className="mt-4 rounded-full">Back to shop</Button></Link>
@@ -453,7 +454,7 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
             )}
             {listing.isThrift && (
               <div className="absolute top-3 left-3 text-xs px-3 py-1 rounded-full font-bold bg-purple-500 text-white">
-                Thrift Drop 💜
+                Thrift Drop
               </div>
             )}
 
@@ -942,7 +943,7 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
           {/* Related Products */}
           {related.length > 0 && (
             <section className="mt-2">
-              <p className="text-sm font-black mb-3">You might also love ✨</p>
+              <p className="text-sm font-black mb-3">You might also love</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {related.map((item) => (
                   <Link key={item.id} href={`/listing/${item.id}`}>
@@ -1002,7 +1003,7 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
               className="w-full rounded-full font-bold bg-purple-500 hover:bg-purple-600 border-0 h-12"
               onClick={() => setShowDeposit(true)}
             >
-              💜 Pay Deposit — {formatNaira(listing.depositAmount ?? 0)}
+              <Clock className="w-4 h-4" /> Pay Deposit — {formatNaira(listing.depositAmount ?? 0)}
             </Button>
           ) : (
             <Button
@@ -1039,7 +1040,7 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
               className="flex-1 rounded-full font-bold bg-purple-500 hover:bg-purple-600 border-0 h-12"
               onClick={() => setShowDeposit(true)}
             >
-              💜 Pay Deposit — {formatNaira(listing.depositAmount ?? 0)}
+              <Clock className="w-4 h-4" /> Pay Deposit — {formatNaira(listing.depositAmount ?? 0)}
             </Button>
           ) : (
             <Button
@@ -1061,7 +1062,7 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
       <Dialog open={showDeposit} onOpenChange={setShowDeposit}>
         <DialogContent className="rounded-3xl max-w-sm mx-auto">
           <DialogHeader>
-            <DialogTitle className="text-center text-lg font-black">💜 Secure Your Piece</DialogTitle>
+            <DialogTitle className="text-center text-lg font-black">Secure Your Piece</DialogTitle>
             <DialogDescription className="text-center text-sm">
               Pay a deposit to hold <strong>{listing.title}</strong> exclusively for 24 hours.
             </DialogDescription>
@@ -1170,4 +1171,4 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
-}
+    }
