@@ -7,6 +7,7 @@ import ThemeSwitcher from "@/components/theme-switcher";
 import QuickViewModal from "@/components/quick-view-modal";
 import SaveToBoardModal from "@/components/save-to-board-modal";
 import { ArrowLeft, Heart, Star, BadgeCheck, BookmarkX } from "lucide-react";
+import { Pin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 function formatNaira(n: number) {
@@ -35,7 +36,7 @@ export default function BoardDetail() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <p className="text-5xl mb-4">📌</p>
+          <Pin className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
           <p className="font-bold text-lg">Board not found</p>
           <Link href="/boards">
             <Button variant="outline" size="sm" className="mt-4 rounded-full">Back to boards</Button>
@@ -101,7 +102,7 @@ export default function BoardDetail() {
                       loading="lazy"
                     />
                     {listing.isThrift && (
-                      <span className="absolute top-2 left-2 text-[9px] px-2 py-0.5 rounded-full font-bold bg-purple-500 text-white">Thrift 💜</span>
+                      <span className="absolute top-2 left-2 text-[9px] px-2 py-0.5 rounded-full font-bold bg-purple-500 text-white">Thrift</span>
                     )}
                     {listing.discount && (
                       <span className="absolute bottom-2 right-2 text-[9px] px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground font-bold">-{listing.discount}%</span>
