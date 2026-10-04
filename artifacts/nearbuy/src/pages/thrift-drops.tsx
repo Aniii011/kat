@@ -9,6 +9,7 @@ import {
   ArrowLeft, Star, BadgeCheck, Recycle, ShoppingBag,
   Clock, Info, Timer,
 } from "lucide-react";
+import { Search, CheckCircle2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -49,7 +50,7 @@ function ThriftCard({ listing, status, timeRemaining }: {
           )}
           <div className="absolute top-2 left-2 flex flex-col gap-1">
             <span className="text-[10px] px-2.5 py-1 rounded-full font-bold bg-purple-500 text-white">
-              1 of 1 💜
+              1 of 1
             </span>
             {status === "available" && (
               <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500 text-white">
@@ -135,7 +136,7 @@ export default function ThriftDrops() {
             </Button>
           </Link>
           <div className="flex-1">
-            <h1 className="text-base font-black">💜 Thrift Drops</h1>
+            <h1 className="text-base font-black flex items-center gap-1.5"><Recycle className="w-4 h-4 text-purple-500" /> Thrift Drops</h1>
           </div>
           <ThemeSwitcher />
           <Link href="/cart">
@@ -174,12 +175,12 @@ export default function ThriftDrops() {
           </h3>
           <div className="grid grid-cols-3 gap-3">
             {[
-              { icon: "🔍", title: "Find your piece", desc: "Browse one-of-one thrift items" },
-              { icon: "💜", title: "Pay deposit", desc: "Hold the item for 24 hours" },
-              { icon: "✅", title: "Complete payment", desc: "Pay balance & it's yours" },
+              { Icon: Search, title: "Find your piece", desc: "Browse one-of-one thrift items" },
+              { Icon: Clock, title: "Pay deposit", desc: "Hold the item for 24 hours" },
+              { Icon: CheckCircle2, title: "Complete payment", desc: "Pay balance & it's yours" },
             ].map((s, i) => (
               <div key={i} className="bg-card border border-card-border rounded-2xl p-3 text-center">
-                <div className="text-2xl mb-1">{s.icon}</div>
+                <s.Icon className="w-6 h-6 mx-auto mb-1.5 text-purple-500" />
                 <p className="text-xs font-semibold leading-tight">{s.title}</p>
                 <p className="text-[10px] text-muted-foreground mt-1">{s.desc}</p>
               </div>
@@ -216,7 +217,7 @@ export default function ThriftDrops() {
             {displayedListings.length} item{displayedListings.length !== 1 ? "s" : ""}
           </p>
           <span className="text-[10px] bg-purple-100 dark:bg-purple-950/40 text-purple-600 dark:text-purple-300 px-2.5 py-1 rounded-full font-semibold">
-            🔄 Updated daily
+            <RefreshCw className="w-3 h-3 inline -mt-0.5 mr-1" /> Updated daily
           </span>
         </div>
 
@@ -235,7 +236,7 @@ export default function ThriftDrops() {
           </div>
         ) : displayedListings.length === 0 ? (
           <div className="text-center py-16">
-            <div className="text-5xl mb-4">💜</div>
+            <Recycle className="w-12 h-12 mx-auto mb-4 text-purple-500" />
             <p className="font-bold text-base">
               {activeTab === "holding" ? "You're not holding anything right now" :
                activeTab === "held_by_me" ? "No previously held items" :
@@ -271,4 +272,4 @@ export default function ThriftDrops() {
       </main>
     </div>
   );
-            }
+              }
