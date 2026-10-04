@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import HeaderCartButton from "@/components/header-cart-button";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useListings } from "@/hooks/use-listings";
@@ -399,11 +400,7 @@ export default function Home() {
                 <Bookmark className="w-4 h-4" />
               </Button>
             </Link>
-            <Link href="/cart">
-              <Button variant="ghost" size="icon" className="w-9 h-9 rounded-full">
-                <ShoppingBag className="w-4 h-4" />
-              </Button>
-            </Link>
+            <HeaderCartButton />
 
             {user ? (
               <Link href="/me">
@@ -649,4 +646,4 @@ export default function Home() {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
     </div>
   );
-                }
+}
