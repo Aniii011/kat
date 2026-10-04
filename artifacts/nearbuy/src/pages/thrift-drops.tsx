@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import HeaderCartButton from "@/components/header-cart-button";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { useListings } from "@/hooks/use-listings";
@@ -139,11 +140,7 @@ export default function ThriftDrops() {
             <h1 className="text-base font-black flex items-center gap-1.5"><Recycle className="w-4 h-4 text-purple-500" /> Thrift Drops</h1>
           </div>
           <ThemeSwitcher />
-          <Link href="/cart">
-            <Button variant="ghost" size="icon" className="w-9 h-9 rounded-full">
-              <ShoppingBag className="w-4 h-4" />
-            </Button>
-          </Link>
+          <HeaderCartButton />
         </div>
       </header>
 
@@ -272,4 +269,4 @@ export default function ThriftDrops() {
       </main>
     </div>
   );
-              }
+                }
