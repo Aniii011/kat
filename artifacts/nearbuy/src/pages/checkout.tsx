@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import {
   ArrowLeft, MapPin, ShoppingBag, Lock,
 } from "lucide-react";
+import { Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -546,7 +547,7 @@ export default function Checkout() {
 
           <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
             <p className="text-sm font-bold flex items-center gap-2">
-              🏷️ Coupon Code
+              <Tag className="w-4 h-4 text-primary" /> Coupon Code
             </p>
             {appliedCoupon ? (
               <div className="flex items-center justify-between bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2.5">
@@ -630,7 +631,7 @@ export default function Checkout() {
               <span className="text-primary">{formatNaira(total)}</span>
             </div>
             {discount > 0 && (
-              <p className="text-xs text-emerald-600 font-semibold text-right">You saved {formatNaira(discount)} 🎉</p>
+              <p className="text-xs text-emerald-600 font-semibold text-right">You saved {formatNaira(discount)}</p>
             )}
           </div>
 
@@ -665,4 +666,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-    }
+            }
