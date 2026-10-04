@@ -77,7 +77,7 @@ export default function OrderConfirmation() {
           <div className="w-24 h-24 rounded-full bg-emerald-100 dark:bg-emerald-950/30 flex items-center justify-center mx-auto mb-5">
             <CheckCircle2 className="w-12 h-12 text-emerald-500" />
           </div>
-          <h1 className="text-2xl font-black">Order Placed! 🎉</h1>
+          <h1 className="text-2xl font-black">Order Placed!</h1>
           <p className="text-sm text-muted-foreground mt-2 max-w-xs mx-auto">
             Thank you {order.fullName.split(" ")[0]}! Your order has been received and is being processed.
           </p>
@@ -123,7 +123,7 @@ export default function OrderConfirmation() {
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Delivery</span>
               <span className={order.delivery === 0 ? "text-emerald-600 font-semibold" : ""}>
-                {order.delivery === 0 ? "Free 🎉" : formatNaira(order.delivery)}
+                {order.delivery === 0 ? "Free" : formatNaira(order.delivery)}
               </span>
             </div>
             <div className="flex justify-between font-black text-base">
@@ -219,4 +219,4 @@ export default function OrderConfirmation() {
       </main>
     </div>
   );
-        }
+}
