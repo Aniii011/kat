@@ -1,10 +1,14 @@
 import { Sun, Moon } from "lucide-react";
 import { useTheme } from "@/context/theme-context";
 import { Button } from "@/components/ui/button";
+import { DARK_MODE_ENABLED } from "@/context/theme-context";
 
 export default function ThemeSwitcher() {
   const { theme, setTheme } = useTheme();
   const isDark = theme === "dark";
+
+  // Hidden until dark mode is finished (see DARK_MODE_ENABLED).
+  if (!DARK_MODE_ENABLED) return null;
 
   return (
     <Button
