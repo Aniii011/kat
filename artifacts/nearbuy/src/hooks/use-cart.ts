@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 export interface CartItem {
   listingId: string;
@@ -31,13 +31,33 @@ function load<T>(key: string): T[] {
   } catch { return []; }
 }
 
+// Every component that calls useCart() has its own React state, so without this
+// the bottom-nav badge never saw items added from a product card. Writes announce
+// themselves and every instance re-reads localStorage.
+const CART_SYNC_EVENT = "kat:cart-sync";
+
 function save<T>(key: string, items: T[]) {
   localStorage.setItem(key, JSON.stringify(items));
+  // Deferred so we never update other components while one is rendering.
+  queueMicrotask(() => window.dispatchEvent(new Event(CART_SYNC_EVENT)));
 }
 
 export function useCart() {
   const [items, setItems] = useState<CartItem[]>(() => load<CartItem>(CART_KEY));
   const [savedItems, setSavedItems] = useState<SavedItem[]>(() => load<SavedItem>(SAVED_KEY));
+
+  useEffect(() => {
+    const sync = () => {
+      setItems(load<CartItem>(CART_KEY));
+      setSavedItems(load<SavedItem>(SAVED_KEY));
+    };
+    window.addEventListener(CART_SYNC_EVENT, sync);
+    window.addEventListener("storage", sync); // other browser tabs
+    return () => {
+      window.removeEventListener(CART_SYNC_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
 
   const addItem = useCallback((item: Omit<CartItem, "quantity"> & { quantity?: number }) => {
     setItems((prev) => {
