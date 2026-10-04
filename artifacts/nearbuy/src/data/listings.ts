@@ -94,15 +94,15 @@ export const CATEGORY_TO_TOP: Record<string, TopCategory> = {
   "Clothing": "Woman",
 };
 
-export const AESTHETICS: { label: Aesthetic; emoji: string }[] = [
-  { label: "Old Money", emoji: "👜" },
-  { label: "Baddie", emoji: "💅" },
-  { label: "Boho", emoji: "🌸" },
-  { label: "90s African Aunty", emoji: "🌺" },
-  { label: "Clean Girl", emoji: "✨" },
-  { label: "Streetwear", emoji: "🔥" },
-  { label: "Vacay", emoji: "🌴" },
-  { label: "Soft Girl", emoji: "🎀" },
+export const AESTHETICS: { label: Aesthetic }[] = [
+  { label: "Old Money" },
+  { label: "Baddie" },
+  { label: "Boho" },
+  { label: "90s African Aunty" },
+  { label: "Clean Girl" },
+  { label: "Streetwear" },
+  { label: "Vacay" },
+  { label: "Soft Girl" },
 ];
 
 export const CATEGORIES = [
