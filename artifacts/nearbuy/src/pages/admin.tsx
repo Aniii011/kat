@@ -71,7 +71,23 @@ const ORDER_STATUS: Record<string, { label: string }> = {
 
 export default function Admin() {
   const { user, signOut } = useAuth();
-  const [section, setSection] = useState<AdminSection>("home");
+  // The current tab is kept in the URL (?section=logistics) so refreshing
+  // the page — or sharing/bookmarking a link to a specific tab — lands back
+  // on the same tab instead of always bouncing to the dashboard home.
+  const ADMIN_SECTIONS: AdminSection[] = ["home", "sellers", "products", "orders", "finance", "analytics", "logistics", "coupons", "users", "moderation", "settings"];
+  const initialSearch = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const initialSection = (initialSearch?.get("section") as AdminSection) || "home";
+  const [section, setSectionState] = useState<AdminSection>(
+    ADMIN_SECTIONS.includes(initialSection) ? initialSection : "home"
+  );
+  const setSection = (next: AdminSection) => {
+    setSectionState(next);
+    const params = new URLSearchParams(window.location.search);
+    if (next === "home") params.delete("section");
+    else params.set("section", next);
+    const query = params.toString();
+    window.history.replaceState(null, "", `/admin${query ? `?${query}` : ""}`);
+  };
   const [sellers, setSellers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [storesById, setStoresById] = useState<Record<string, any>>({});
@@ -1158,4 +1174,4 @@ function TrendChart({ orders, rangeDays, metric, commissionRate }: { orders: any
       </div>
     </div>
   );
-}
+        }
