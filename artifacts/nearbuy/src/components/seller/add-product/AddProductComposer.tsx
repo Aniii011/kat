@@ -2,7 +2,7 @@ import React from "react";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { SellerCategoryId } from "@/lib/seller-categories";
-import type { ProductVariant } from "@/lib/product-variants";
+import { type ProductVariant, lowestVariantPrice } from "@/lib/product-variants";
 import PhotosSection from "./PhotosSection";
 import NameDescriptionSection from "./NameDescriptionSection";
 import SubcategoryPicker from "./SubcategoryPicker";
@@ -117,7 +117,11 @@ export default function AddProductComposer(props: AddProductComposerProps) {
     uploadError, uploading, onSaveDraft, onPublish,
   } = props;
 
-  const buyerPrice = price ? Number(price) * 1.095 : 0;
+  const hasVariants = variants.length > 0;
+  const variantPriced = useVariantPricing && hasVariants;
+  // With per-variant pricing the preview shows the cheapest variant ("from" price).
+  const effectivePrice = variantPriced ? (lowestVariantPrice(variants) ?? 0) : Number(price) || 0;
+  const buyerPrice = effectivePrice ? effectivePrice * 1.095 : 0;
   const mainImage = existingImages[0] || imagePreviews[0];
 
   const renderCategoryComposer = () => {
@@ -279,6 +283,8 @@ export default function AddProductComposer(props: AddProductComposerProps) {
           onPriceChange={onPriceChange}
           stock={stock}
           onStockChange={onStockChange}
+          hidePrice={variantPriced}
+          hideStock={hasVariants}
         />
 
         <MoreOptionsAccordion
@@ -329,4 +335,4 @@ export default function AddProductComposer(props: AddProductComposerProps) {
       </div>
     </div>
   );
-}
+            }
