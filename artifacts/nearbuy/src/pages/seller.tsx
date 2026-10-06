@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import SellerCategoryIcon from "@/components/seller/category-icons";
 import { Link } from "wouter";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
@@ -2116,7 +2117,7 @@ function SellerStoreSection({ user, isMultiStore, activeStore, completenessCheck
         </p>
         <div className="flex items-center justify-between bg-muted rounded-xl px-3 py-2.5">
           <span className="text-sm font-medium">
-            {SELLER_CATEGORIES.find((c: any) => c.id === sellerCategory)?.emoji}{" "}
+            <SellerCategoryIcon id={sellerCategory} className="w-4 h-4 inline -mt-0.5 mr-1.5" />
             {SELLER_CATEGORIES.find((c: any) => c.id === sellerCategory)?.label || "Not set"}
           </span>
           <Button size="sm" variant="outline" className="rounded-full" onClick={() => setShowCategoryPicker(true)}>
@@ -2151,7 +2152,7 @@ function SellerStoreSection({ user, isMultiStore, activeStore, completenessCheck
                     sellerCategory === cat.id ? "border-primary bg-primary/5" : "border-border hover:border-primary"
                   }`}
                 >
-                  <span className="text-2xl">{cat.emoji}</span>
+                  <SellerCategoryIcon id={cat.id} className="w-6 h-6 text-primary" />
                   <span className="text-xs font-bold text-center">{cat.label}</span>
                 </button>
               ))}
@@ -2193,4 +2194,4 @@ function EmptyState({ icon, title, action }: any) {
       {action}
     </div>
   );
-                                     }
+}
