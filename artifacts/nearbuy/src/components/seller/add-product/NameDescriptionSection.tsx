@@ -1,4 +1,5 @@
 import React from "react";
+import { Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,7 @@ export default function NameDescriptionSection({
               onClick={onGenerateAI}
               disabled={generatingAI}
             >
-              ✨ {generatingAI ? "Generating..." : "Generate Title & Description with AI"}
+              <Sparkles className="w-3.5 h-3.5" /> {generatingAI ? "Generating..." : "Generate Title & Description with AI"}
             </Button>
             {aiError && <p className="text-[10px] text-destructive mt-1">{aiError}</p>}
           </>
