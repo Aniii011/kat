@@ -1,4 +1,5 @@
 import React from "react";
+import { AlertTriangle, AlertCircle, CheckCircle2 } from "lucide-react";
 
 export default function NeedsAttention({
   pendingSellers,
@@ -20,7 +21,7 @@ Needs Attention
 <div className="flex items-center justify-between bg-amber-50 rounded-xl p-3">
 
 <p className="text-xs font-semibold">
-⚠ {pendingSellers} sellers waiting for approval
+<AlertTriangle className="w-3.5 h-3.5 inline -mt-0.5 mr-1" /> {pendingSellers} sellers waiting for approval
 </p>
 
 <button
@@ -38,7 +39,7 @@ Review
 <div className="flex items-center justify-between bg-red-50 rounded-xl p-3">
 
 <p className="text-xs font-semibold">
-🚨 {pendingOrders} orders need attention
+<AlertCircle className="w-3.5 h-3.5 inline -mt-0.5 mr-1" /> {pendingOrders} orders need attention
 </p>
 
 <button
@@ -55,7 +56,7 @@ View
 {pendingSellers === 0 && pendingOrders === 0 && (
 <div className="bg-emerald-50 rounded-xl p-3">
 <p className="text-xs font-semibold text-emerald-700">
-🟢 Everything is running smoothly
+<CheckCircle2 className="w-3.5 h-3.5 inline -mt-0.5 mr-1" /> Everything is running smoothly
 </p>
 </div>
 )}
