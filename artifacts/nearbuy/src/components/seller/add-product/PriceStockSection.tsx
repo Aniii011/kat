@@ -19,6 +19,10 @@ interface PriceStockSectionProps {
   onSkuChange?: (v: string) => void;
   showSku?: boolean;
   stockPlaceholder?: string;
+  // When the product has variants, stock lives on each variant. When per-variant
+  // pricing is also on, so does the price.
+  hidePrice?: boolean;
+  hideStock?: boolean;
 }
 
 export default function PriceStockSection({
@@ -30,11 +34,21 @@ export default function PriceStockSection({
   onSkuChange,
   showSku = true,
   stockPlaceholder = "Stock quantity *",
+  hidePrice = false,
+  hideStock = false,
 }: PriceStockSectionProps) {
   const numericPrice = Number(price);
 
   return (
     <div className="space-y-3">
+      {(hidePrice || hideStock) && (
+        <p className="text-[11px] text-muted-foreground">
+          {hidePrice && hideStock
+            ? "Price and stock are set on each variant above."
+            : "Stock is set on each variant above."}
+        </p>
+      )}
+      {!hidePrice && (
       <div>
         <Input
           placeholder="Your price — what you want to earn (₦) *"
@@ -53,14 +67,17 @@ export default function PriceStockSection({
           Includes KAT's 9.5% platform fee — you keep exactly what you type above.
         </p>
       </div>
+      )}
 
-      <Input
-        placeholder={stockPlaceholder}
-        type="number"
-        value={stock}
-        onChange={(e) => onStockChange(e.target.value)}
-        className="rounded-xl h-11"
-      />
+      {!hideStock && (
+        <Input
+          placeholder={stockPlaceholder}
+          type="number"
+          value={stock}
+          onChange={(e) => onStockChange(e.target.value)}
+          className="rounded-xl h-11"
+        />
+      )}
 
       {showSku && onSkuChange && (
         <Input
