@@ -31,9 +31,10 @@ const ACCENT_CLASSES: Record<AccentColor, string> = {
   blue: "accent-blue",
 };
 
-// Dark mode is hidden until every screen is finished, so the base is always
-// the cream (white) theme. Flip DARK_MODE_ENABLED to bring it back.
-export const DARK_MODE_ENABLED = false;
+// Switch for the dark (black) base. New visitors always start on the cream base;
+// they can choose Black in Settings or with the sun/moon button.
+// Set to false to hide dark mode again.
+export const DARK_MODE_ENABLED = true;
 
 function loadTheme(): AppTheme {
   try {
