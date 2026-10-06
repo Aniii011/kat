@@ -1,4 +1,6 @@
 import React from "react";
+import SellerCategoryIcon from "@/components/seller/category-icons";
+import { Sparkles } from "lucide-react";
 import { SELLER_CATEGORIES, type SellerCategoryId } from "@/lib/seller-categories";
 
 interface SellerCategoryGateProps {
@@ -11,7 +13,7 @@ export default function SellerCategoryGate({ onSelect, saving = false }: SellerC
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 py-10">
       <div className="max-w-sm w-full text-center mb-8">
         <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4 text-2xl">
-          ✨
+          <Sparkles className="w-7 h-7 text-primary" />
         </div>
         <h1 className="text-xl font-black mb-2">What do you sell?</h1>
         <p className="text-sm text-muted-foreground">
@@ -29,7 +31,7 @@ export default function SellerCategoryGate({ onSelect, saving = false }: SellerC
             onClick={() => onSelect(cat.id)}
             className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-border bg-card hover:border-primary transition-all disabled:opacity-50"
           >
-            <span className="text-2xl">{cat.emoji}</span>
+            <SellerCategoryIcon id={cat.id} className="w-6 h-6 text-primary" />
             <span className="text-xs font-bold text-center">{cat.label}</span>
           </button>
         ))}
