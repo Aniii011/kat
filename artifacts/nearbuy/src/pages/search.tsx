@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { flyToCart } from "@/lib/cart-feedback";
 import { supabase } from "@/lib/supabase";
 import { useCart } from "@/hooks/use-cart";
 import { useInteractions } from "@/hooks/use-interactions";
@@ -10,7 +9,6 @@ import {
   Search as SearchIcon, X, SlidersHorizontal, Star, BadgeCheck,
   ArrowLeft, Camera, Image, ShoppingBag, CheckCircle2, Loader2, Play,
 } from "lucide-react";
-import { Sparkles, Flame, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
@@ -138,7 +136,7 @@ function ProductCard({
             <span className="absolute bottom-2 left-2 text-[9px] px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground font-bold">-{product.discount}%</span>
           )}
           <button
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); flyToCart(e.currentTarget, product.image_url); onAddToCart(product); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAddToCart(product); }}
             className={`absolute bottom-2 right-2 w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all ${added ? "bg-emerald-500" : "bg-primary opacity-0 group-hover:opacity-100 sm:opacity-100"}`}
           >
             {added ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : <ShoppingBag className="w-3.5 h-3.5 text-primary-foreground" />}
@@ -193,6 +191,7 @@ export default function Search() {
 
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
   const [addedId, setAddedId] = useState<string | null>(null);
+  const [, navigate] = useLocation();
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100000]);
@@ -386,6 +385,18 @@ export default function Search() {
   };
 
   const handleAddToCart = (product: any) => {
+    // Same reasoning as the home feed: a product with colours or sizes
+    // can't be added from this card — there's no picker here — so send
+    // the buyer to the product page to choose instead of silently adding
+    // with no selection at all.
+    const hasOptionsToChoose =
+      (product.colors && product.colors.length > 0) ||
+      (product.clothing_sizes && product.clothing_sizes.length > 0) ||
+      (product.shoe_sizes && product.shoe_sizes.length > 0);
+    if (hasOptionsToChoose) {
+      navigate(`/listing/${product.id}`);
+      return;
+    }
     addItem({
       listingId: product.id,
       title: product.title,
@@ -570,7 +581,7 @@ export default function Search() {
               </div>
 
               <p className="text-[11px] text-muted-foreground text-center mt-5">
-                KAT will find visually similar products for you
+                KAT will find visually similar products for you ✨
               </p>
             </motion.div>
           </motion.div>
@@ -619,7 +630,7 @@ export default function Search() {
                 </div>
               )}
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold text-primary flex items-center gap-1"><Sparkles className="w-3 h-3" /> Visual search</p>
+                <p className="text-xs font-bold text-primary flex items-center gap-1">✨ Visual search</p>
                 <p className="text-[11px] text-muted-foreground truncate">
                   {loading ? "Matching products..." : `${results.length} similar product${results.length !== 1 ? "s" : ""} found`}
                 </p>
@@ -634,7 +645,7 @@ export default function Search() {
 
             {imageSearchTags.length > 0 && (
               <div>
-                <p className="text-xs font-bold mb-1.5 flex items-center gap-1"><Sparkles className="w-3 h-3 text-primary" /> We found these styles</p>
+                <p className="text-xs font-bold mb-1.5">✨ We found these styles</p>
                 <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1">
                   {imageSearchTags.map((tag) => (
                     <span key={tag} className="shrink-0 text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-medium whitespace-nowrap">
@@ -671,7 +682,7 @@ export default function Search() {
 
             {popularSearches.length > 0 && (
               <div>
-                <p className="text-sm font-bold mb-3 flex items-center gap-1.5"><Flame className="w-4 h-4 text-primary" /> Popular searches</p>
+                <p className="text-sm font-bold mb-3">🔥 Popular searches</p>
                 <div className="flex flex-wrap gap-2">
                   {popularSearches.map((term) => (
                     <button key={term} onClick={() => setQuery(term)}
@@ -717,7 +728,7 @@ export default function Search() {
           isImageSearch ? (
             !imageSearchError && results.length > 0 && (
               <div className="mb-3">
-                <p className="text-sm font-black">Similar finds</p>
+                <p className="text-sm font-black">Similar finds ✨</p>
                 <p className="text-xs text-muted-foreground">
                   Based on your photo · {results.length} similar product{results.length !== 1 ? "s" : ""}
                 </p>
@@ -750,7 +761,7 @@ export default function Search() {
         {!loading && !imageSearchLoading && isSearching && results.length === 0 && (
           isImageSearch ? (
             <div className="text-center py-16">
-              <Camera className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
+              <p className="text-4xl mb-3">📷</p>
               <p className="font-semibold">No close matches yet</p>
               <p className="text-sm text-muted-foreground mt-1 max-w-[260px] mx-auto">
                 We couldn't find products that look very similar to this photo.
@@ -761,7 +772,7 @@ export default function Search() {
             </div>
           ) : (
             <div className="text-center py-16">
-              <Search className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
+              <p className="text-4xl mb-3">🔍</p>
               <p className="font-semibold">No results found</p>
               <p className="text-sm text-muted-foreground mt-1">Try a different search term or remove filters</p>
               <button onClick={clearAll} className="mt-3 text-xs text-primary font-semibold">Clear filters</button>
@@ -773,7 +784,7 @@ export default function Search() {
         {!loading && !imageSearchLoading && (
           <div className="space-y-3">
             {!isSearching && featured.length > 0 && (
-              <p className="text-sm font-bold">New Arrivals</p>
+              <p className="text-sm font-bold">New Arrivals ✨</p>
             )}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {displayProducts.map((product, i) => (
@@ -787,4 +798,4 @@ export default function Search() {
       </main>
     </div>
   );
-      }
+  }
