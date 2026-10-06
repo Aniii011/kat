@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { Lock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -109,7 +110,7 @@ export default function MoreOptionsAccordion({
 
           <div className="space-y-1">
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-              🔒 Private Seller Note
+              <Lock className="w-3 h-3" /> Private Seller Note
             </p>
             <Textarea
               placeholder={sellerNotePlaceholder}
