@@ -1,13 +1,11 @@
 import { Sun, Moon } from "lucide-react";
-import { useTheme } from "@/context/theme-context";
+import { useTheme, DARK_MODE_ENABLED } from "@/context/theme-context";
 import { Button } from "@/components/ui/button";
-import { DARK_MODE_ENABLED } from "@/context/theme-context";
 
 export default function ThemeSwitcher() {
-  const { theme, setTheme } = useTheme();
-  const isDark = theme === "dark";
+  const { theme, setBase } = useTheme();
+  const isDark = theme.base === "black";
 
-  // Hidden until dark mode is finished (see DARK_MODE_ENABLED).
   if (!DARK_MODE_ENABLED) return null;
 
   return (
@@ -16,7 +14,7 @@ export default function ThemeSwitcher() {
       size="icon"
       className="w-9 h-9 rounded-full"
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      onClick={() => setTheme(isDark ? "light" : "dark")}
+      onClick={() => setBase(isDark ? "white" : "black")}
     >
       {isDark
         ? <Sun className="w-4 h-4 text-amber-400" />
