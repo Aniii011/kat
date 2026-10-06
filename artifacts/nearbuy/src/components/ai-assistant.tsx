@@ -12,47 +12,47 @@ interface Message {
 }
 
 const QUICK_REPLIES = [
-  "Style me for a beach vacation 🌴",
-  "Date night outfit under ₦30k 💕",
-  "Baddie look for less ₦40k 💅",
-  "Owambe party drip 🎉",
-  "What's trending? 🔥",
-  "Clean girl aesthetic ✨",
-  "Gym fit under ₦25k 💪",
-  "Soft girl vibes 🎀",
+  "Style me for a beach vacation",
+  "Date night outfit under ₦30k",
+  "Baddie look for less ₦40k",
+  "Owambe party drip",
+  "What's trending?",
+  "Clean girl aesthetic",
+  "Gym fit under ₦25k",
+  "Soft girl vibes",
 ];
 
 function getSuggestion(input: string): { text: string; productIds: number[] } {
   const q = input.toLowerCase();
   if (q.match(/beach|vacation|vacay|holiday|island|travel/))
-    return { text: "Beach babes, this one is for you! 🌴 Your perfect vacay edit:", productIds: [7, 8, 9] };
+    return { text: "Beach babes, this one is for you! Your perfect vacay edit:", productIds: [7, 8, 9] };
   if (q.match(/date|dinner|night out|romantic/))
-    return { text: "Date night done right 💕 He won't know what hit him:", productIds: [2, 13, 5] };
+    return { text: "Date night done right He won't know what hit him:", productIds: [2, 13, 5] };
   if (q.match(/gym|workout|fitness|exercise|yoga/))
-    return { text: "Main character energy at the gym 💪", productIds: [12, 9] };
+    return { text: "Main character energy at the gym", productIds: [12, 9] };
   if (q.match(/owambe|party|wedding|event|aso-ebi|birthday/))
-    return { text: "Owambe season is a SPORT and you're winning it! 🎉", productIds: [1, 11, 5] };
+    return { text: "Owambe season is a SPORT and you're winning it!", productIds: [1, 11, 5] };
   if (q.match(/baddie|slay|hot girl|boss/))
-    return { text: "Baddie era activated 🔥 These pieces will have everyone checking for you:", productIds: [2, 15, 13, 4] };
+    return { text: "Baddie era activated These pieces will have everyone checking for you:", productIds: [2, 15, 13, 4] };
   if (q.match(/old money|clean|minimal|classic|elegant|chic/))
-    return { text: "Old money aesthetic — quiet luxury is the loudest flex ✨", productIds: [3, 5, 9] };
+    return { text: "Old money aesthetic — quiet luxury is the loudest flex", productIds: [3, 5, 9] };
   if (q.match(/boho|bohemian|free spirit|festival/))
-    return { text: "Boho girlie energy 🌸 Free, flowy, and stunning:", productIds: [8, 7, 5] };
+    return { text: "Boho girlie energy Free, flowy, and stunning:", productIds: [8, 7, 5] };
   if (q.match(/soft girl|cute|pastel|feminine|girly|pink/))
-    return { text: "Soft girl era activated! 🎀", productIds: [10, 5, 8] };
+    return { text: "Soft girl era activated!", productIds: [10, 5, 8] };
   if (q.match(/streetwear|street|urban|swag/))
-    return { text: "Streets will know 🔥", productIds: [6, 9, 15] };
+    return { text: "Streets will know", productIds: [6, 9, 15] };
   if (q.match(/skin|glow|serum|skincare|face|beauty/))
-    return { text: "Your skin is your best accessory ✨", productIds: [14] };
+    return { text: "Your skin is your best accessory", productIds: [14] };
   if (q.match(/wig|hair/))
-    return { text: "Hair is everything darling 💇‍♀️", productIds: [4] };
+    return { text: "Hair is everything darling", productIds: [4] };
   if (q.match(/office|work|corporate|professional/))
-    return { text: "CEO energy activated 💼", productIds: [3, 1, 5] };
+    return { text: "CEO energy activated", productIds: [3, 1, 5] };
   if (q.match(/budget|cheap|affordable|under/))
-    return { text: "Budget-friendly and still fly 💸", productIds: [5, 11, 14] };
+    return { text: "Budget-friendly and still fly", productIds: [5, 11, 14] };
   if (q.match(/trend|viral|popular|new/))
-    return { text: "Here's what everyone is buying right now on KAT 🔥", productIds: [4, 2, 12, 9] };
-  return { text: "Here are some of our most loved pieces right now ✨", productIds: [2, 3, 12, 5] };
+    return { text: "Here's what everyone is buying right now on KAT", productIds: [4, 2, 12, 9] };
+  return { text: "Here are some of our most loved pieces right now", productIds: [2, 3, 12, 5] };
 }
 
 function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
@@ -77,7 +77,7 @@ let msgCounter = 0;
 const WELCOME: Message = {
   id: ++msgCounter,
   role: "assistant",
-  text: "Hey! I'm KAT AI 👋 Tell me an occasion, vibe, or budget and I'll build you the perfect outfit ✨",
+  text: "Hey! I'm KAT AI Tell me an occasion, vibe, or budget and I'll build you the perfect outfit",
 };
 
 export default function AiAssistant() {
@@ -147,7 +147,7 @@ export default function AiAssistant() {
               </div>
               <div className="flex-1">
                 <p className="font-bold text-sm">KAT AI Stylist</p>
-                <p className="text-[10px] opacity-80">Your personal style assistant ✨</p>
+                <p className="text-[10px] opacity-80">Your personal style assistant</p>
               </div>
               <button onClick={() => setOpen(false)} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
                 <ChevronDown className="w-4 h-4" />
@@ -216,4 +216,4 @@ export default function AiAssistant() {
       </AnimatePresence>
     </>
   );
-}
+                }
