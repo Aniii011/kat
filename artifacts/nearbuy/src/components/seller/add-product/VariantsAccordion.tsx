@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import type { ProductVariant } from "@/lib/product-variants";
 import { COLORS, CLOTHING_SIZES, SHOE_SIZES } from "@/lib/product-option-sets";
 import { Plus, X } from "lucide-react";
+import { Palette } from "lucide-react";
 
 function toggle(list: string[], value: string) {
   return list.includes(value) ? list.filter((x) => x !== value) : [...list, value];
@@ -136,7 +137,7 @@ export default function VariantsAccordion({
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between px-4 py-3 text-sm font-bold"
       >
-        <span>🎨 Add color/size options{variants.length > 0 ? ` (${variants.length})` : ""}</span>
+        <span className="flex items-center gap-2"><Palette className="w-4 h-4" /> Add color/size options{variants.length > 0 ? ` (${variants.length})` : ""}</span>
         {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
       </button>
 
@@ -429,4 +430,4 @@ export default function VariantsAccordion({
       )}
     </div>
   );
-          }
+}
