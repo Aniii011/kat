@@ -11,18 +11,17 @@ export type SellerCategoryId =
 export interface SellerCategoryDef {
   id: SellerCategoryId;
   label: string;
-  emoji: string;
 }
 
 export const SELLER_CATEGORIES: SellerCategoryDef[] = [
-  { id: "Fashion", label: "Fashion", emoji: "✨" },
-  { id: "Shoes", label: "Shoes", emoji: "👟" },
-  { id: "Electronics", label: "Electronics", emoji: "📱" },
-  { id: "Beauty & Health", label: "Beauty & Health", emoji: "💄" },
-  { id: "Home", label: "Home", emoji: "🏠" },
-  { id: "Jewelry & Accessories", label: "Jewelry & Accessories", emoji: "💍" },
-  { id: "Gym & Outdoor", label: "Gym & Outdoor", emoji: "🏋️" },
-  { id: "Thrift", label: "Thrift", emoji: "♻️" },
+  { id: "Fashion", label: "Fashion" },
+  { id: "Shoes", label: "Shoes" },
+  { id: "Electronics", label: "Electronics" },
+  { id: "Beauty & Health", label: "Beauty & Health" },
+  { id: "Home", label: "Home" },
+  { id: "Jewelry & Accessories", label: "Jewelry & Accessories" },
+  { id: "Gym & Outdoor", label: "Gym & Outdoor" },
+  { id: "Thrift", label: "Thrift" },
 ];
 
 // Maps a seller specialization to the existing canonical TOP_CATEGORIES values
