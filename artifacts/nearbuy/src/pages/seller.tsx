@@ -19,6 +19,10 @@ import {
   findRemovedVariants,
   hasIncompleteVariants,
   variantNeedsStock,
+  variantNeedsPrice,
+  hasIncompletePricing,
+  lowestVariantPrice,
+  totalVariantStock,
   deriveOptionsFromVariants,
   suggestSku,
   normalizeVariants,
@@ -690,14 +694,25 @@ export default function Seller() {
 
   const saveProduct = async (status: "draft" | "published") => {
     const resolvedCategory = resolveCategory();
+    const variantPriced = useVariantPricing && variants.length > 0;
+    // The listing's own price is the cheapest variant when each variant has its own;
+    // its stock is the sum of the variants.
+    const listingSellerPrice = variantPriced ? lowestVariantPrice(variants) : (Number(basePrice) || null);
+    const listingStock = variants.length > 0 ? totalVariantStock(variants) : (stockCount ? Number(stockCount) : null);
 
     if (status === "published") {
       if (!resolvedCategory) { setUploadError("Please select what you're listing."); return; }
       if (!subcategory) { setUploadError("Please select what you're listing."); return; }
       if (existingImages.length + imageFiles.length === 0) { setUploadError("Please add at least one photo."); return; }
-      if (!title.trim() || !basePrice) { setUploadError("Please fill in title and price."); return; }
-      if (!stockCount) { setUploadError("Please enter stock quantity."); return; }
+      // With variants, stock lives on each variant; with per-variant pricing, so does price.
+      if (!title.trim() || (!variantPriced && !basePrice)) { setUploadError("Please fill in title and price."); return; }
+      if (variants.length === 0 && !stockCount) { setUploadError("Please enter stock quantity."); return; }
       if (sellerCategory === "Thrift" && !thriftCondition) { setUploadError("Please select the item's condition."); return; }
+      if (variantPriced && hasIncompletePricing(variants)) {
+        const missing = variants.filter(variantNeedsPrice).map((v) => Object.values(v.attributes).join(" / "));
+        setUploadError(`Please set a price for: ${missing.join(", ")} before publishing.`);
+        return;
+      }
       if (hasIncompleteVariants(variants)) {
         const missing = variants.filter(variantNeedsStock).map((v) => Object.values(v.attributes).join(" / "));
         setUploadError(`Please set stock for: ${missing.join(", ")} before publishing.`);
@@ -762,8 +777,8 @@ export default function Seller() {
       fit: fit || null,
       material: material || null,
       occasion: occasion || null,
-      seller_price: Number(basePrice) || null,
-      price: basePrice ? Math.round(Number(basePrice) * 1.095) : 0,
+      seller_price: listingSellerPrice,
+      price: listingSellerPrice ? Math.round(listingSellerPrice * 1.095) : 0,
       image_url: allImages[0] || "",
       image_embedding: imageEmbedding,
       images: allImages,
@@ -775,7 +790,7 @@ export default function Seller() {
       thrift_condition: isNewThrift && thriftCondition ? thriftCondition : null,
       package_size: packageSize || null,
       seller_note: sellerNote.trim() || null,
-      stock_count: stockCount ? Number(stockCount) : null,
+      stock_count: listingStock,
       in_stock: true,
       seller_id: user.id,
       seller_name: user.name || user.email,
@@ -2194,4 +2209,4 @@ function EmptyState({ icon, title, action }: any) {
       {action}
     </div>
   );
-}
+    }
