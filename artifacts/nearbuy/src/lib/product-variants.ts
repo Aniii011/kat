@@ -251,3 +251,29 @@ export function resolveVariantPrice(
   const customerPrice = Math.round(sellerPrice * (1 + PLATFORM_FEE_RATE));
   return { sellerPrice, customerPrice };
 }
+
+// ---------------------------------------------------------------------------
+// 6. Per-variant pricing and stock helpers (seller form).
+//    When "Different price per variant" is on, every variant must carry its own
+//    price, and the product's overall stock is simply the sum of the variants.
+// ---------------------------------------------------------------------------
+
+export function variantNeedsPrice(variant: ProductVariant): boolean {
+  return variant.price === undefined || variant.price === null || !(Number(variant.price) > 0);
+}
+
+export function hasIncompletePricing(variants: ProductVariant[]): boolean {
+  return variants.some(variantNeedsPrice);
+}
+
+// Cheapest variant price (seller price), used as the listing's "from" price.
+export function lowestVariantPrice(variants: ProductVariant[]): number | null {
+  const prices = variants
+    .map((v) => Number(v.price))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  return prices.length > 0 ? Math.min(...prices) : null;
+}
+
+export function totalVariantStock(variants: ProductVariant[]): number {
+  return variants.reduce((sum, v) => sum + (Number(v.stock) > 0 ? Number(v.stock) : 0), 0);
+}
