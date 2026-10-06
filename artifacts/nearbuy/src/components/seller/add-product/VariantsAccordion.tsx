@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import type { ProductVariant } from "@/lib/product-variants";
+import { type ProductVariant, variantNeedsPrice } from "@/lib/product-variants";
 import { COLORS, CLOTHING_SIZES, SHOE_SIZES } from "@/lib/product-option-sets";
 import { Plus, X } from "lucide-react";
 import { Palette } from "lucide-react";
@@ -392,11 +392,18 @@ export default function VariantsAccordion({
                     <p className="text-xs font-semibold">
                       {Object.values(v.attributes).filter(Boolean).join(" / ") || "Default"}
                     </p>
-                    {(v.stock === undefined || v.stock === null) && (
-                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full shrink-0">
-                        Needs stock
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {useVariantPricing && variantNeedsPrice(v) && (
+                        <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full">
+                          Needs price
+                        </span>
+                      )}
+                      {(v.stock === undefined || v.stock === null) && (
+                        <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full">
+                          Needs stock
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <Input
                     placeholder="SKU"
@@ -407,7 +414,7 @@ export default function VariantsAccordion({
                   <div className="grid grid-cols-2 gap-2">
                     {useVariantPricing && (
                       <Input
-                        placeholder="Price (₦) — optional"
+                        placeholder="Price (₦) *"
                         type="number"
                         value={v.price ?? ""}
                         onChange={(e) => onUpdateVariant(v.id, "price", e.target.value === "" ? undefined : Number(e.target.value))}
@@ -430,4 +437,4 @@ export default function VariantsAccordion({
       )}
     </div>
   );
-}
+                                                    }
