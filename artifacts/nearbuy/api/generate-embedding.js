@@ -1,53 +1,35 @@
+import { getAuthedUser } from "./_lib/auth.js";
+import { checkRateLimit } from "./_lib/rate-limit.js";
+import { embedImage, isHttpsUrl, MAX_IMAGE_BASE64_CHARS } from "./_lib/embedding.js";
+
+// Used when a seller publishes a product, to index its first photo for visual
+// search. Requires a signed-in user and is rate limited, because every call
+// costs money on the Jina account.
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  const user = await getAuthedUser(req);
+  if (!user) return res.status(401).json({ error: "Please sign in." });
+
+  const limit = await checkRateLimit(`generate-embedding:${user.id}`, 60, 3600);
+  if (limit.limited) {
+    res.setHeader("Retry-After", String(limit.retryAfter));
+    return res.status(429).json({ error: "Too many requests. Please try again shortly." });
   }
 
-  const { imageUrl, imageBase64, mimeType } = req.body;
+  const { imageUrl, imageBase64, mimeType } = req.body || {};
 
-  if (!imageUrl && !imageBase64) {
-    return res.status(400).json({ error: "Provide either imageUrl or imageBase64" });
+  if (imageUrl) {
+    if (!isHttpsUrl(imageUrl)) return res.status(400).json({ error: "imageUrl must be an https link." });
+  } else if (typeof imageBase64 !== "string" || !imageBase64 || imageBase64.length > MAX_IMAGE_BASE64_CHARS) {
+    return res.status(400).json({ error: "Provide a valid imageUrl or imageBase64." });
   }
 
-  // Jina's API expects the image under the "image" key — either a plain URL
-  // or a base64 data URL (data:<mime>;base64,<data>), not raw base64 bytes.
-  const imageInput = imageUrl
-    ? { image: imageUrl }
-    : { image: `data:${mimeType || "image/jpeg"};base64,${imageBase64}` };
-
-  
   try {
-    const response = await fetch("https://api.jina.ai/v1/embeddings", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.JINA_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "jina-clip-v2",
-        dimensions: 768,
-        input: [imageInput],
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("Jina embedding error:", data);
-      return res.status(500).json({ error: data?.detail || data?.error?.message || "Embedding generation failed" });
-    }
-
-    const embedding = data?.data?.[0]?.embedding;
-
-    if (!Array.isArray(embedding) || embedding.length !== 768) {
-      console.error("Unexpected embedding shape from Jina:", embedding?.length);
-      return res.status(500).json({ error: "Embedding generation returned an unexpected format" });
-    }
-
+    const embedding = await embedImage({ imageUrl, imageBase64, mimeType });
     return res.status(200).json({ embedding });
-
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: error.message || "Embedding generation failed" });
+    console.error("generate-embedding failed", error?.message);
+    return res.status(500).json({ error: "Embedding generation failed" });
   }
 }
