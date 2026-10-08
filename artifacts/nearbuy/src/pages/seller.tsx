@@ -661,9 +661,13 @@ export default function Seller() {
     setGeneratingAI(true);
     setAiError("");
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
       const res = await fetch("/api/generate-listing", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionData.session?.access_token ?? ""}`,
+        },
         body: JSON.stringify({
           roughName: title,
           category: department || category, audience, fit, material, occasion,
@@ -740,9 +744,13 @@ export default function Seller() {
     let imageEmbedding = null;
     if (allImages[0]) {
       try {
+        const { data: sessionData } = await supabase.auth.getSession();
         const embedRes = await fetch("/api/generate-embedding", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${sessionData.session?.access_token ?? ""}`,
+          },
           body: JSON.stringify({ imageUrl: allImages[0] }),
         });
         const embedData = await embedRes.json();
@@ -2209,4 +2217,4 @@ function EmptyState({ icon, title, action }: any) {
       {action}
     </div>
   );
-    }
+                                 }
