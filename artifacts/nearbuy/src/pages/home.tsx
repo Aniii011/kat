@@ -12,10 +12,11 @@ import { useAuth } from "@/context/auth-context";
 import { useCart } from "@/hooks/use-cart";
 import { useInteractions } from "@/hooks/use-interactions";
 import ThemeSwitcher from "@/components/theme-switcher";
+import HeaderCartButton from "@/components/header-cart-button";
 import SaveToBoardModal from "@/components/save-to-board-modal";
 import AuthModal from "@/components/auth-modal";
 import {
-  Search, ShoppingBag, ShoppingBasket, Plus, Star, BadgeCheck, Flame, Sparkles,
+  Search, ShoppingBasket, Plus, Star, BadgeCheck, Flame, Sparkles,
   ChevronRight, Bookmark, Heart, LogIn, CheckCircle2, Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -397,11 +398,7 @@ export default function Home() {
                 <Bookmark className="w-4 h-4" />
               </Button>
             </Link>
-            <Link href="/cart">
-              <Button variant="ghost" size="icon" className="w-9 h-9 rounded-full">
-                <ShoppingBag className="w-4 h-4" />
-              </Button>
-            </Link>
+            <HeaderCartButton />
 
             {user ? (
               <Link href="/me">
@@ -644,4 +641,4 @@ export default function Home() {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
     </div>
   );
-                                                                                                                                 }
+                                    }
