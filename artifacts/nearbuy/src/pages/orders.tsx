@@ -95,12 +95,14 @@ export default function Orders() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      <header className="sticky top-0 z-20 bg-background/90 backdrop-blur-xl px-3 py-2.5 flex items-center gap-1">
-        <Link href="/me">
-          <button className="w-9 h-9 rounded-full hover:bg-muted flex items-center justify-center" aria-label="Back to account">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-        </Link>
+      <header className="sticky top-0 z-20 bg-background/90 backdrop-blur-xl">
+        <div className="max-w-lg mx-auto px-3 py-2.5 flex items-center gap-1">
+          <Link href="/me">
+            <button className="w-9 h-9 rounded-full hover:bg-muted flex items-center justify-center" aria-label="Back to account">
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+          </Link>
+        </div>
       </header>
 
       <main className="max-w-lg mx-auto px-4 pb-5 space-y-5">
@@ -210,4 +212,4 @@ export default function Orders() {
       </AnimatePresence>
     </div>
   );
-                }
+          }
