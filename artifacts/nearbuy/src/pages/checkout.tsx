@@ -204,6 +204,20 @@ export default function Checkout() {
     createdAt: new Date().toISOString(),
   });
 
+  // What is being bought and where it goes. Prices are NOT trusted: the server
+  // re-prices everything from the database (see /api/quote and /api/verify-payment).
+  const makeOrderIntent = () => ({
+    items,
+    fullName: fullName.trim(),
+    phone: phone.trim(),
+    address: address.trim(),
+    state,
+    city,
+    deliveryFee: delivery,
+    couponCode: appliedCoupon?.code || null,
+    buyerId: user?.id || null,
+  });
+
   const handleSuccessfulPayment = async (response: any) => {
     if (paymentHandledRef.current) {
       // A duplicate onSuccess firing for a transaction already being (or
@@ -215,41 +229,23 @@ export default function Checkout() {
     paymentHandledRef.current = true;
 
     try {
-      const expectedAmountKobo = total * 100;
-
-      // Order creation now happens server-side (see /api/verify-payment) —
-      // the browser only asks the server to verify-and-fulfill, and never
-      // touches `processed_payments` or inserts `orders` rows directly.
-      // This orderIntent shape must exactly match what's attached as
-      // Paystack metadata below (fullName, discount, nested buyerId) —
-      // paystack-webhook.js's reconciliation path reads that same metadata
-      // shape, so the two paths would silently diverge if these differed.
-      const orderIntent = {
-        items,
-        fullName: fullName.trim(),
-        phone: phone.trim(),
-        address: address.trim(),
-        state,
-        city,
-        deliveryFee: delivery,
-        couponCode: appliedCoupon?.code || null,
-        discount,
-        buyerId: user?.id || null,
-      };
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        setError("Your session expired. Please sign in again, then check Orders before paying again.");
+        setPlacing(false);
+        return;
+      }
 
       const verify = await fetch("/api/verify-payment", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           reference: response.reference,
-          // FIX: server-side verification now independently confirms the
-          // amount Paystack actually collected matches what Checkout
-          // expected — without this, verification only proved "a successful
-          // charge exists for this reference," not "for the right amount."
-          expectedAmount: expectedAmountKobo,
-          orderIntent,
+          orderIntent: makeOrderIntent(),
         }),
       });
 
@@ -277,12 +273,7 @@ export default function Checkout() {
       // result.created (fresh) or result.alreadyCreated (this reference was
       // already fulfilled by an earlier request/the webhook) both mean the
       // order genuinely exists — either way, this is success.
-      if (appliedCoupon) {
-        await supabase
-          .from("coupons")
-          .update({ times_used: (appliedCoupon.times_used || 0) + 1 })
-          .eq("id", appliedCoupon.id);
-      }
+      // (Coupon usage is now counted on the server when the order is created.)
 
       sessionStorage.setItem(
         "kat_order_confirmed",
@@ -322,15 +313,59 @@ export default function Checkout() {
     }
 
     try {
+      // Ask the server what this order really costs BEFORE opening the payment
+      // popup. We charge exactly the server's amount, with an unguessable reference.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        setError("Please sign in to complete your purchase.");
+        setPlacing(false);
+        return;
+      }
+
+      const quoteRes = await fetch("/api/quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ orderIntent: makeOrderIntent() }),
+      });
+      const quote = await quoteRes.json().catch(() => null);
+
+      if (!quoteRes.ok || !quote?.ok) {
+        setError(quote?.error || "We couldn't confirm your order total. Please try again.");
+        setPlacing(false);
+        return;
+      }
+
+      if (quote.total !== total) {
+        // Prices or fees changed since this page loaded: show the new numbers, don't charge yet.
+        setItems((prev) =>
+          prev.map((i) => {
+            const q = (quote.items || []).find(
+              (x: any) =>
+                x.listingId === i.listingId &&
+                (x.selectedColor || null) === (i.selectedColor || null) &&
+                (x.selectedSize || null) === (i.selectedSize || null)
+            );
+            return q ? { ...i, price: q.unitPrice } : i;
+          })
+        );
+        setError(`Some prices were updated. Your total is now ${formatNaira(quote.total)}. Please review it and tap Pay again.`);
+        setPlacing(false);
+        return;
+      }
+
       // Paystack Popup v2 API — the script tag in index.html must be
       // https://js.paystack.co/v2/inline.js for this to work.
       const popup = new PaystackPop();
       popup.newTransaction({
-        key: "pk_test_f4a152b1348a3c6f5c4b415f3341691ea02b2e2c",
+        // Set VITE_PAYSTACK_PUBLIC_KEY in Vercel (use your pk_live_ key at launch).
+        key:
+          (import.meta as any).env?.VITE_PAYSTACK_PUBLIC_KEY ||
+          "pk_test_f4a152b1348a3c6f5c4b415f3341691ea02b2e2c",
         email: user?.email || "customer@kat.ng",
-        amount: total * 100,
+        amount: quote.amountKobo,
         currency: "NGN",
-        reference: `KAT-${Date.now()}`,
+        reference: quote.reference,
         // FIX: attach the full order intent as Paystack metadata. Paystack
         // echoes metadata back on both the client success callback AND the
         // server-side webhook event. If the browser tab closes, loses
@@ -340,18 +375,7 @@ export default function Checkout() {
         // successful payment can no longer permanently disappear just
         // because the client never made it back to finish the job.
         metadata: {
-          orderIntent: {
-            items,
-            fullName: fullName.trim(),
-            phone: phone.trim(),
-            address: address.trim(),
-            state,
-            city,
-            deliveryFee: delivery,
-            couponCode: appliedCoupon?.code || null,
-            discount,
-            buyerId: user?.id || null,
-          },
+          orderIntent: makeOrderIntent(),
         },
         onSuccess: (response: any) => {
           handleSuccessfulPayment(response);
@@ -666,4 +690,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-            }
+    }
