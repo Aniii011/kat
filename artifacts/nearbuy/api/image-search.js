@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { embedImage, cleanMimeType, MAX_IMAGE_BASE64_CHARS } from "./_lib/embedding.js";
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
@@ -75,19 +76,10 @@ function computeAttributeScore(candidateProduct, imageTags) {
 }
 
 async function getVisualMatches(imageBase64, mimeType, req, imageTags) {
-  const origin = `https://${req.headers.host}`;
-  const embedRes = await fetch(`${origin}/api/generate-embedding`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ imageBase64, mimeType }),
-  });
-  const embedData = await embedRes.json();
-  if (!embedRes.ok || !Array.isArray(embedData.embedding)) {
-    throw new Error(embedData.error || "Embedding generation failed");
-  }
+  const embedding = await embedImage({ imageBase64, mimeType });
 
   const { data, error } = await supabase.rpc("match_products_by_image", {
-    query_embedding: embedData.embedding,
+    query_embedding: embedding,
     match_count: 50,
   });
   if (error) throw new Error(error.message);
@@ -128,11 +120,15 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: "Too many image searches, please try again shortly." });
   }
 
-  const { imageBase64, mimeType } = req.body;
+  const { imageBase64, mimeType: rawMimeType } = req.body || {};
 
-  if (!imageBase64) {
+  if (typeof imageBase64 !== "string" || !imageBase64) {
     return res.status(400).json({ error: "Missing image data" });
   }
+  if (imageBase64.length > MAX_IMAGE_BASE64_CHARS) {
+    return res.status(413).json({ error: "That image is too large. Try a smaller photo." });
+  }
+  const mimeType = cleanMimeType(rawMimeType);
 
   const tagsResult = await Promise.allSettled([getGeminiTags(imageBase64, mimeType)]).then((r) => r[0]);
   const imageTags = tagsResult.status === "fulfilled" ? tagsResult.value : [];
@@ -143,7 +139,7 @@ export default async function handler(req, res) {
 
   if (productsResult.status === "rejected") {
     console.error("Visual search failed:", productsResult.reason);
-    return res.status(500).json({ error: productsResult.reason.message || "Image search failed" });
+    return res.status(500).json({ error: "Image search failed. Please try again." });
   }
 
   return res.status(200).json({
