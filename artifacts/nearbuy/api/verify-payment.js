@@ -1,394 +1,115 @@
-import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "./_lib/supabase-admin.js";
+import { getAuthedUser } from "./_lib/auth.js";
+import { priceOrder } from "./_lib/pricing.js";
+import { fulfillOrder } from "./_lib/fulfill.js";
 
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const SUPPORT_NOTE = "Please contact KAT support and quote this payment reference";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({
-      verified: false,
-      error: "Method not allowed",
-    });
+    return res.status(405).json({ verified: false, error: "Method not allowed" });
   }
 
-  const { reference, expectedAmount, orderIntent } = req.body || {};
+  // 1. Who is asking? The buyer comes from the verified login token, never from the request body.
+  const user = await getAuthedUser(req);
+  if (!user) return res.status(401).json({ verified: false, error: "Please sign in to continue." });
 
-  console.log("verify-payment request body:", JSON.stringify(req.body));
+  const { reference, orderIntent } = req.body || {};
 
-  if (!reference) {
-    console.error("verify-payment 400: missing reference");
-    return res.status(400).json({
-      verified: false,
-      error: "Payment reference is required.",
-    });
+  if (typeof reference !== "string" || !/^KAT-[A-Za-z0-9-]{8,80}$/.test(reference)) {
+    return res.status(400).json({ verified: false, error: "Payment reference is invalid." });
   }
-
-  if (
-    typeof expectedAmount !== "number" ||
-    !Number.isFinite(expectedAmount) ||
-    expectedAmount <= 0
-  ) {
-    console.error("verify-payment 400: invalid expectedAmount", expectedAmount);
-    return res.status(400).json({
-      verified: false,
-      error: "Invalid expected amount.",
-    });
-  }
-
   if (!orderIntent || !Array.isArray(orderIntent.items)) {
-    console.error("verify-payment 400: missing/invalid orderIntent.items", orderIntent);
-    return res.status(400).json({
-      verified: false,
-      error: "Order information is missing.",
-    });
-  }
-
-  // buyerId lives nested in orderIntent — this is the exact same shape
-  // already attached as Paystack metadata at transaction init time (see
-  // checkout.tsx), which paystack-webhook.js also reads from. Keeping one
-  // single orderIntent shape everywhere means the client path and the
-  // webhook reconciliation path can never silently drift apart.
-  const buyerId = orderIntent.buyerId;
-
-  if (!buyerId) {
-    console.error("verify-payment 400: missing buyerId on orderIntent", orderIntent);
-    return res.status(400).json({
-      verified: false,
-      error: "Buyer information is missing.",
-    });
+    return res.status(400).json({ verified: false, error: "Order information is missing." });
   }
 
   try {
-    /*
-     * 1. Verify the transaction directly with Paystack.
-     */
+    // 2. Ask Paystack whether this payment really succeeded.
     const response = await fetch(
       `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-          "Content-Type": "application/json",
-        },
-      }
+      { headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` } }
     );
-
     const data = await response.json();
+    const transaction = data?.data;
 
-    console.log("Paystack verify:", {
-      reference,
-      apiStatus: data.status,
-      transactionStatus: data.data?.status,
-      amount: data.data?.amount,
-      currency: data.data?.currency,
-    });
-
-    const transaction = data.data;
-
-    const verified =
-      Boolean(data.status) &&
+    const paid =
+      Boolean(data?.status) &&
       transaction?.status === "success" &&
       transaction?.reference === reference &&
-      transaction?.currency === "NGN" &&
-      transaction?.amount === expectedAmount;
+      transaction?.currency === "NGN";
 
-    if (!verified) {
-      return res.status(200).json({
-        verified: false,
-        reason: "Payment verification failed.",
-        payment: transaction || null,
-      });
+    if (!paid) {
+      return res.status(200).json({ verified: false, reason: "Payment verification failed." });
     }
 
-    /*
-     * 2. Check whether this payment already created orders.
-     *
-     * This is important because both the browser callback and
-     * Paystack webhook can reach the fulfillment logic.
-     */
-    const { data: existingOrders, error: existingOrdersError } =
-      await supabaseAdmin
-        .from("orders")
-        .select("id")
-        .eq("payment_ref", reference)
-        .limit(1);
-
-    if (existingOrdersError) {
-      console.error(
-        "Existing order lookup failed:",
-        existingOrdersError
-      );
-
-      return res.status(500).json({
-        verified: false,
-        error: "Could not check existing order.",
-      });
+    // 3. The payment must belong to this signed-in buyer.
+    if (transaction?.metadata?.orderIntent?.buyerId !== user.id) {
+      console.error("verify-payment: buyer mismatch", { reference });
+      return res.status(403).json({ verified: false, error: "This payment belongs to a different account." });
     }
 
-    if (existingOrders && existingOrders.length > 0) {
+    // 4. Already turned into orders (retry, or the webhook got there first)? Return them.
+    const { data: existing } = await supabaseAdmin
+      .from("orders")
+      .select("id, buyer_id")
+      .eq("payment_ref", reference);
+
+    if (existing && existing.length > 0) {
+      if (existing[0].buyer_id !== user.id) {
+        return res.status(403).json({ verified: false, error: "This payment belongs to a different account." });
+      }
       return res.status(200).json({
         verified: true,
         alreadyCreated: true,
-        orderIds: existingOrders.map((order) => order.id),
-        payment: transaction,
+        orderIds: existing.map((o) => o.id),
       });
     }
 
-    /*
-     * 3. Prevent another fulfillment request from winning the race.
-     *
-     * IMPORTANT:
-     * The browser no longer touches processed_payments.
-     * This happens with the service-role client on the server.
-     */
-    const { error: claimError } = await supabaseAdmin
-      .from("processed_payments")
-      .insert({
-        payment_ref: reference,
-      });
-
-    if (claimError) {
-      /*
-       * A duplicate key means another fulfillment path already
-       * claimed this payment. We do NOT treat every database
-       * error as a duplicate.
-       */
-      const duplicate =
-        claimError.code === "23505" ||
-        String(claimError.message || "")
-          .toLowerCase()
-          .includes("duplicate");
-
-      if (duplicate) {
-        const { data: retryOrders } = await supabaseAdmin
-          .from("orders")
-          .select("id")
-          .eq("payment_ref", reference);
-
-        if (retryOrders && retryOrders.length > 0) {
-          return res.status(200).json({
-            verified: true,
-            alreadyCreated: true,
-            orderIds: retryOrders.map((order) => order.id),
-            payment: transaction,
-          });
-        }
-
-        /*
-         * Another process may currently be creating the order.
-         * Tell the browser to wait rather than charging again.
-         */
-        return res.status(200).json({
-          verified: true,
-          processing: true,
-          payment: transaction,
-        });
-      }
-
-      console.error(
-        "processed_payments claim failed:",
-        claimError
-      );
-
-      return res.status(500).json({
+    // 5. Work out what the order SHOULD cost from the database, and require the
+    //    amount Paystack actually collected to match it exactly.
+    const priced = await priceOrder(supabaseAdmin, orderIntent);
+    if (!priced.ok) {
+      console.error("verify-payment: could not price order", { reference, reason: priced.error });
+      return res.status(409).json({
         verified: false,
-        error: "Could not reserve payment for order creation.",
+        error: `We received your payment but couldn't confirm your order. ${SUPPORT_NOTE}: ${reference}`,
       });
     }
 
-    /*
-     * 4. Fetch the real product/seller information from Supabase.
-     *
-     * We do not trust product pricing or seller information
-     * supplied by the browser.
-     */
-    const listingIds = orderIntent.items
-      .map((item) => item.listingId)
-      .filter(Boolean);
-
-    if (listingIds.length !== orderIntent.items.length) {
-      console.error("verify-payment 400: item missing listingId", orderIntent.items);
-      await supabaseAdmin
-        .from("processed_payments")
-        .delete()
-        .eq("payment_ref", reference);
-
-      return res.status(400).json({
+    if (transaction.amount !== priced.total * 100) {
+      console.error("verify-payment: AMOUNT MISMATCH", {
+        reference,
+        paidKobo: transaction.amount,
+        expectedKobo: priced.total * 100,
+      });
+      return res.status(409).json({
         verified: false,
-        error: "One or more products are missing.",
+        error: `The amount paid doesn't match your order total. ${SUPPORT_NOTE}: ${reference}`,
       });
     }
 
-    const { data: products, error: productsError } =
-      await supabaseAdmin
-        .from("products")
-        .select(
-          "id, seller_id, store_id, seller_name, title, image_url"
-        )
-        .in("id", listingIds);
-
-    if (productsError) {
-      console.error("Product lookup failed:", productsError);
-
-      await supabaseAdmin
-        .from("processed_payments")
-        .delete()
-        .eq("payment_ref", reference);
-
-      return res.status(500).json({
-        verified: false,
-        error: "Could not load products.",
-      });
-    }
-
-    const productMap = new Map(
-      (products || []).map((product) => [product.id, product])
-    );
-
-    /*
-     * 5. Build order rows.
-     *
-     * Keep the same order shape your current Checkout uses.
-     */
-    const rows = [];
-
-    for (const item of orderIntent.items) {
-      const product = productMap.get(item.listingId);
-
-      if (!product) {
-        console.error("verify-payment 400: product not found", item.listingId, "known ids:", Array.from(productMap.keys()));
-        await supabaseAdmin
-          .from("processed_payments")
-          .delete()
-          .eq("payment_ref", reference);
-
-        return res.status(400).json({
-          verified: false,
-          error: `Product ${item.listingId} could not be found.`,
-        });
-      }
-
-      rows.push({
-        product_id: item.listingId,
-        product_title: product.title || item.title || "Product",
-        product_image: product.image_url || item.imageUrl || null,
-        product_seller_name:
-          product.seller_name || item.sellerName || null,
-
-        buyer_id: buyerId,
-
-        // Real orderIntent field names — must match exactly what
-        // checkout.tsx attaches as Paystack metadata (fullName, discount),
-        // since paystack-webhook.js reads that same metadata shape for its
-        // own reconciliation path. A mismatch here would silently corrupt
-        // orders created via one path but not the other.
-        buyer_name: orderIntent.fullName || null,
-        buyer_address: orderIntent.address || null,
-        buyer_phone: orderIntent.phone || null,
-
-        delivery_area: orderIntent.city || null,
-        delivery_state: orderIntent.state || null,
-        delivery_fee: Number(orderIntent.deliveryFee || 0),
-
-        amount: Number(item.price || 0),
-        quantity: Number(item.quantity || 1),
-
-        total:
-          Number(item.price || 0) *
-          Number(item.quantity || 1),
-
-        variant: {
-          color: item.selectedColor || null,
-          size: item.selectedSize || null,
-        },
-
-        coupon_code: orderIntent.couponCode || null,
-        discount_amount: Number(orderIntent.discount || 0),
-
-        status: "pending",
-        seller_status: "pending",
-        admin_status: "accepted",
-        assigned_to_seller: Boolean(product.seller_id),
-
-        seller_id: product.seller_id || null,
-        store_id: product.store_id || null,
-
-        payment_ref: reference,
-      });
-    }
-
-    /*
-     * 6. Create the orders.
-     */
-    const { data: createdOrders, error: ordersError } =
-      await supabaseAdmin
-        .from("orders")
-        .insert(rows)
-        .select("id, payment_ref");
-
-    if (ordersError || !createdOrders) {
-      console.error("Order creation failed:", ordersError);
-
-      /*
-       * Release the idempotency claim so the webhook can retry.
-       */
-      await supabaseAdmin
-        .from("processed_payments")
-        .delete()
-        .eq("payment_ref", reference);
-
-      return res.status(500).json({
-        verified: false,
-        error: "Payment verified but order creation failed.",
-      });
-    }
-
-    /*
-     * 7. Create order events.
-     */
-    const events = createdOrders.map((order) => ({
-      order_id: order.id,
-      status: "pending",
-      note: "Order placed successfully.",
-    }));
-
-    const { error: eventsError } = await supabaseAdmin
-      .from("order_events")
-      .insert(events);
-
-    if (eventsError) {
-      console.error("Order events creation failed:", eventsError);
-
-      /*
-       * Do NOT delete processed_payments here.
-       *
-       * The orders already exist. Re-running fulfillment would
-       * risk duplicate orders.
-       */
-    }
-
-    console.log("Order fulfillment successful:", {
+    // 6. Create the orders.
+    const result = await fulfillOrder(supabaseAdmin, {
       reference,
-      orderIds: createdOrders.map((order) => order.id),
+      intent: orderIntent,
+      priced,
+      buyerId: user.id,
+      eventStatus: "pending",
+      eventNote: "Order placed successfully.",
     });
 
-    return res.status(200).json({
-      verified: true,
-      created: true,
-      orderIds: createdOrders.map((order) => order.id),
-      payment: transaction,
-    });
+    if (result.state === "processing") {
+      return res.status(200).json({ verified: true, processing: true });
+    }
+    if (result.state === "already") {
+      return res.status(200).json({ verified: true, alreadyCreated: true, orderIds: result.orderIds });
+    }
+    if (result.state === "created") {
+      return res.status(200).json({ verified: true, created: true, orderIds: result.orderIds });
+    }
+    return res.status(500).json({ verified: false, error: result.message });
   } catch (error) {
-    console.error("verify-payment error:", error);
-
-    return res.status(500).json({
-      verified: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Payment verification failed.",
-    });
+    console.error("verify-payment error", error?.message);
+    return res.status(500).json({ verified: false, error: "Payment verification failed. Please try again." });
   }
         }
