@@ -159,7 +159,6 @@ export default function Me() {
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [showPrivacy, setShowPrivacy] = useState(false);
   const [showReturns, setShowReturns] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const openOrder = (order: ActiveOrder) => {
@@ -340,35 +339,6 @@ export default function Me() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {showPrivacy && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center px-4 pb-4 sm:pb-0">
-            <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }} className="bg-card border border-card-border rounded-3xl p-6 max-w-sm w-full shadow-xl max-h-[80vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-black text-base">Privacy Policy</h3>
-                <button onClick={() => setShowPrivacy(false)} aria-label="Close" className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="space-y-4 text-sm text-muted-foreground">
-                <p className="text-xs">Last updated: June 2025</p>
-                {[
-                  { title: "Information We Collect", content: "We collect information you provide when creating an account, making purchases, or contacting support." },
-                  { title: "How We Use Your Information", content: "We use your information to process orders, send updates, and improve our services." },
-                  { title: "Data Security", content: "We use industry-standard security measures. Payment details are encrypted and never stored on our servers." },
-                  { title: "Your Rights", content: "You can access, update, or delete your personal information at any time by contacting us." },
-                ].map(({ title, content }) => (
-                  <div key={title}>
-                    <p className="font-semibold text-foreground mb-1">{title}</p>
-                    <p>{content}</p>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
         {showReturns && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center px-4 pb-4 sm:pb-0">
             <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }} className="bg-card border border-card-border rounded-3xl p-6 max-w-sm w-full shadow-xl space-y-4">
@@ -400,7 +370,7 @@ export default function Me() {
         theme={theme}
         setBase={setBase}
         setAccent={setAccent}
-        onOpenPrivacy={() => { setShowSettings(false); setShowPrivacy(true); }}
+        onOpenPrivacy={() => { setShowSettings(false); navigate("/privacy"); }}
         onSignOut={() => setShowSignOutConfirm(true)}
       />
 
@@ -630,4 +600,4 @@ export default function Me() {
       </main>
     </div>
   );
-      }
+    }
