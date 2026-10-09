@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { supportMailto } from "@/lib/support";
 
 function formatNaira(n: number) {
   return "₦" + Number(n || 0).toLocaleString("en-NG");
@@ -327,7 +328,7 @@ export default function ShopByStore() {
           <button
             onClick={() => {
               if (window.confirm("Report this store to KAT admin?")) {
-                window.open(`https://wa.me/2348103925304?text=I want to report store: ${store.name} (ID: ${storeId})`, "_blank");
+                window.location.href = supportMailto(`Report store: ${store.name}`, `I want to report store: ${store.name} (ID: ${storeId})\n\nReason:\n`);
               }
             }}
             className="flex items-center gap-2 text-xs text-muted-foreground hover:text-destructive transition-colors"
@@ -338,4 +339,4 @@ export default function ShopByStore() {
       </div>
     </div>
   );
-                                                           }
+                  }
