@@ -17,8 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-
-const SUPPORT_EMAIL = "supportkat00@gmail.com";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 interface ProfileRow {
   full_name: string | null;
@@ -600,4 +599,4 @@ export default function Me() {
       </main>
     </div>
   );
-    }
+}
