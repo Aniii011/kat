@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { CheckCircle2, ShoppingBag, MapPin, Home, MessageCircle, Copy, Check, AlertCircle } from "lucide-react";
+import { CheckCircle2, ShoppingBag, MapPin, Home, Mail, Copy, Check, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { supportMailto } from "@/lib/support";
 import { STATUS_SEQUENCE, STATUS_META } from "@/lib/order-status";
 
 function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
@@ -184,14 +185,14 @@ export default function OrderConfirmation() {
           transition={{ delay: 0.6 }}
           className="bg-muted rounded-2xl p-4 flex items-center gap-3"
         >
-          <MessageCircle className="w-5 h-5 text-primary shrink-0" />
+          <Mail className="w-5 h-5 text-primary shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold">Need help with your order?</p>
             <p className="text-xs text-muted-foreground">
-              Contact us on WhatsApp{order.paymentRef ? ` with order #${order.paymentRef}` : ""}</p>
+              Email us{order.paymentRef ? ` with order #${order.paymentRef}` : ""}</p>
           </div>
-          <a href="https://wa.me/2348000000000" target="_blank" rel="noopener noreferrer">
-            <Button size="sm" variant="outline" className="rounded-full text-xs shrink-0">Chat</Button>
+          <a href={supportMailto(order.paymentRef ? `Help with order #${order.paymentRef}` : "Help with my order")}>
+            <Button size="sm" variant="outline" className="rounded-full text-xs shrink-0">Email</Button>
           </a>
         </motion.div>
 
