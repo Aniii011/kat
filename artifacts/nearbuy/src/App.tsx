@@ -31,6 +31,8 @@ import ShopByStore from "@/pages/shop-by-store";
 import Inbox from "@/pages/inbox";
 import Reviews from "@/pages/reviews";
 import Following from "@/pages/following";
+import Privacy from "@/pages/privacy";
+import Terms from "@/pages/terms";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +62,10 @@ function Router() {
       <Route path="/admin/orders/:id" component={AdminOrderDetail} />
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/auth/callback" component={AuthCallback} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/terms" component={Terms} />
+      {/* Kept so the link already saved in Google Cloud (/term) doesn't 404 */}
+      <Route path="/term" component={Terms} />
       <Route component={NotFound} />
     </Switch>
   );
