@@ -84,7 +84,7 @@ const SECTIONS: LegalSection[] = [
     body: ["You agree not to:"],
     bullets: [
       "break the law or use KAT to commit fraud;",
-      "post reviews or messages that are false, abusive, hateful or misleading;",
+      "post reviews or other content that is false, abusive, hateful or misleading;",
       "harass other users or try to take transactions or payments outside KAT to avoid fees or protections;",
       "interfere with the security or normal working of the site, or access accounts and data that are not yours;",
       "copy or scrape KAT in bulk without our written permission.",
