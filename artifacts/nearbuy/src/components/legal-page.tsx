@@ -1,7 +1,8 @@
 import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
-export const SUPPORT_EMAIL = "supportkat00@gmail.com";
+export { SUPPORT_EMAIL };
 
 export type LegalSection = {
   title: string;
