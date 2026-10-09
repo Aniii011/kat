@@ -16,7 +16,7 @@ const SECTIONS: LegalSection[] = [
       "Order and delivery details: your full name, phone number, delivery address, state and delivery area, the items you order, and the amounts paid.",
       "Payment confirmation: payments are handled by Paystack. We receive a payment reference and the payment status, but we never see or store your full card details.",
       "Seller details: if you apply to sell, your store name, store description and category, and the product listings and photos you upload.",
-      "Content you create: reviews, saved items, wishlists and boards, followed stores, and messages you send through KAT.",
+      "Content you create: reviews, saved items, wishlists and boards, and the stores you follow.",
       "Photos you upload for image search: when you search with a picture, the image is processed so we can find similar products.",
       "Basic device data: KAT stores your sign-in session and your theme choice in your browser's local storage so you stay signed in and your settings are remembered.",
     ],
