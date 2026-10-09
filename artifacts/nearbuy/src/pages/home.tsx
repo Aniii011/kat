@@ -628,6 +628,15 @@ export default function Home() {
             </div>
           </section>
         )}
+
+        {/* Footer — public legal links (also required for Google sign-in verification) */}
+        <footer className="mt-12 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
+          <p>© {new Date().getFullYear()} KAT. All rights reserved.</p>
+          <nav className="flex items-center gap-4" aria-label="Legal">
+            <Link href="/privacy" className="hover:text-foreground underline underline-offset-2">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-foreground underline underline-offset-2">Terms of Service</Link>
+          </nav>
+        </footer>
       </main>
 
       {saveTarget && (
@@ -641,4 +650,4 @@ export default function Home() {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
     </div>
   );
-                                    }
+    }
