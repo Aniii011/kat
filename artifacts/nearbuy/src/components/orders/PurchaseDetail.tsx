@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Package, MessageCircle, Copy, Check, RotateCcw, Pencil } from "lucide-react";
+import { ArrowLeft, Package, Mail, Copy, Check, RotateCcw, Pencil } from "lucide-react";
 import { Link } from "wouter";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
+import { supportMailto } from "@/lib/support";
 import { Input } from "@/components/ui/input";
 import { resolveProduct, orderStage, type PurchaseGroup } from "@/lib/order-groups";
 import { STATUS_META, normalizeStatus, deliveryExpectationCopy } from "@/lib/order-status";
@@ -171,12 +172,10 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
 
           {isCancelled && (
             <a
-              href="https://wa.me/2348000000000"
-              target="_blank"
-              rel="noopener noreferrer"
+              href={supportMailto(group.paymentRef ? `Refund for cancelled order #${group.paymentRef}` : "Refund for cancelled order")}
               className="inline-flex items-center gap-1.5 text-sm font-bold text-primary mt-3"
             >
-              <MessageCircle className="w-4 h-4" /> Chat with us — including about a refund
+              <Mail className="w-4 h-4" /> Email us — including about a refund
             </a>
           )}
         </section>
@@ -321,19 +320,17 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
           )
         ) : !isCancelled ? (
           <a
-            href="https://wa.me/2348000000000"
-            target="_blank"
-            rel="noopener noreferrer"
+            href={supportMailto(group.paymentRef ? `Help with order #${group.paymentRef}` : "Help with my order")}
             className="flex items-center gap-3 bg-muted rounded-xl p-4"
           >
-            <MessageCircle className="w-5 h-5 text-primary shrink-0" />
+            <Mail className="w-5 h-5 text-primary shrink-0" />
             <div>
               <p className="text-sm font-semibold">Need help with this order?</p>
-              <p className="text-xs text-muted-foreground">Chat with us on WhatsApp</p>
+              <p className="text-xs text-muted-foreground">Email us and quote your order number</p>
             </div>
           </a>
         ) : null}
       </main>
     </motion.div>
   );
-                                           }
+              }
