@@ -5,6 +5,35 @@ import { Eye, EyeOff, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
+import AuthModal from "@/components/auth-modal";
+
+// Captured when this module loads, before supabase-js has a chance to strip
+// the token (or the error) out of the address bar.
+const INITIAL_URL =
+  typeof window !== "undefined"
+    ? { search: window.location.search, hash: window.location.hash }
+    : { search: "", hash: "" };
+
+type LinkState = "checking" | "ready" | "expired" | "invalid";
+
+function getInitialLinkState(): LinkState {
+  const query = new URLSearchParams(INITIAL_URL.search);
+  const hash = new URLSearchParams(INITIAL_URL.hash.replace(/^#/, ""));
+
+  // Supabase sends the user back with an error when the link is expired or already used.
+  const errorCode = hash.get("error_code") ?? query.get("error_code");
+  const error = hash.get("error") ?? query.get("error");
+  if (errorCode === "otp_expired") return "expired";
+  if (errorCode || error) return "invalid";
+
+  // A genuine reset link always arrives carrying a token or a code.
+  const hasRecoveryParams =
+    hash.get("type") === "recovery" ||
+    hash.has("access_token") ||
+    query.has("code") ||
+    query.has("token_hash");
+  return hasRecoveryParams ? "checking" : "invalid";
+}
 
 function getPasswordStrength(password: string) {
   const checks = {
@@ -27,6 +56,36 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [linkState, setLinkState] = useState<LinkState>(getInitialLinkState);
+  const [showRequestLink, setShowRequestLink] = useState(false);
+
+  // Wait for supabase-js to turn the link's token into a session.
+  useEffect(() => {
+    if (linkState !== "checking") return;
+    let settled = false;
+    const markReady = () => {
+      settled = true;
+      setLinkState("ready");
+    };
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (
+        session &&
+        (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN" || event === "INITIAL_SESSION")
+      ) {
+        markReady();
+      }
+    });
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) markReady();
+    });
+    const timer = window.setTimeout(() => {
+      if (!settled) setLinkState("invalid");
+    }, 6000);
+    return () => {
+      listener.subscription.unsubscribe();
+      window.clearTimeout(timer);
+    };
+  }, [linkState]);
 
   const strength = getPasswordStrength(password);
   const isValid = strength.score === 4;
@@ -49,7 +108,11 @@ export default function ResetPassword() {
     const { error } = await supabase.auth.updateUser({ password });
     setLoading(false);
     if (error) {
-      setError(error.message);
+      if (error.message.toLowerCase().includes("session")) {
+        setLinkState("expired");
+      } else {
+        setError(error.message);
+      }
     } else {
       setSuccess(true);
       setTimeout(() => navigate("/me"), 2000);
@@ -81,6 +144,39 @@ export default function ResetPassword() {
             <p className="text-xs text-muted-foreground mt-1">
               Redirecting you to your account...
             </p>
+          </motion.div>
+        ) : linkState === "checking" ? (
+          <div className="text-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto" />
+            <p className="text-xs text-muted-foreground mt-3">Checking your link...</p>
+          </div>
+        ) : linkState !== "ready" ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center py-4"
+          >
+            <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-3">
+              <XCircle className="w-7 h-7 text-destructive" />
+            </div>
+            <p className="font-bold text-base">
+              {linkState === "expired" ? "This reset link has expired" : "This reset link isn't valid"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+              {linkState === "expired"
+                ? "For your security, reset links only work for a short time and can only be used once. Request a new one to continue."
+                : "It may have already been used, or it wasn't opened from the email we sent. Request a new one to continue."}
+            </p>
+            <Button className="w-full rounded-full h-11 font-bold mt-5" onClick={() => setShowRequestLink(true)}>
+              Request a new link
+            </Button>
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="text-xs text-muted-foreground hover:text-foreground mt-3 underline underline-offset-2"
+            >
+              Back to KAT
+            </button>
           </motion.div>
         ) : (
           <form onSubmit={handleReset} className="space-y-4">
@@ -154,6 +250,7 @@ export default function ResetPassword() {
           </form>
         )}
       </motion.div>
+      <AuthModal open={showRequestLink} onClose={() => setShowRequestLink(false)} defaultMode="forgot" />
     </div>
   );
-}
+    }
