@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase";
 interface AuthModalProps {
   open: boolean;
   onClose: () => void;
-  defaultMode?: "login" | "signup";
+  defaultMode?: "login" | "signup" | "forgot";
 }
 
 function getPasswordStrength(password: string) {
@@ -441,4 +441,4 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
       )}
     </AnimatePresence>
   );
-}
+      }
