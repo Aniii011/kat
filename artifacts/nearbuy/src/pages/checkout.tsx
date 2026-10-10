@@ -144,42 +144,34 @@ export default function Checkout() {
     setApplyingCoupon(true);
     setCouponError("");
 
-    const { data, error } = await supabase
-      .from("coupons")
-      .select("*")
-      .eq("code", code)
-      .eq("active", true)
-      .single();
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        setCouponError("Please sign in to use a coupon.");
+        setAppliedCoupon(null);
+        setApplyingCoupon(false);
+        return;
+      }
 
-    if (error || !data) {
-      setCouponError("Invalid or expired coupon code.");
+      // Checked on the server so coupon codes can't be listed from the browser.
+      const res = await fetch("/api/coupon", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ code, subtotal }),
+      });
+      const result = await res.json().catch(() => null);
+
+      if (!res.ok || !result?.ok) {
+        setCouponError(result?.error || "Couldn't check that coupon. Please try again.");
+        setAppliedCoupon(null);
+      } else {
+        setAppliedCoupon(result.coupon);
+      }
+    } catch {
+      setCouponError("Couldn't check that coupon. Please try again.");
       setAppliedCoupon(null);
-      setApplyingCoupon(false);
-      return;
     }
-
-    if (data.expires_at && new Date(data.expires_at) < new Date()) {
-      setCouponError("This coupon has expired.");
-      setAppliedCoupon(null);
-      setApplyingCoupon(false);
-      return;
-    }
-
-    if (data.usage_limit && data.times_used >= data.usage_limit) {
-      setCouponError("This coupon has reached its usage limit.");
-      setAppliedCoupon(null);
-      setApplyingCoupon(false);
-      return;
-    }
-
-    if (data.min_order_amount && subtotal < data.min_order_amount) {
-      setCouponError(`This code requires a minimum order of ${formatNaira(data.min_order_amount)}.`);
-      setAppliedCoupon(null);
-      setApplyingCoupon(false);
-      return;
-    }
-
-    setAppliedCoupon(data);
     setApplyingCoupon(false);
   };
 
@@ -690,4 +682,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-    }
+                                          }
