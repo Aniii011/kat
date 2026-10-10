@@ -13,14 +13,28 @@ import { useCart } from "@/hooks/use-cart";
 import { useInteractions } from "@/hooks/use-interactions";
 import ThemeSwitcher from "@/components/theme-switcher";
 import HeaderCartButton from "@/components/header-cart-button";
+import { flyToCart } from "@/lib/cart-feedback";
 import SaveToBoardModal from "@/components/save-to-board-modal";
 import AuthModal from "@/components/auth-modal";
 import {
-  Search, ShoppingBasket, Plus, Star, BadgeCheck, Flame, Sparkles,
+  Search, ShoppingBag, Plus, Star, BadgeCheck, Flame, Sparkles,
   ChevronRight, Bookmark, Heart, LogIn, CheckCircle2, Play,
 } from "lucide-react";
+import { Gem, Crown, Leaf, Flower, TreePalm, Check, Recycle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { LucideIcon } from "lucide-react";
+
+const VIBE_ICONS: Record<string, LucideIcon> = {
+  "Old Money": Gem,
+  "Baddie": Crown,
+  "Boho": Leaf,
+  "90s African Aunty": Flower,
+  "Clean Girl": Sparkles,
+  "Streetwear": Flame,
+  "Vacay": TreePalm,
+  "Soft Girl": Heart,
+};
 
 function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
 
@@ -32,13 +46,16 @@ const BADGE_STYLES: Record<string, string> = {
   "Limited":     "bg-purple-600 text-white",
 };
 
+// Announcement text can come from the database, so strip any emoji at render time.
+const stripEmoji = (s: string) => s.replace(/[\p{Extended_Pictographic}\uFE0F\u200d]+\s*/gu, "").trim();
+
 const DEFAULT_ANNOUNCEMENT_ITEMS = [
-  "🛍️ Shop the latest drops",
-  "✨ New arrivals daily",
-  "🔒 Secure checkout",
-  "💜 Verified sellers only",
-  "📦 Fast delivery across Nigeria",
-  "🌟 Trusted by thousands",
+  "Shop the latest drops",
+  "New arrivals daily",
+  "Secure checkout",
+  "Verified sellers only",
+  "Fast delivery across Nigeria",
+  "Trusted by thousands",
 ];
 
 function ProductCard({
@@ -94,6 +111,7 @@ function ProductCard({
       sellerName: listing.sellerName,
       quantity: 1,
     });
+    flyToCart(e.currentTarget as Element, listing.imageUrl);
     setAddedToCart(true);
     setTimeout(() => setAddedToCart(false), 1500);
   };
@@ -121,7 +139,7 @@ function ProductCard({
             <div className="absolute top-2 left-2 flex flex-col gap-1">
               {listing.isThrift && (
                 <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-purple-500 text-white leading-tight">
-                  Thrift 💜
+                  Thrift
                 </span>
               )}
               {listing.badge && !listing.isThrift && (
@@ -185,16 +203,17 @@ function ProductCard({
                 <motion.button
                   onClick={handleAddToCart}
                   whileTap={{ scale: 0.85 }}
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                    addedToCart ? "border-emerald-500 bg-emerald-500" : "border-primary bg-transparent"
+                  aria-label="Add to cart"
+                  className={`w-8 h-8 rounded-full flex items-center justify-center shadow-sm transition-all ${
+                    addedToCart ? "bg-emerald-500" : "bg-primary"
                   }`}
                 >
                   {addedToCart ? (
-                    <CheckCircle2 className="w-3 h-3 text-white" />
+                    <Check className="w-4 h-4 text-white" strokeWidth={3} />
                   ) : (
                     <div className="relative">
-                      <ShoppingBasket className="w-3 h-3 text-primary" />
-                      <Plus className="w-1.5 h-1.5 text-primary-foreground absolute -top-0.5 -right-0.5 bg-primary rounded-full" strokeWidth={4} />
+                      <ShoppingBag className="w-4 h-4 text-primary-foreground" />
+                      <Plus className="w-2.5 h-2.5 text-primary bg-primary-foreground rounded-full absolute -top-1 -right-1.5" strokeWidth={4} />
                     </div>
                   )}
                 </motion.button>
@@ -370,7 +389,7 @@ export default function Home() {
             transition={{ duration: 0.3 }}
             className="block"
           >
-            {announcementItems[announcementIndex % announcementItems.length]}
+            {stripEmoji(announcementItems[announcementIndex % announcementItems.length])}
           </motion.span>
         </AnimatePresence>
       </div>
@@ -451,7 +470,7 @@ export default function Home() {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {cat === "Thrift" ? "💜 Thrift" : cat}
+                {cat}
               </button>
             ))}
           </div>
@@ -511,20 +530,20 @@ export default function Home() {
                 </Button>
                 <Link href="/thrift-drops">
                   <Button variant="outline" size="sm" className="rounded-full font-semibold border-primary/50 text-primary hover:bg-primary/10">
-                    💜 Thrift Drops
+                    <Recycle className="w-3.5 h-3.5 mr-1.5" /> Thrift Drops
                   </Button>
                 </Link>
               </div>
             </div>
             <div className="absolute right-6 top-1/2 -translate-y-1/2 text-[72px] opacity-10 pointer-events-none hidden sm:block select-none">
-              ✨
+              <Sparkles className="w-[72px] h-[72px]" />
             </div>
           </motion.div>
         )}
 
         {topCategory === "Deals" && (
           <div className="mt-4 mb-5 rounded-3xl bg-gradient-to-r from-rose-500 to-orange-400 p-5 text-white">
-            <p className="text-2xl font-black">🔥 Deals & Offers</p>
+            <p className="text-2xl font-black flex items-center gap-2"><Flame className="w-6 h-6" /> Deals & Offers</p>
             <p className="text-sm opacity-90 mt-1">Up to 35% off selected items</p>
           </div>
         )}
@@ -532,7 +551,7 @@ export default function Home() {
         {topCategory === "All" && (
           <section className="mb-4">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-bold">✨ Shop by Vibe</h2>
+              <h2 className="text-sm font-bold flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-primary" /> Shop by Vibe</h2>
               {selectedAesthetic && (
                 <button onClick={() => setSelectedAesthetic(null)} className="text-xs text-primary font-semibold">
                   Clear
@@ -540,7 +559,9 @@ export default function Home() {
               )}
             </div>
             <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-              {AESTHETICS.map(({ label, emoji }) => (
+              {AESTHETICS.map(({ label }) => {
+                const VibeIcon = VIBE_ICONS[label];
+                return (
                 <button
                   key={label}
                   onClick={() => setSelectedAesthetic(selectedAesthetic === label ? null : label)}
@@ -550,9 +571,10 @@ export default function Home() {
                       : "bg-card border-border hover:border-primary hover:text-primary"
                   }`}
                 >
-                  <span>{emoji}</span> {label}
+                  {VibeIcon && <VibeIcon className="w-3.5 h-3.5" aria-hidden="true" />} {label}
                 </button>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}
@@ -580,7 +602,7 @@ export default function Home() {
           </div>
         ) : filteredListings.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-5xl mb-4">🔍</p>
+            <Search className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <p className="font-bold text-base">No items found</p>
             <Button variant="outline" size="sm" className="mt-5 rounded-full" onClick={() => { selectTop("All"); setSelectedAesthetic(null); }}>
               Clear filters
@@ -604,7 +626,7 @@ export default function Home() {
           <section className="mt-12 mb-4">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-base font-black">💜 Thrift Drops</h2>
+                <h2 className="text-base font-black flex items-center gap-1.5"><Recycle className="w-4 h-4 text-purple-500" /> Thrift Drops</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   One-of-one vintage & pre-loved — deposit to hold
                 </p>
@@ -650,4 +672,4 @@ export default function Home() {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
     </div>
   );
-    }
+  }
