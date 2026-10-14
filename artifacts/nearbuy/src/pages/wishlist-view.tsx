@@ -35,23 +35,14 @@ export default function WishlistView() {
 
   const fetchWishlist = async () => {
     setLoading(true);
-    const { data: wl } = await supabase
-      .from("wishlists")
-      .select("*")
-      .eq("id", wishlistId)
-      .eq("is_public", true)
-      .single();
+    // Loaded through a database function that returns this one wishlist (found by
+    // its id from the shared link), so the wishlists table can't be read in bulk.
+    const { data } = await supabase.rpc("get_public_wishlist", { p_id: wishlistId });
 
-    if (!wl) { navigate("/"); return; }
+    if (!data) { navigate("/"); return; }
+    const { items: wlItems, ...wl } = data as any;
     setWishlist(wl);
-
-    const { data: wlItems } = await supabase
-      .from("wishlist_items")
-      .select("*")
-      .eq("wishlist_id", wishlistId)
-      .order("created_at", { ascending: true });
-
-    if (wlItems) setItems(wlItems);
+    setItems(wlItems || []);
     setLoading(false);
   };
 
@@ -229,4 +220,4 @@ export default function WishlistView() {
       </div>
     </div>
   );
-            }
+        }
