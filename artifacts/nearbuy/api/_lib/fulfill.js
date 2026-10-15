@@ -6,7 +6,7 @@ async function releaseClaim(sb, reference) {
   await sb.from("processed_payments").delete().eq("payment_ref", reference);
 }
 
-export async function fulfillOrder(sb, { reference, intent, priced, buyerId, eventStatus = "pending", eventNote }) {
+export async function fulfillOrder(sb, { reference, intent, priced, buyerId, eventStatus = "pending", eventNote, gift = null }) {
   // Already fulfilled?
   const { data: existing, error: existingError } = await sb
     .from("orders")
@@ -40,9 +40,10 @@ export async function fulfillOrder(sb, { reference, intent, priced, buyerId, eve
     product_seller_name: product.seller_name || item.sellerName || null,
 
     buyer_id: buyerId,
-    buyer_name: String(intent.fullName || "").slice(0, 120) || null,
-    buyer_address: String(intent.address || "").slice(0, 400) || null,
-    buyer_phone: String(intent.phone || "").slice(0, 30) || null,
+    // Gift orders ship to the wishlist owner's saved details, not to anything the browser sent.
+    buyer_name: (gift ? gift.recipient.name : String(intent.fullName || "").slice(0, 120)) || null,
+    buyer_address: (gift ? gift.recipient.address : String(intent.address || "").slice(0, 400)) || null,
+    buyer_phone: (gift ? gift.recipient.phone : String(intent.phone || "").slice(0, 30)) || null,
 
     delivery_area: intent.city || null,
     delivery_state: intent.state || null,
@@ -55,6 +56,7 @@ export async function fulfillOrder(sb, { reference, intent, priced, buyerId, eve
     variant: {
       color: item.selectedColor || null,
       size: item.selectedSize || null,
+      ...(gift ? { gift: { from: gift.from, wishlist_item_id: gift.itemId } } : {}),
     },
 
     coupon_code: priced.coupon ? priced.coupon.code : null,
@@ -83,6 +85,20 @@ export async function fulfillOrder(sb, { reference, intent, priced, buyerId, eve
     .from("order_events")
     .insert(created.map((o) => ({ order_id: o.id, status: eventStatus, note: eventNote })));
   if (eventsError) console.error("Order events creation failed", { reference }); // orders exist: never re-run
+
+  // Gift: mark the wishlist item purchased now that payment is confirmed and the order exists.
+  // The "is_purchased = false" condition means two gifters can never overwrite each other.
+  if (gift) {
+    const { data: marked, error: giftError } = await sb
+      .from("wishlist_items")
+      .update({ is_purchased: true, purchased_by_name: gift.from })
+      .eq("id", gift.itemId)
+      .eq("is_purchased", false)
+      .select("id");
+    if (giftError || !marked || marked.length === 0) {
+      console.error("Gift item was not marked purchased", { reference });
+    }
+  }
 
   // Count the coupon use on the server (the browser no longer touches coupons)
   if (priced.coupon) {
