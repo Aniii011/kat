@@ -6,6 +6,7 @@ import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { STATUS_META, type OrderStatus } from "@/lib/order-status";
+import { groupOrdersByPurchase } from "@/lib/order-groups";
 
 function formatNaira(n: number) {
   return "₦" + Number(n || 0).toLocaleString("en-NG");
@@ -27,10 +28,12 @@ export default function AdminOrderDetail() {
   const orderId = params?.id;
 
   const [order, setOrder] = useState<any>(null);
-  const [product, setProduct] = useState<any>(null);
-  const [seller, setSeller] = useState<any>(null);
+  // Every order row in this purchase. Checkout stores one row per item, all
+  // sharing one payment_ref — to admin that whole set is ONE order.
+  const [lines, setLines] = useState<any[]>([]);
+  const [productsById, setProductsById] = useState<Record<string, any>>({});
+  const [sellersById, setSellersById] = useState<Record<string, any>>({});
   const [events, setEvents] = useState<{ status: string; created_at: string }[]>([]);
-  const [siblingOrders, setSiblingOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
@@ -52,25 +55,30 @@ export default function AdminOrderDetail() {
     setAddressDraft(o?.buyer_address || "");
     setPhoneDraft(o?.buyer_phone || "");
 
-    if (o?.product_id) {
-      const { data: p } = await supabase.from("products").select("*").eq("id", o.product_id).maybeSingle();
-      setProduct(p);
-    }
-    if (o?.seller_id) {
-      const { data: s } = await supabase.from("profiles").select("*").eq("id", o.seller_id).maybeSingle();
-      setSeller(s);
-    }
+    let purchaseLines: any[] = o ? [o] : [];
     if (o?.payment_ref) {
-      // Other orders that share this same payment — a single checkout can
-      // split into several orders when the buyer bought from multiple
-      // sellers at once. This is why payment reference and order ID
-      // legitimately differ.
-      const { data: siblings } = await supabase
+      const { data: all } = await supabase
         .from("orders")
-        .select("id, total, seller_id")
+        .select("*")
         .eq("payment_ref", o.payment_ref)
-        .neq("id", o.id);
-      setSiblingOrders(siblings || []);
+        .order("created_at", { ascending: true });
+      if (all && all.length > 0) purchaseLines = all;
+    }
+    setLines(purchaseLines);
+
+    const productIds = Array.from(new Set(purchaseLines.map((l) => l.product_id).filter(Boolean)));
+    if (productIds.length > 0) {
+      const { data: ps } = await supabase.from("products").select("*").in("id", productIds);
+      const map: Record<string, any> = {};
+      (ps || []).forEach((p: any) => { map[p.id] = p; });
+      setProductsById(map);
+    }
+    const sellerIds = Array.from(new Set(purchaseLines.map((l) => l.seller_id).filter(Boolean)));
+    if (sellerIds.length > 0) {
+      const { data: ss } = await supabase.from("profiles").select("*").in("id", sellerIds);
+      const map: Record<string, any> = {};
+      (ss || []).forEach((s: any) => { map[s.id] = s; });
+      setSellersById(map);
     }
     const { data: ev } = await supabase
       .from("order_events")
@@ -83,18 +91,24 @@ export default function AdminOrderDetail() {
 
   useEffect(() => { load(); }, [orderId]);
 
-  const status = (order?.admin_status || "pending") as OrderStatus;
-  const color = order?.variant?.color;
-  const size = order?.variant?.size;
+  const purchase = groupOrdersByPurchase(lines.length ? lines : order ? [order] : [])[0];
+  const status = (purchase?.headlineStatus || order?.admin_status || "pending") as OrderStatus;
+  // Rows still live. A line cancelled on its own earlier stays cancelled when the
+  // rest of the purchase moves forward. If everything is cancelled, act on all rows.
+  const liveIds: string[] = lines.filter((l) => l.admin_status !== "cancelled").map((l) => l.id);
+  const targetIds: string[] = liveIds.length ? liveIds : lines.map((l) => l.id);
 
   const applyStatus = async (newStatus: string) => {
-    if (!order) return;
+    if (!order || targetIds.length === 0) return;
     setUpdating(true);
-    const { error } = await supabase.from("orders").update({ admin_status: newStatus, updated_at: new Date().toISOString() }).eq("id", order.id);
+    const now = new Date().toISOString();
+    // One purchase = one status: every row in the purchase moves together.
+    const { error } = await supabase.from("orders").update({ admin_status: newStatus, updated_at: now }).in("id", targetIds);
     if (!error) {
-      await supabase.from("order_events").insert({ order_id: order.id, status: newStatus });
+      await supabase.from("order_events").insert(targetIds.map((id) => ({ order_id: id, status: newStatus })));
+      setLines((prev) => prev.map((l) => targetIds.includes(l.id) ? { ...l, admin_status: newStatus } : l));
       setOrder((prev: any) => ({ ...prev, admin_status: newStatus }));
-      setEvents((prev) => [...prev, { status: newStatus, created_at: new Date().toISOString() }]);
+      setEvents((prev) => [...prev, { status: newStatus, created_at: now }]);
     } else {
       alert("Failed to update status: " + error.message);
     }
@@ -102,19 +116,22 @@ export default function AdminOrderDetail() {
   };
 
   const handleCancel = async () => {
+    if (!order || targetIds.length === 0) return;
     const reason = window.prompt("This will cancel the order and notify the customer. Please give a reason (required):");
     if (!reason || !reason.trim()) return; // no reason, no cancellation
     setUpdating(true);
+    const now = new Date().toISOString();
     const { error } = await supabase.from("orders").update({
       admin_status: "cancelled",
       admin_note: reason.trim(),
-      updated_at: new Date().toISOString(),
-    }).eq("id", order.id);
+      updated_at: now,
+    }).in("id", targetIds);
     if (!error) {
-      await supabase.from("order_events").insert({ order_id: order.id, status: "cancelled" });
+      await supabase.from("order_events").insert(targetIds.map((id) => ({ order_id: id, status: "cancelled" })));
+      setLines((prev) => prev.map((l) => targetIds.includes(l.id) ? { ...l, admin_status: "cancelled", admin_note: reason.trim() } : l));
       setOrder((prev: any) => ({ ...prev, admin_status: "cancelled", admin_note: reason.trim() }));
       setNoteDraft(reason.trim());
-      setEvents((prev) => [...prev, { status: "cancelled", created_at: new Date().toISOString() }]);
+      setEvents((prev) => [...prev, { status: "cancelled", created_at: now }]);
     } else {
       alert("Failed to cancel: " + error.message);
     }
@@ -130,19 +147,22 @@ export default function AdminOrderDetail() {
     await applyStatus(previous);
   };
 
+  const allIds: string[] = lines.map((l) => l.id);
+
   const handleSaveNote = async () => {
     setSavingNote(true);
-    await supabase.from("orders").update({ admin_note: noteDraft.trim() }).eq("id", order.id);
+    await supabase.from("orders").update({ admin_note: noteDraft.trim() }).in("id", allIds.length ? allIds : [order.id]);
     setOrder((prev: any) => ({ ...prev, admin_note: noteDraft.trim() }));
     setSavingNote(false);
   };
 
   const saveAddressEdit = async () => {
     setSavingAddress(true);
+    // The delivery details belong to the whole purchase — update every row.
     const { error } = await supabase.from("orders").update({
       buyer_address: addressDraft.trim(),
       buyer_phone: phoneDraft.trim(),
-    }).eq("id", order.id);
+    }).in("id", allIds.length ? allIds : [order.id]);
     setSavingAddress(false);
     if (!error) {
       setOrder((prev: any) => ({ ...prev, buyer_address: addressDraft.trim(), buyer_phone: phoneDraft.trim() }));
@@ -176,7 +196,7 @@ export default function AdminOrderDetail() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-3 p-6 text-center">
         <p className="font-bold">Order not found.</p>
-        <Button onClick={() => navigate("/admin")} className="rounded-full">Back to admin</Button>
+        <Button onClick={() => navigate("/admin?section=orders")} className="rounded-full">Back to admin</Button>
       </div>
     );
   }
@@ -184,13 +204,13 @@ export default function AdminOrderDetail() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-xl border-b border-border px-4 py-3 flex items-center gap-3 no-print">
-        <button onClick={() => navigate("/admin")} className="w-9 h-9 rounded-full hover:bg-muted flex items-center justify-center shrink-0" aria-label="Back to admin">
+        <button onClick={() => navigate("/admin?section=orders")} className="w-9 h-9 rounded-full hover:bg-muted flex items-center justify-center shrink-0" aria-label="Back to admin">
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold">Order details</p>
           <button onClick={copyRef} className="flex items-center gap-1 text-[11px] text-muted-foreground font-mono">
-            <span className="truncate max-w-[220px]">Order #{order.id.slice(0, 8)} · Payment {order.payment_ref}</span>
+            <span className="truncate max-w-[220px]">{order.payment_ref ? `Payment ${order.payment_ref}` : `Order #${order.id.slice(0, 8)}`} · {lines.length || 1} item{(lines.length || 1) > 1 ? "s" : ""}</span>
             {copied ? <Check className="w-3 h-3 text-emerald-500 shrink-0" /> : <Copy className="w-3 h-3 shrink-0" />}
           </button>
         </div>
@@ -200,33 +220,54 @@ export default function AdminOrderDetail() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-5 space-y-5 pb-16">
-        {siblingOrders.length > 0 && (
-          <p className="text-xs text-muted-foreground bg-muted rounded-xl px-3 py-2">
-            This payment ({order.payment_ref}) also covers {siblingOrders.length} other order{siblingOrders.length > 1 ? "s" : ""} — the buyer checked out from multiple sellers at once, so each seller's order has its own ID but shares this reference.
+        <section className="rounded-2xl bg-muted p-4 space-y-4">
+          <p className="text-xs text-muted-foreground">
+            {lines.length || 1} item{(lines.length || 1) > 1 ? "s" : ""}
+            {purchase && purchase.sellerCount > 1 ? ` · from ${purchase.sellerCount} sellers` : ""}
           </p>
-        )}
-
-        <section className="rounded-2xl bg-muted p-4 flex gap-4">
-          {product?.image_url ? (
-            <img src={product.image_url} alt={product?.title} className="w-20 h-20 rounded-xl object-cover shrink-0" />
-          ) : (
-            <div className="w-20 h-20 rounded-xl bg-background flex items-center justify-center shrink-0">
-              <Package className="w-6 h-6 text-muted-foreground" />
+          {(lines.length ? lines : [order]).map((l) => {
+            const prod = productsById[l.product_id];
+            const sel = sellersById[l.seller_id];
+            const title = prod?.title || l.product_title || "Product unavailable";
+            const img = prod?.image_url || l.product_image;
+            const sellerName = sel?.store_name || sel?.full_name || l.product_seller_name;
+            const c = l.variant?.color;
+            const sz = l.variant?.size;
+            return (
+              <div key={l.id} className="flex gap-4">
+                {img ? (
+                  <img src={img} alt={title} className="w-20 h-20 rounded-xl object-cover shrink-0" />
+                ) : (
+                  <div className="w-20 h-20 rounded-xl bg-background flex items-center justify-center shrink-0">
+                    <Package className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                )}
+                <div className="space-y-1 min-w-0">
+                  <p className="font-bold truncate">{title}</p>
+                  {(c || sz) && (
+                    <p className="text-sm text-muted-foreground">
+                      {c ? `Color: ${c}` : ""}{c && sz ? " · " : ""}{sz ? `Size: ${sz}` : ""}
+                    </p>
+                  )}
+                  <p className="text-sm">Qty: {l.quantity}</p>
+                  <p className="font-bold text-primary">{formatNaira(l.total)}</p>
+                  {sellerName && (
+                    <p className="text-xs text-muted-foreground">Sold by {sellerName}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {purchase && (
+            <div className="border-t border-border pt-3 space-y-1 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{formatNaira(purchase.subtotal)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Delivery</span><span>{formatNaira(purchase.deliveryFee)}</span></div>
+              {purchase.discount > 0 && (
+                <div className="flex justify-between"><span className="text-muted-foreground">Discount</span><span>-{formatNaira(purchase.discount)}</span></div>
+              )}
+              <div className="flex justify-between font-bold pt-1"><span>Total paid</span><span className="text-primary">{formatNaira(purchase.total)}</span></div>
             </div>
           )}
-          <div className="space-y-1 min-w-0">
-            <p className="font-bold truncate">{product?.title || "Product unavailable"}</p>
-            {(color || size) && (
-              <p className="text-sm text-muted-foreground">
-                {color ? `Color: ${color}` : ""}{color && size ? " · " : ""}{size ? `Size: ${size}` : ""}
-              </p>
-            )}
-            <p className="text-sm">Qty: {order.quantity}</p>
-            <p className="font-bold text-primary">{formatNaira(order.total)}</p>
-            {seller && (
-              <p className="text-xs text-muted-foreground">Sold by {seller.store_name || seller.full_name}</p>
-            )}
-          </div>
         </section>
 
         <section>
@@ -369,30 +410,39 @@ export default function AdminOrderDetail() {
               <p style={{ margin: 0, fontSize: "13px", fontWeight: 600 }}>{order.delivery_area}{order.delivery_state ? `, ${order.delivery_state}` : ""}</p>
             </div>
 
-            {/* Item row, with thumbnail like Temu/Shein/Jumia slips */}
-            <div style={{ display: "flex", gap: "10px", border: "1px solid #ddd", borderRadius: "6px", padding: "10px", marginBottom: "12px" }}>
-              {product?.image_url && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={product.image_url} alt="" style={{ width: "56px", height: "56px", objectFit: "cover", borderRadius: "4px", border: "1px solid #eee" }} />
-              )}
-              <div style={{ flex: 1 }}>
-                <p style={{ fontWeight: 700, fontSize: "13px", margin: "0 0 2px" }}>{product?.title || "Product"}</p>
-                {(color || size) && (
-                  <p style={{ fontSize: "11px", color: "#666", margin: "0 0 2px" }}>
-                    {color ? `Color: ${color}` : ""}{color && size ? " · " : ""}{size ? `Size: ${size}` : ""}
-                  </p>
-                )}
-                <p style={{ fontSize: "11px", color: "#666", margin: 0 }}>Sold by {seller?.store_name || seller?.full_name || "KAT seller"}</p>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <p style={{ fontSize: "11px", color: "#666", margin: 0 }}>Qty</p>
-                <p style={{ fontWeight: 800, fontSize: "15px", margin: 0 }}>{order.quantity}</p>
-              </div>
-            </div>
+            {/* Item rows, with thumbnails like Temu/Shein/Jumia slips */}
+            {(lines.length ? lines : [order]).map((l) => {
+              const prod = productsById[l.product_id];
+              const sel = sellersById[l.seller_id];
+              const img = prod?.image_url || l.product_image;
+              const c = l.variant?.color;
+              const sz = l.variant?.size;
+              return (
+                <div key={l.id} style={{ display: "flex", gap: "10px", border: "1px solid #ddd", borderRadius: "6px", padding: "10px", marginBottom: "8px" }}>
+                  {img && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={img} alt="" style={{ width: "56px", height: "56px", objectFit: "cover", borderRadius: "4px", border: "1px solid #eee" }} />
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: 700, fontSize: "13px", margin: "0 0 2px" }}>{prod?.title || l.product_title || "Product"}</p>
+                    {(c || sz) && (
+                      <p style={{ fontSize: "11px", color: "#666", margin: "0 0 2px" }}>
+                        {c ? `Color: ${c}` : ""}{c && sz ? " · " : ""}{sz ? `Size: ${sz}` : ""}
+                      </p>
+                    )}
+                    <p style={{ fontSize: "11px", color: "#666", margin: 0 }}>Sold by {sel?.store_name || sel?.full_name || l.product_seller_name || "KAT seller"}</p>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <p style={{ fontSize: "11px", color: "#666", margin: 0 }}>Qty</p>
+                    <p style={{ fontWeight: 800, fontSize: "15px", margin: 0 }}>{l.quantity}</p>
+                  </div>
+                </div>
+              );
+            })}
 
-            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: "14px", borderTop: "1.5px solid #111", paddingTop: "8px", marginBottom: "16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: "14px", borderTop: "1.5px solid #111", paddingTop: "8px", marginBottom: "16px", marginTop: "4px" }}>
               <span>TOTAL</span>
-              <span>{formatNaira(order.total)}</span>
+              <span>{formatNaira(purchase ? purchase.total : order.total)}</span>
             </div>
 
             {/* QC / handling checklist, like fulfillment-center slips */}
