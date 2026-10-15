@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import {
   ArrowLeft, MapPin, ShoppingBag, Lock,
 } from "lucide-react";
-import { Tag } from "lucide-react";
+import { Tag, Gift } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,6 +54,13 @@ export default function Checkout() {
   const [fullName, setFullName] = useState(user?.name || localStorage.getItem("kat_name") || "");
   const [phone, setPhone] = useState(localStorage.getItem("kat_phone") || "");
   const [address, setAddress] = useState(localStorage.getItem("kat_address") || "");
+  // Set when this checkout started from someone's wishlist (see pages/wishlist-view.tsx).
+  const [gift, setGift] = useState<null | {
+    wishlistItemId: string;
+    productId: string;
+    from: string;
+    recipient: { name: string; phone: string; address: string };
+  }>(null);
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
   const [deliveryFee, setDeliveryFee] = useState(0);
@@ -83,9 +90,37 @@ export default function Checkout() {
   useEffect(() => {
     const stored = sessionStorage.getItem("kat_checkout_items");
     if (stored) {
-      try { setItems(JSON.parse(stored)); }
+      try {
+        const parsed = JSON.parse(stored);
+        setItems(parsed);
+
+        // A gift checkout only applies to exactly the one gifted item. If the buyer
+        // wandered off and came back through the cart, drop the stale gift.
+        const rawGift = sessionStorage.getItem("kat_gift_checkout");
+        if (rawGift) {
+          try {
+            const g = JSON.parse(rawGift);
+            const matches =
+              Array.isArray(parsed) &&
+              parsed.length === 1 &&
+              parsed[0].listingId === g.productId &&
+              Number(parsed[0].quantity) === 1;
+            if (matches) {
+              setGift(g);
+              setFullName(g.recipient?.name || "");
+              setPhone(g.recipient?.phone || "");
+              setAddress(g.recipient?.address || "");
+            } else {
+              sessionStorage.removeItem("kat_gift_checkout");
+            }
+          } catch {
+            sessionStorage.removeItem("kat_gift_checkout");
+          }
+        }
+      }
       catch { navigate("/cart"); }
     } else {
+      sessionStorage.removeItem("kat_gift_checkout");
       navigate("/cart");
     }
   }, []);
@@ -208,6 +243,7 @@ export default function Checkout() {
     deliveryFee: delivery,
     couponCode: appliedCoupon?.code || null,
     buyerId: user?.id || null,
+    gift: gift ? { wishlistItemId: gift.wishlistItemId, from: gift.from } : null,
   });
 
   const handleSuccessfulPayment = async (response: any) => {
@@ -273,7 +309,11 @@ export default function Checkout() {
       );
 
       sessionStorage.removeItem("kat_checkout_items");
-      clearCart();
+      if (gift) {
+        sessionStorage.removeItem("kat_gift_checkout"); // the buyer's own cart is left alone
+      } else {
+        clearCart();
+      }
 
       setPlacing(false);
       navigate("/order-confirmation");
@@ -436,14 +476,25 @@ export default function Checkout() {
               <MapPin className="w-4 h-4 text-primary" /> Delivery Address
             </p>
 
+            {gift && (
+              <div className="bg-primary/5 border border-primary/20 rounded-xl p-3">
+                <p className="text-xs font-semibold text-primary flex items-center gap-1.5">
+                  <Gift className="w-3.5 h-3.5" /> Gift for {gift.recipient.name || "your friend"}, from {gift.from}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  It will be delivered to their saved address. Choose their state and city below so we can price delivery.
+                </p>
+              </div>
+            )}
+
             <div className="space-y-1.5">
               <Label htmlFor="fullName">Full name</Label>
-              <Input id="fullName" placeholder="e.g. Anike Johnson" value={fullName} onChange={(e) => setFullName(e.target.value)} className="rounded-xl h-11" />
+              <Input id="fullName" placeholder="e.g. Anike Johnson" value={fullName} onChange={(e) => setFullName(e.target.value)} disabled={!!gift} className="rounded-xl h-11" />
             </div>
 
             <div className="space-y-1.5">
               <Label htmlFor="phone">Phone number</Label>
-              <Input id="phone" placeholder="e.g. 08012345678" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl h-11" type="tel" inputMode="tel" />
+              <Input id="phone" placeholder="e.g. 08012345678" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!!gift && /^0\d{10}$|^234\d{10}$/.test((gift.recipient.phone || "").replace(/\D/g, ""))} className="rounded-xl h-11" type="tel" inputMode="tel" />
               {phone.trim().length === 0 && (
                 <p className="text-xs text-muted-foreground">Please enter a phone number.</p>
               )}
@@ -454,7 +505,7 @@ export default function Checkout() {
 
             <div className="space-y-1.5">
               <Label htmlFor="address">Delivery address</Label>
-              <Input id="address" placeholder="Street address" value={address} onChange={(e) => setAddress(e.target.value)} className="rounded-xl h-11" />
+              <Input id="address" placeholder="Street address" value={address} onChange={(e) => setAddress(e.target.value)} disabled={!!gift} className="rounded-xl h-11" />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -682,4 +733,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-                                          }
+             }
