@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
-import { useCart } from "@/hooks/use-cart";
 import { useAuth } from "@/context/auth-context";
 import {
   ArrowLeft, Heart, ShoppingBag, CheckCircle2, Gift, Lock,
@@ -10,6 +9,7 @@ import {
 import { Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import AuthModal from "@/components/auth-modal";
 
 function formatNaira(n: number) { return "₦" + Number(n || 0).toLocaleString("en-NG"); }
 
@@ -18,7 +18,6 @@ export default function WishlistView() {
   const wishlistId = params?.id ?? null;
   const [, navigate] = useLocation();
   const { user } = useAuth();
-  const { addItem } = useCart();
 
   const [wishlist, setWishlist] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
@@ -26,7 +25,7 @@ export default function WishlistView() {
   const [giftingItem, setGiftingItem] = useState<any>(null);
   const [gifterName, setGifterName] = useState("");
   const [purchasing, setPurchasing] = useState(false);
-  const [purchased, setPurchased] = useState<string | null>(null);
+  const [showAuth, setShowAuth] = useState(false);
 
   useEffect(() => {
     if (!wishlistId) return;
@@ -46,45 +45,46 @@ export default function WishlistView() {
     setLoading(false);
   };
 
-  const handleGiftItem = async (item: any) => {
-    if (!gifterName.trim()) return;
+  // Start a gift checkout. Nothing is marked "purchased" here: that happens on the
+  // server only after the payment is confirmed (see api/_lib/fulfill.js).
+  const handleGiftItem = (item: any) => {
+    const name = gifterName.trim();
+    if (!name || !wishlist?.delivery_address) return;
+
+    // Paying needs an account. Ask them to sign in, then they tap the button again.
+    if (!user) {
+      setShowAuth(true);
+      return;
+    }
+
     setPurchasing(true);
 
-    // Mark item as purchased
-    await supabase.from("wishlist_items").update({
-      is_purchased: true,
-      purchased_by_name: gifterName.trim(),
-    }).eq("id", item.id);
-
-    // Add to cart with wishlist owner's address pre-filled
-    addItem({
+    // The gift is checked out on its own, never mixed into the buyer's cart.
+    sessionStorage.setItem("kat_checkout_items", JSON.stringify([{
       listingId: item.product_id,
       title: item.title,
-      price: item.price,
+      price: Number(item.price),
       imageUrl: item.image_url,
       sellerName: "KAT",
       quantity: 1,
-    });
+    }]));
 
-    // Store delivery address for checkout
-    if (wishlist.delivery_address) {
-      sessionStorage.setItem("kat_gift_delivery", JSON.stringify({
-        name: wishlist.delivery_name,
-        phone: wishlist.delivery_phone,
-        address: wishlist.delivery_address,
-        isGift: true,
-        giftFrom: gifterName.trim(),
-        wishlistOwner: wishlist.delivery_name,
-      }));
-    }
+    // Who it is for and who it is from. The server re-reads the recipient's real
+    // details from the wishlist, so nothing here can redirect the delivery.
+    sessionStorage.setItem("kat_gift_checkout", JSON.stringify({
+      wishlistItemId: item.id,
+      productId: item.product_id,
+      from: name,
+      recipient: {
+        name: wishlist.delivery_name || "",
+        phone: wishlist.delivery_phone || "",
+        address: wishlist.delivery_address || "",
+      },
+    }));
 
-    setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, is_purchased: true, purchased_by_name: gifterName.trim() } : i));
-    setPurchased(item.id);
     setGiftingItem(null);
     setPurchasing(false);
-
-    // Navigate to cart
-    setTimeout(() => navigate("/cart"), 1000);
+    navigate("/checkout");
   };
 
   if (loading) {
@@ -139,11 +139,21 @@ export default function WishlistView() {
                 <p className="text-xs text-muted-foreground mb-2">Your name (so they know who gifted it)</p>
                 <Input placeholder="Your name" value={gifterName} onChange={(e) => setGifterName(e.target.value)} className="rounded-xl h-11" autoFocus />
               </div>
-              <div className="bg-primary/5 border border-primary/20 rounded-xl p-3">
-                <p className="text-xs font-semibold text-primary flex items-center gap-1"><Package className="w-3.5 h-3.5" /> Delivery to:</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{wishlist.delivery_name} · {wishlist.delivery_address}</p>
-              </div>
-              <Button className="w-full rounded-full font-bold h-12 gap-2" onClick={() => handleGiftItem(giftingItem)} disabled={!gifterName.trim() || purchasing}>
+              {wishlist.delivery_address ? (
+                <div className="bg-primary/5 border border-primary/20 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-primary flex items-center gap-1"><Package className="w-3.5 h-3.5" /> Delivery to:</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{wishlist.delivery_name} · {wishlist.delivery_address}</p>
+                  <p className="text-[11px] text-muted-foreground mt-1.5">At checkout you'll pick their state and city so we can price delivery.</p>
+                </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-amber-700">This wishlist has no delivery address yet, so it can't be gifted. Ask the owner to add one.</p>
+                </div>
+              )}
+              {!user && wishlist.delivery_address && (
+                <p className="text-[11px] text-muted-foreground text-center">You'll be asked to sign in before you pay.</p>
+              )}
+              <Button className="w-full rounded-full font-bold h-12 gap-2" onClick={() => handleGiftItem(giftingItem)} disabled={!gifterName.trim() || !wishlist.delivery_address || purchasing}>
                 {purchasing ? "Processing..." : <><ShoppingBag className="w-4 h-4" /> Buy this Gift — {formatNaira(giftingItem.price)}</>}
               </Button>
               <Button variant="ghost" size="sm" className="w-full rounded-full" onClick={() => setGiftingItem(null)}>Cancel</Button>
@@ -218,6 +228,8 @@ export default function WishlistView() {
           </Link>
         </div>
       </div>
+
+      <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
-        }
+            }
