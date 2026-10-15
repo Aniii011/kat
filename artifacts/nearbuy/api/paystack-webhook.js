@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { supabaseAdmin } from "./_lib/supabase-admin.js";
 import { priceOrder } from "./_lib/pricing.js";
 import { fulfillOrder } from "./_lib/fulfill.js";
+import { resolveGift } from "./_lib/gift.js";
 
 // Paystack signs the EXACT bytes it sends, so we need the raw body to check the
 // signature. Re-serialising parsed JSON can produce different bytes and fail.
@@ -77,12 +78,19 @@ export default async function handler(req, res) {
       return res.status(200).json({ received: true, note: "Needs manual review." });
     }
 
+    const giftCheck = await resolveGift(supabaseAdmin, intent, priced.lines);
+    if (!giftCheck.ok) {
+      console.error("PAYSTACK WEBHOOK: gift problem. Needs manual review.", { reference, reason: giftCheck.error });
+      return res.status(200).json({ received: true, note: "Needs manual review." });
+    }
+
     const result = await fulfillOrder(supabaseAdmin, {
       reference,
       intent,
       priced,
       buyerId: intent.buyerId,
       eventStatus: "accepted",
+      gift: giftCheck.gift,
     });
 
     if (result.state === "error") return res.status(500).json({ error: "Order reconciliation failed", reference });
