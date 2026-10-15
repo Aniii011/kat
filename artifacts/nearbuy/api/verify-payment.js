@@ -2,6 +2,7 @@ import { supabaseAdmin } from "./_lib/supabase-admin.js";
 import { getAuthedUser } from "./_lib/auth.js";
 import { priceOrder } from "./_lib/pricing.js";
 import { fulfillOrder } from "./_lib/fulfill.js";
+import { resolveGift } from "./_lib/gift.js";
 
 const SUPPORT_NOTE = "Please contact KAT support and quote this payment reference";
 
@@ -88,7 +89,17 @@ export default async function handler(req, res) {
       });
     }
 
-    // 6. Create the orders.
+    // 6. Gift orders: re-check the wishlist item against the database.
+    const giftCheck = await resolveGift(supabaseAdmin, orderIntent, priced.lines);
+    if (!giftCheck.ok) {
+      console.error("verify-payment: gift problem after payment", { reference, reason: giftCheck.error });
+      return res.status(409).json({
+        verified: false,
+        error: `We received your payment but couldn't complete the gift: ${giftCheck.error} ${SUPPORT_NOTE}: ${reference}`,
+      });
+    }
+
+    // 7. Create the orders.
     const result = await fulfillOrder(supabaseAdmin, {
       reference,
       intent: orderIntent,
@@ -96,6 +107,7 @@ export default async function handler(req, res) {
       buyerId: user.id,
       eventStatus: "pending",
       eventNote: "Order placed successfully.",
+      gift: giftCheck.gift,
     });
 
     if (result.state === "processing") {
@@ -112,4 +124,4 @@ export default async function handler(req, res) {
     console.error("verify-payment error", error?.message);
     return res.status(500).json({ verified: false, error: "Payment verification failed. Please try again." });
   }
-        }
+}
