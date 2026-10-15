@@ -336,7 +336,7 @@ export default function Seller() {
         <h1 className="font-bold text-lg">Seller Access Required</h1>
         <p className="text-sm text-muted-foreground max-w-xs">
           Your account is not yet approved as a verified KAT seller.
-          Contact <span className="text-primary font-semibold">sellers@kat.com</span> to apply.
+          Contact <span className="text-primary font-semibold">support@kat.com.ng</span> to apply.
         </p>
         <Link href="/"><Button variant="outline" className="rounded-full mt-2">Go Home</Button></Link>
       </div>
@@ -580,17 +580,22 @@ export default function Seller() {
     setImagePreviews((prev) => [...prev, ...newFiles.map((f) => URL.createObjectURL(f))]);
   };
 
-  const uploadImages = async (): Promise<string[]> => {
+  // Returns the photos that uploaded AND the ones that failed, so the caller can
+  // tell the seller instead of silently saving a product with missing photos.
+  const uploadImages = async (): Promise<{ urls: string[]; failed: { name: string; message: string }[] }> => {
     const urls: string[] = [];
+    const failed: { name: string; message: string }[] = [];
     for (const file of imageFiles) {
       const fileName = `${Date.now()}-${Math.random()}-${file.name}`;
       const { error } = await supabase.storage.from("product-images").upload(fileName, file);
-      if (!error) {
-        const { data } = supabase.storage.from("product-images").getPublicUrl(fileName);
-        urls.push(data.publicUrl);
+      if (error) {
+        failed.push({ name: file.name, message: error.message });
+        continue;
       }
+      const { data } = supabase.storage.from("product-images").getPublicUrl(fileName);
+      urls.push(data.publicUrl);
     }
-    return urls;
+    return { urls, failed };
   };
 
   // Single-file upload, reused for per-color variant photos. Returns null
@@ -728,7 +733,16 @@ export default function Seller() {
 
     setUploading(true); setUploadError(null);
 
-    const newImageUrls = await uploadImages();
+    const { urls: newImageUrls, failed: failedImages } = await uploadImages();
+    if (failedImages.length > 0) {
+      const first = failedImages[0];
+      setUploadError(
+        `${failedImages.length} of your ${imageFiles.length} new photo${imageFiles.length > 1 ? "s" : ""} couldn't be uploaded ` +
+        `(${first.name}: ${first.message}). Nothing was saved. Please try again, or remove the photo that failed.`
+      );
+      setUploading(false);
+      return;
+    }
     const allImages = [...existingImages, ...newImageUrls];
     let videoUrl = existingVideoUrl;
     if (videoFile) {
@@ -2010,7 +2024,7 @@ function SellerPromotionsSection() {
         </p>
       </div>
       <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-        <Info className="w-3.5 h-3.5" /> Want a new promotion on your store? Contact sellers@kat.com
+        <Info className="w-3.5 h-3.5" /> Want a new promotion on your store? Contact support@kat.com.ng
       </p>
     </div>
   );
@@ -2203,7 +2217,7 @@ function SellerStoreSection({ user, isMultiStore, activeStore, completenessCheck
 
       <div>
         <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Support</p>
-        <p className="text-sm">sellers@kat.com</p>
+        <p className="text-sm">support@kat.com.ng</p>
       </div>
     </div>
   );
@@ -2217,4 +2231,4 @@ function EmptyState({ icon, title, action }: any) {
       {action}
     </div>
   );
-                                 }
+}
