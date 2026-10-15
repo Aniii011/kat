@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { supabaseAdmin } from "./_lib/supabase-admin.js";
 import { getAuthedUser } from "./_lib/auth.js";
 import { priceOrder } from "./_lib/pricing.js";
+import { resolveGift } from "./_lib/gift.js";
 
 // Called by checkout just BEFORE the Paystack popup opens. It returns the
 // authoritative total (worked out from database prices) and an unguessable
@@ -16,6 +17,10 @@ export default async function handler(req, res) {
   try {
     const priced = await priceOrder(supabaseAdmin, req.body?.orderIntent);
     if (!priced.ok) return res.status(400).json({ ok: false, error: priced.error });
+
+    // Gift orders: make sure the wishlist item is still available before taking payment.
+    const giftCheck = await resolveGift(supabaseAdmin, req.body?.orderIntent, priced.lines);
+    if (!giftCheck.ok) return res.status(400).json({ ok: false, error: giftCheck.error });
 
     return res.status(200).json({
       ok: true,
