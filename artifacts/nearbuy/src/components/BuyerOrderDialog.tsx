@@ -92,7 +92,7 @@ export default function BuyerOrderDialog({ open, order, product, onClose }: Prop
             <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" />
             <div>
               <p className="text-xs text-muted-foreground">Delivering to</p>
-              <p className="text-sm font-semibold">{order.buyer_address}</p>
+              <p className="text-sm font-semibold">{order.variant?.gift ? "Your gift recipient's saved address" : order.buyer_address}</p>
               {order.delivery_area && (
                 <p className="text-xs text-muted-foreground">{order.delivery_area}, {order.delivery_state}</p>
               )}
