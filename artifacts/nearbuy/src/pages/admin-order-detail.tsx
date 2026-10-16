@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useRoute, useLocation } from "wouter";
-import { ArrowLeft, Package, Printer, RotateCcw, Copy, Check } from "lucide-react";
+import { ArrowLeft, Package, Printer, RotateCcw, Copy, Check, X, Gift } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
@@ -22,11 +22,22 @@ const STATUS_FLOW: { key: OrderStatus; label: string }[] = [
   { key: "completed", label: "Complete" },
 ];
 
-export default function AdminOrderDetail() {
+interface AdminOrderDetailProps {
+  /** When set, the page renders inside the Orders side panel instead of as a full page. */
+  embeddedId?: string;
+  onClose?: () => void;
+  /** Called after any change so the list behind the panel can refresh. */
+  onChanged?: () => void;
+  params?: unknown; // passed by the router; unused
+}
+
+export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: AdminOrderDetailProps = {}) {
   const { user } = useAuth();
   const [, params] = useRoute("/admin/orders/:id");
   const [, navigate] = useLocation();
-  const orderId = params?.id;
+  const embedded = !!embeddedId;
+  const orderId = embeddedId ?? params?.id;
+  const closeOrBack = () => (embedded && onClose ? onClose() : navigate("/admin?section=orders"));
 
   const [order, setOrder] = useState<any>(null);
   // Every order row in this purchase. Checkout stores one row per item, all
@@ -44,6 +55,8 @@ export default function AdminOrderDetail() {
   const [addressDraft, setAddressDraft] = useState("");
   const [phoneDraft, setPhoneDraft] = useState("");
   const [savingAddress, setSavingAddress] = useState(false);
+  // How long this customer has shopped with KAT (for loyalty gifts / anniversaries).
+  const [customer, setCustomer] = useState<{ orders: number; spend: number; since: string } | null>(null);
 
   const isAdmin = user?.isAdmin;
 
@@ -81,6 +94,18 @@ export default function AdminOrderDetail() {
       (ss || []).forEach((s: any) => { map[s.id] = s; });
       setSellersById(map);
     }
+    if (o?.buyer_id) {
+      const { data: mine } = await supabase.from("orders").select("*").eq("buyer_id", o.buyer_id);
+      const gs = groupOrdersByPurchase(mine || []);
+      if (gs.length > 0) {
+        const live = gs.filter((g) => g.headlineStatus !== "cancelled");
+        setCustomer({
+          orders: live.length,
+          spend: live.reduce((s, g) => s + g.total, 0),
+          since: gs.reduce((m, g) => (g.createdAt < m ? g.createdAt : m), gs[0].createdAt),
+        });
+      }
+    }
     const { data: ev } = await supabase
       .from("order_events")
       .select("status, created_at")
@@ -110,6 +135,7 @@ export default function AdminOrderDetail() {
       setLines((prev) => prev.map((l) => targetIds.includes(l.id) ? { ...l, admin_status: newStatus } : l));
       setOrder((prev: any) => ({ ...prev, admin_status: newStatus }));
       setEvents((prev) => [...prev, { status: newStatus, created_at: now }]);
+      onChanged?.();
     } else {
       alert("Failed to update status: " + error.message);
     }
@@ -133,6 +159,7 @@ export default function AdminOrderDetail() {
       setOrder((prev: any) => ({ ...prev, admin_status: "cancelled", admin_note: reason.trim() }));
       setNoteDraft(reason.trim());
       setEvents((prev) => [...prev, { status: "cancelled", created_at: now }]);
+      onChanged?.();
     } else {
       alert("Failed to cancel: " + error.message);
     }
@@ -155,6 +182,7 @@ export default function AdminOrderDetail() {
     await supabase.from("orders").update({ admin_note: noteDraft.trim() }).in("id", allIds.length ? allIds : [order.id]);
     setOrder((prev: any) => ({ ...prev, admin_note: noteDraft.trim() }));
     setSavingNote(false);
+    onChanged?.();
   };
 
   const saveAddressEdit = async () => {
@@ -168,10 +196,28 @@ export default function AdminOrderDetail() {
     if (!error) {
       setOrder((prev: any) => ({ ...prev, buyer_address: addressDraft.trim(), buyer_phone: phoneDraft.trim() }));
       setEditingAddress(false);
+      onChanged?.();
     } else {
       alert("Failed to update delivery info: " + error.message);
     }
   };
+
+  const printSlip = () => {
+    if (embedded && order) {
+      window.open(`/admin/orders/${order.id}?print=1`, "_blank");
+    } else {
+      window.print();
+    }
+  };
+
+  // Opened with ?print=1 from the panel: print as soon as the order has loaded.
+  useEffect(() => {
+    if (!embedded && !loading && order && new URLSearchParams(window.location.search).get("print") === "1") {
+      const timer = setTimeout(() => window.print(), 400);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [embedded, loading, order]);
 
   const copyRef = () => {
     if (!order?.payment_ref) return;
@@ -183,30 +229,30 @@ export default function AdminOrderDetail() {
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-6 text-center">
+      <div className={`${embedded ? "" : "min-h-screen "}bg-background flex items-center justify-center p-6 text-center`}>
         <p className="font-bold">Admin access only.</p>
       </div>
     );
   }
 
   if (loading) {
-    return <div className="min-h-screen bg-background flex items-center justify-center"><p className="text-sm text-muted-foreground">Loading order…</p></div>;
+    return <div className={`${embedded ? "py-24 " : "min-h-screen "}bg-background flex items-center justify-center`}><p className="text-sm text-muted-foreground">Loading order…</p></div>;
   }
 
   if (!order) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-3 p-6 text-center">
+      <div className={`${embedded ? "py-24 " : "min-h-screen "}bg-background flex flex-col items-center justify-center gap-3 p-6 text-center`}>
         <p className="font-bold">Order not found.</p>
-        <Button onClick={() => navigate("/admin?section=orders")} className="rounded-full">Back to admin</Button>
+        <Button onClick={closeOrBack} className="rounded-full">{embedded ? "Close" : "Back to admin"}</Button>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={embedded ? "bg-background" : "min-h-screen bg-background"}>
       <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-xl border-b border-border px-4 py-3 flex items-center gap-3 no-print">
-        <button onClick={() => navigate("/admin?section=orders")} className="w-9 h-9 rounded-full hover:bg-muted flex items-center justify-center shrink-0" aria-label="Back to admin">
-          <ArrowLeft className="w-5 h-5" />
+        <button onClick={closeOrBack} className="w-9 h-9 rounded-full hover:bg-muted flex items-center justify-center shrink-0" aria-label={embedded ? "Close panel" : "Back to admin"}>
+          {embedded ? <X className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
         </button>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold">Order details</p>
@@ -215,7 +261,7 @@ export default function AdminOrderDetail() {
             {copied ? <Check className="w-3 h-3 text-emerald-500 shrink-0" /> : <Copy className="w-3 h-3 shrink-0" />}
           </button>
         </div>
-        <Button size="sm" variant="outline" className="rounded-full gap-1.5 text-xs" onClick={() => window.print()}>
+        <Button size="sm" variant="outline" className="rounded-full gap-1.5 text-xs" onClick={printSlip}>
           <Printer className="w-3.5 h-3.5" /> Print
         </Button>
       </header>
@@ -281,10 +327,30 @@ export default function AdminOrderDetail() {
         </section>
 
         <div className="rounded-2xl bg-muted p-4 space-y-1">
-          <p className="text-xs text-muted-foreground">Buyer</p>
+          <p className="text-xs text-muted-foreground">{lines.some((l) => !!l.variant?.gift) ? "Gift recipient" : "Buyer"}</p>
           <p className="font-bold">{order.buyer_name}</p>
           <a href={`tel:${order.buyer_phone}`} className="text-primary text-sm block">{order.buyer_phone}</a>
         </div>
+
+        {customer && (
+          <div className="rounded-2xl bg-muted p-4 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                {lines.some((l) => !!l.variant?.gift) && <Gift className="w-3 h-3 text-primary" />}
+                {lines.some((l) => !!l.variant?.gift) ? "Gift order · account that paid" : "Customer history"}
+              </p>
+              <p className="text-sm font-semibold">
+                {customer.orders} order{customer.orders === 1 ? "" : "s"} · {formatNaira(customer.spend)} spent
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Customer since {new Date(customer.since).toLocaleDateString("en-NG", { month: "short", year: "numeric" })}
+              </p>
+            </div>
+            <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${customer.orders > 1 ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300"}`}>
+              {customer.orders > 1 ? "Returning" : "New"}
+            </span>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl bg-muted p-4">
@@ -471,4 +537,4 @@ export default function AdminOrderDetail() {
       </main>
     </div>
   );
-    }
+}
