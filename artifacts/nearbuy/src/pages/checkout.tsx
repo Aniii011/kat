@@ -59,7 +59,8 @@ export default function Checkout() {
     wishlistItemId: string;
     productId: string;
     from: string;
-    recipient: { name: string; phone: string; address: string };
+    // First name only. The recipient's phone and street address stay on the server.
+    recipient: { name: string; needsPhone?: boolean };
   }>(null);
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
@@ -107,9 +108,11 @@ export default function Checkout() {
               Number(parsed[0].quantity) === 1;
             if (matches) {
               setGift(g);
+              // The gifter never sees the recipient's phone or address. The server
+              // reads the real ones from the wishlist when the order is created.
               setFullName(g.recipient?.name || "");
-              setPhone(g.recipient?.phone || "");
-              setAddress(g.recipient?.address || "");
+              setPhone("");
+              setAddress("");
             } else {
               sessionStorage.removeItem("kat_gift_checkout");
             }
@@ -165,12 +168,16 @@ export default function Checkout() {
   // or 13 digits with country code (e.g. 2348012345678).
   const isValidPhone = /^0\d{10}$/.test(phoneDigits) || /^234\d{10}$/.test(phoneDigits);
 
-  const canPlaceOrder =
-    fullName.trim().length > 0 &&
-    isValidPhone &&
-    address.trim().length > 0 &&
-    !!state &&
-    !!city;
+  // For a gift the server supplies the recipient's name and address. A phone is
+  // only asked for when the recipient has no usable phone saved on their wishlist.
+  const giftNeedsPhone = !!gift && !!gift.recipient?.needsPhone;
+  const canPlaceOrder = gift
+    ? (!giftNeedsPhone || isValidPhone) && !!state && !!city
+    : fullName.trim().length > 0 &&
+      isValidPhone &&
+      address.trim().length > 0 &&
+      !!state &&
+      !!city;
 
   const applyCoupon = async () => {
     const code = couponInput.trim().toUpperCase();
@@ -224,9 +231,11 @@ export default function Checkout() {
     items,
     total,
     delivery,
-    fullName: fullName.trim(),
-    phone: phone.trim(),
-    address: `${address.trim()}, ${city.trim()}`,
+    // For a gift, nothing about the recipient is stored in the gifter's browser.
+    fullName: gift ? (user?.name || "") : fullName.trim(),
+    phone: gift ? "" : phone.trim(),
+    address: gift ? "" : `${address.trim()}, ${city.trim()}`,
+    gift: gift ? { for: gift.recipient?.name || "" } : null,
     paymentRef: reference,
     createdAt: new Date().toISOString(),
   });
@@ -482,19 +491,22 @@ export default function Checkout() {
                   <Gift className="w-3.5 h-3.5" /> Gift for {gift.recipient.name || "your friend"}, from {gift.from}
                 </p>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  It will be delivered to their saved address. Choose their state and city below so we can price delivery.
+                  It will be delivered to their saved address, which stays private. Choose their state and city below so we can price delivery.
                 </p>
               </div>
             )}
 
+            {!gift && (
             <div className="space-y-1.5">
               <Label htmlFor="fullName">Full name</Label>
-              <Input id="fullName" placeholder="e.g. Anike Johnson" value={fullName} onChange={(e) => setFullName(e.target.value)} disabled={!!gift} className="rounded-xl h-11" />
+              <Input id="fullName" placeholder="e.g. Anike Johnson" value={fullName} onChange={(e) => setFullName(e.target.value)} className="rounded-xl h-11" />
             </div>
+            )}
 
+            {(!gift || giftNeedsPhone) && (
             <div className="space-y-1.5">
-              <Label htmlFor="phone">Phone number</Label>
-              <Input id="phone" placeholder="e.g. 08012345678" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!!gift && /^0\d{10}$|^234\d{10}$/.test((gift.recipient.phone || "").replace(/\D/g, ""))} className="rounded-xl h-11" type="tel" inputMode="tel" />
+              <Label htmlFor="phone">{gift ? "Recipient's phone number" : "Phone number"}</Label>
+              <Input id="phone" placeholder="e.g. 08012345678" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl h-11" type="tel" inputMode="tel" />
               {phone.trim().length === 0 && (
                 <p className="text-xs text-muted-foreground">Please enter a phone number.</p>
               )}
@@ -502,11 +514,14 @@ export default function Checkout() {
                 <p className="text-xs text-destructive">Please enter a valid phone number (e.g. 08012345678).</p>
               )}
             </div>
+            )}
 
+            {!gift && (
             <div className="space-y-1.5">
               <Label htmlFor="address">Delivery address</Label>
-              <Input id="address" placeholder="Street address" value={address} onChange={(e) => setAddress(e.target.value)} disabled={!!gift} className="rounded-xl h-11" />
+              <Input id="address" placeholder="Street address" value={address} onChange={(e) => setAddress(e.target.value)} className="rounded-xl h-11" />
             </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -712,7 +727,7 @@ export default function Checkout() {
           <div className="hidden md:block space-y-2">
             {!canPlaceOrder && (
               <p className="text-xs text-center text-muted-foreground">
-                Fill in your name, phone, address, state and delivery area to continue
+                {gift ? "Choose their state and delivery area to continue" : "Fill in your name, phone, address, state and delivery area to continue"}
               </p>
             )}
             {payCta}
@@ -725,7 +740,7 @@ export default function Checkout() {
         <div className="max-w-5xl mx-auto space-y-2">
           {!canPlaceOrder && (
             <p className="text-xs text-center text-muted-foreground">
-              Fill in your name, phone, address, state and delivery area to continue
+              {gift ? "Choose their state and delivery area to continue" : "Fill in your name, phone, address, state and delivery area to continue"}
             </p>
           )}
           {payCta}
@@ -733,4 +748,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-             }
+      }
