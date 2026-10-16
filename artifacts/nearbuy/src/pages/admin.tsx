@@ -21,6 +21,7 @@ import Coupons from "@/components/admin/Coupons";
 import OrderDetailsDialog from "@/components/admin/OrderDetailsDialog"; // kept for reference; superseded by /admin/orders/:id full-page view
 import Announcements from "@/components/admin/Announcements";
 import { groupOrdersByPurchase } from "@/lib/order-groups";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 function formatNaira(n: number) { return "₦" + Number(n || 0).toLocaleString("en-NG"); }
 
@@ -1139,7 +1140,7 @@ export default function Admin() {
                 {[
                   { label: "Platform Name", value: "KAT Marketplace" },
                   { label: "Commission Rate", value: "9.5%" },
-                  { label: "Support Contact", value: "support@kat.ng" },
+                  { label: "Support Contact", value: SUPPORT_EMAIL },
                   { label: "Version", value: "MVP 1.0" },
                 ].map((s) => (
                   <div key={s.label} className="flex items-center justify-between py-2 border-b border-border last:border-0">
@@ -1203,4 +1204,4 @@ function TrendChart({ orders, rangeDays, metric, commissionRate }: { orders: any
       </div>
     </div>
   );
-}
+    }
