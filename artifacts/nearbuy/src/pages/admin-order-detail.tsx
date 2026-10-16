@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { STATUS_META, type OrderStatus } from "@/lib/order-status";
 import { groupOrdersByPurchase } from "@/lib/order-groups";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 function formatNaira(n: number) {
   return "₦" + Number(n || 0).toLocaleString("en-NG");
@@ -379,7 +380,7 @@ export default function AdminOrderDetail() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "3px solid #111", paddingBottom: "10px", marginBottom: "12px" }}>
               <div>
                 <h1 style={{ fontSize: "22px", fontWeight: 900, margin: 0, letterSpacing: "-0.5px" }}>KAT</h1>
-                <p style={{ fontSize: "10px", color: "#666", margin: 0 }}>kat.ng · support@kat.ng</p>
+                <p style={{ fontSize: "10px", color: "#666", margin: 0 }}>kat.com.ng · {SUPPORT_EMAIL}</p>
               </div>
               <div style={{ textAlign: "right" }}>
                 <p style={{ fontSize: "9px", color: "#666", margin: 0, textTransform: "uppercase", letterSpacing: "1px" }}>Packing Slip</p>
@@ -453,7 +454,7 @@ export default function AdminOrderDetail() {
 
             <p style={{ fontSize: "10px", color: "#999", textAlign: "center", lineHeight: 1.5, margin: 0 }}>
               Please inspect your item(s) before signing for delivery.<br />
-              Questions or issues? Reach us at support@kat.ng<br />
+              Questions or issues? Reach us at {SUPPORT_EMAIL}<br />
               <strong>Thank you for shopping with KAT</strong>
             </p>
           </div>
@@ -470,4 +471,4 @@ export default function AdminOrderDetail() {
       </main>
     </div>
   );
-      }
+    }
