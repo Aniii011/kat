@@ -45,11 +45,23 @@ export default function WishlistView() {
     setLoading(false);
   };
 
+  // The public wishlist no longer carries the owner's phone or street address (see
+  // get_public_wishlist). It only says whether an address is on file. The `??`
+  // fallbacks keep this page working before and after the database function is updated.
+  const looksLikePhone = (v: any) => {
+    const d = String(v || "").replace(/\D/g, "");
+    return /^0\d{10}$/.test(d) || /^234\d{10}$/.test(d);
+  };
+  const hasDeliveryAddress: boolean = wishlist?.has_delivery_address ?? !!wishlist?.delivery_address;
+  const recipientFirstName: string =
+    wishlist?.recipient_first_name ?? (String(wishlist?.delivery_name || "").trim().split(" ")[0] || "");
+  const recipientHasValidPhone: boolean = wishlist?.has_valid_delivery_phone ?? looksLikePhone(wishlist?.delivery_phone);
+
   // Start a gift checkout. Nothing is marked "purchased" here: that happens on the
   // server only after the payment is confirmed (see api/_lib/fulfill.js).
   const handleGiftItem = (item: any) => {
     const name = gifterName.trim();
-    if (!name || !wishlist?.delivery_address) return;
+    if (!name || !hasDeliveryAddress) return;
 
     // Paying needs an account. Ask them to sign in, then they tap the button again.
     if (!user) {
@@ -75,10 +87,11 @@ export default function WishlistView() {
       wishlistItemId: item.id,
       productId: item.product_id,
       from: name,
+      // Only a first name and "do we need a phone from you" travel to checkout.
+      // The recipient's phone and street address never reach the gifter's browser.
       recipient: {
-        name: wishlist.delivery_name || "",
-        phone: wishlist.delivery_phone || "",
-        address: wishlist.delivery_address || "",
+        name: recipientFirstName,
+        needsPhone: !recipientHasValidPhone,
       },
     }));
 
@@ -139,10 +152,10 @@ export default function WishlistView() {
                 <p className="text-xs text-muted-foreground mb-2">Your name (so they know who gifted it)</p>
                 <Input placeholder="Your name" value={gifterName} onChange={(e) => setGifterName(e.target.value)} className="rounded-xl h-11" autoFocus />
               </div>
-              {wishlist.delivery_address ? (
+              {hasDeliveryAddress ? (
                 <div className="bg-primary/5 border border-primary/20 rounded-xl p-3">
                   <p className="text-xs font-semibold text-primary flex items-center gap-1"><Package className="w-3.5 h-3.5" /> Delivery to:</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{wishlist.delivery_name} · {wishlist.delivery_address}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{recipientFirstName ? `${recipientFirstName}'s` : "Their"} saved address — kept private, only our delivery team sees it.</p>
                   <p className="text-[11px] text-muted-foreground mt-1.5">At checkout you'll pick their state and city so we can price delivery.</p>
                 </div>
               ) : (
@@ -150,10 +163,10 @@ export default function WishlistView() {
                   <p className="text-xs font-semibold text-amber-700">This wishlist has no delivery address yet, so it can't be gifted. Ask the owner to add one.</p>
                 </div>
               )}
-              {!user && wishlist.delivery_address && (
+              {!user && hasDeliveryAddress && (
                 <p className="text-[11px] text-muted-foreground text-center">You'll be asked to sign in before you pay.</p>
               )}
-              <Button className="w-full rounded-full font-bold h-12 gap-2" onClick={() => handleGiftItem(giftingItem)} disabled={!gifterName.trim() || !wishlist.delivery_address || purchasing}>
+              <Button className="w-full rounded-full font-bold h-12 gap-2" onClick={() => handleGiftItem(giftingItem)} disabled={!gifterName.trim() || !hasDeliveryAddress || purchasing}>
                 {purchasing ? "Processing..." : <><ShoppingBag className="w-4 h-4" /> Buy this Gift — {formatNaira(giftingItem.price)}</>}
               </Button>
               <Button variant="ghost" size="sm" className="w-full rounded-full" onClick={() => setGiftingItem(null)}>Cancel</Button>
@@ -166,7 +179,7 @@ export default function WishlistView() {
           <div className="text-5xl mb-2">{wishlist.emoji}</div>
           <h2 className="text-xl font-black">{wishlist.name}</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {wishlist.delivery_name}'s wishlist · {availableItems.length} item{availableItems.length !== 1 ? "s" : ""} available
+            {recipientFirstName ? `${recipientFirstName}'s wishlist` : "Wishlist"} · {availableItems.length} item{availableItems.length !== 1 ? "s" : ""} available
           </p>
           <p className="text-xs text-muted-foreground mt-3 bg-background/60 rounded-xl px-3 py-2">
             Pick an item below and buy it as a gift — it'll be delivered directly to them!
@@ -232,4 +245,4 @@ export default function WishlistView() {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
-            }
+    }
