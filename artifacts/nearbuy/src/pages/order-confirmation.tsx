@@ -80,7 +80,7 @@ export default function OrderConfirmation() {
           </div>
           <h1 className="text-2xl font-black">Order Placed!</h1>
           <p className="text-sm text-muted-foreground mt-2 max-w-xs mx-auto">
-            Thank you {order.fullName.split(" ")[0]}! Your order has been received and is being processed.
+            Thank you{order.fullName ? ` ${order.fullName.split(" ")[0]}` : ""}! Your order has been received and is being processed.
           </p>
 
           {order.paymentRef && (
@@ -144,11 +144,18 @@ export default function OrderConfirmation() {
           <p className="text-sm font-bold flex items-center gap-2">
             <MapPin className="w-4 h-4 text-primary" /> Delivery Details
           </p>
-          <div className="text-sm space-y-1">
-            <p className="font-semibold">{order.fullName}</p>
-            <p className="text-muted-foreground">{order.phone}</p>
-            <p className="text-muted-foreground">{order.address}</p>
-          </div>
+          {order.gift ? (
+            <div className="text-sm space-y-1">
+              <p className="font-semibold">Gift for {order.gift.for || "your friend"}</p>
+              <p className="text-muted-foreground">We'll deliver it to their saved address. For their privacy it isn't shown here.</p>
+            </div>
+          ) : (
+            <div className="text-sm space-y-1">
+              <p className="font-semibold">{order.fullName}</p>
+              <p className="text-muted-foreground">{order.phone}</p>
+              <p className="text-muted-foreground">{order.address}</p>
+            </div>
+          )}
         </motion.div>
 
         {/* What happens next */}
@@ -220,4 +227,4 @@ export default function OrderConfirmation() {
       </main>
     </div>
   );
-}
+            }
