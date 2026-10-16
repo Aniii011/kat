@@ -28,7 +28,9 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
   const [phoneDraft, setPhoneDraft] = useState((group.lines[0] as any)?.buyer_phone || "");
   const [savingAddress, setSavingAddress] = useState(false);
 
-  const canEditDelivery = orderStage(group.headlineStatus) === "processing";
+  // Gift orders carry the RECIPIENT's address. The gifter must not see or change it.
+  const isGift = group.lines.some((l: any) => !!l.variant?.gift);
+  const canEditDelivery = !isGift && orderStage(group.headlineStatus) === "processing";
 
   const saveAddress = async () => {
     setSavingAddress(true);
@@ -181,7 +183,16 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
         </section>
 
         {/* ── Where it's going ── */}
-        {firstLine.buyer_address && (
+        {isGift ? (
+          <section>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Delivering to</p>
+            <p className="text-sm font-semibold">Your gift recipient's saved address</p>
+            {firstLine.delivery_area && (
+              <p className="text-xs text-muted-foreground">{firstLine.delivery_area}, {firstLine.delivery_state}</p>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">For their privacy the address isn't shown. Message support if something needs fixing.</p>
+          </section>
+        ) : firstLine.buyer_address && (
           <section>
             <div className="flex items-center justify-between mb-1.5">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Delivering to</p>
@@ -333,4 +344,4 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
       </main>
     </motion.div>
   );
-              }
+                }
