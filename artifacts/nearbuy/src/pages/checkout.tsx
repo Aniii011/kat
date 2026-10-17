@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/auth-context";
 import { useCart } from "@/hooks/use-cart";
 import { supabase } from "@/lib/supabase";
+import { SUPPORT_EMAIL } from "@/lib/support";
 import {
   ArrowLeft, MapPin, ShoppingBag, Lock,
 } from "lucide-react";
@@ -127,6 +128,33 @@ export default function Checkout() {
       navigate("/cart");
     }
   }, []);
+
+  // Pre-fill delivery details from the buyer's saved address (Me page / last order),
+  // like other marketplaces do. They can still change any of it. Skipped for gift
+  // checkouts, where the address belongs to the recipient and is never shown.
+  useEffect(() => {
+    if (!user?.id || sessionStorage.getItem("kat_gift_checkout")) return undefined;
+    let cancelled = false;
+    (async () => {
+      // If the saved-address columns don't exist yet this returns an error and we
+      // simply skip pre-filling.
+      const { data } = await supabase
+        .from("profiles")
+        .select("address, delivery_state, delivery_city")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      if (data.address) {
+        setAddress((cur) => cur || data.address);
+        if (!localStorage.getItem("kat_address")) localStorage.setItem("kat_address", data.address);
+      }
+      if (data.delivery_state && NIGERIAN_STATES.includes(data.delivery_state)) {
+        setState((cur) => cur || data.delivery_state);
+        if (data.delivery_city) setCity((cur) => cur || data.delivery_city);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   useEffect(() => {
     if (!state) {
@@ -395,6 +423,16 @@ export default function Checkout() {
         return;
       }
 
+      // Remember these delivery details for next time (best effort, never blocks payment).
+      if (!gift && user?.id) {
+        localStorage.setItem("kat_address", address.trim());
+        void supabase
+          .from("profiles")
+          .update({ address: address.trim(), delivery_state: state, delivery_city: city })
+          .eq("id", user.id)
+          .then(() => undefined, () => undefined);
+      }
+
       // Paystack Popup v2 API — the script tag in index.html must be
       // https://js.paystack.co/v2/inline.js for this to work.
       const popup = new PaystackPop();
@@ -403,7 +441,7 @@ export default function Checkout() {
         key:
           (import.meta as any).env?.VITE_PAYSTACK_PUBLIC_KEY ||
           "pk_test_f4a152b1348a3c6f5c4b415f3341691ea02b2e2c",
-        email: user?.email || "customer@kat.ng",
+        email: user?.email || SUPPORT_EMAIL,
         amount: quote.amountKobo,
         currency: "NGN",
         reference: quote.reference,
@@ -748,4 +786,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-      }
+}
