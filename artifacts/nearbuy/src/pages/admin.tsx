@@ -20,8 +20,8 @@ import DeliveryAreas from "@/components/admin/DeliveryAreas";
 import Coupons from "@/components/admin/Coupons";
 import OrderDetailsDialog from "@/components/admin/OrderDetailsDialog"; // kept for reference; superseded by /admin/orders/:id full-page view
 import Announcements from "@/components/admin/Announcements";
-import { groupOrdersByPurchase } from "@/lib/order-groups";
 import { SUPPORT_EMAIL } from "@/lib/support";
+import OrdersPanel from "@/components/admin/OrdersPanel";
 
 function formatNaira(n: number) { return "₦" + Number(n || 0).toLocaleString("en-NG"); }
 
@@ -137,6 +137,17 @@ export default function Admin() {
     if (ordersData) setOrders(ordersData);
     if (eventsData) setOrderEvents(eventsData);
     setLoading(false);
+  };
+
+  // Light refresh used by the order panel: reload only orders + their events,
+  // not every profile and product in the database.
+  const refreshOrders = async () => {
+    const [{ data: ordersData }, { data: eventsData }] = await Promise.all([
+      supabase.from("orders").select("*").order("created_at", { ascending: false }),
+      supabase.from("order_events").select("*"),
+    ]);
+    if (ordersData) setOrders(ordersData);
+    if (eventsData) setOrderEvents(eventsData);
   };
 
   useEffect(() => {
@@ -379,19 +390,6 @@ export default function Admin() {
     const label = d.toLocaleDateString("en-NG", { weekday: "short" });
     const dayOrders = orders.filter((o) => new Date(o.created_at).toDateString() === d.toDateString());
     return { name: label, revenue: dayOrders.reduce((s, o) => s + (o.total || 0), 0), orders: dayOrders.length };
-  });
-
-  // One row per PURCHASE (one payment), not per item. Checkout stores one
-  // `orders` row per item, all sharing a payment_ref; to admin that is ONE order.
-  const purchaseGroups = groupOrdersByPurchase(orders).filter((g) => {
-    if (orderFilter !== "all" && g.headlineStatus !== orderFilter) return false;
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return g.lines.some((o) => {
-      const product = products.find((p) => p.id === o.product_id);
-      const seller = users.find((u) => u.id === o.seller_id);
-      return [o.id, o.payment_ref, (o as any).buyer_name, (o as any).buyer_phone, o.buyer_address, o.delivery_area, o.delivery_state, product?.title, seller?.full_name].some((f) => f?.toLowerCase().includes(q));
-    });
   });
 
   // ── UNCHANGED filters ──
@@ -791,96 +789,17 @@ export default function Admin() {
 
           {/* ── ORDERS — rebuilt as grouped operational pipeline ── */}
           {section === "orders" && (
-            <div className="space-y-5">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-black">Orders ({groupOrdersByPurchase(orders).length})</h2>
-                <button onClick={fetchAll} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors">
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-              </div>
-              <p className="text-xs text-muted-foreground">Cancellation rate: {cancellationRate.toFixed(1)}% · Fulfillment rate: {fulfillmentRate.toFixed(0)}%</p>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by order ID, buyer, phone, seller, product, or area..." className="rounded-xl pl-9 h-9 text-sm" />
-              </div>
-
-              {loading && orders.length === 0 && (
-                <div className="space-y-2">
-                  {[0, 1, 2].map((i) => (
-                    <div key={i} className="bg-card border border-border rounded-2xl p-3 flex items-center gap-3 animate-pulse">
-                      <div className="w-10 h-10 rounded-xl bg-muted shrink-0" />
-                      <div className="flex-1 space-y-2">
-                        <div className="h-2.5 w-24 rounded bg-muted" />
-                        <div className="h-3 w-32 rounded bg-muted" />
-                        <div className="h-2.5 w-40 rounded bg-muted" />
-                      </div>
-                      <div className="h-4 w-14 rounded bg-muted" />
-                    </div>
-                  ))}
-                </div>
-              )}
-              {(() => {
-                const groups: { title: string; statuses: string[] }[] = [
-                  { title: "Needs action", statuses: ["pending"] },
-                  { title: "In progress", statuses: ["accepted", "preparing", "ready_for_pickup"] },
-                  { title: "Handed to logistics", statuses: ["out_for_delivery", "delivered"] },
-                  { title: "Completed", statuses: ["completed"] },
-                  { title: "Cancelled", statuses: ["cancelled"] },
-                ];
-                return groups.map((g) => {
-                  const rows = purchaseGroups.filter((pg) => g.statuses.includes(pg.headlineStatus));
-                  if (rows.length === 0) return null;
-                  return (
-                    <div key={g.title}>
-                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">{g.title} · {rows.length}</p>
-                      <div className="space-y-2">
-                        {rows.map((pg) => {
-                          const status = pg.headlineStatus;
-                          const first = pg.lines[0] as any;
-                          const isAging = ["pending", "accepted", "preparing"].includes(status) && !isSameDayOrAfter(pg.createdAt, 2);
-                          const thumbs = pg.lines.slice(0, 3).map((l) => {
-                            const prod = products.find((p) => p.id === l.product_id);
-                            return { id: l.id, src: prod?.image_url || l.product_image || null, alt: prod?.title || l.product_title || "" };
-                          });
-                          return (
-                            <div key={pg.groupKey} className="bg-card border border-border rounded-2xl p-3 flex items-center gap-3 cursor-pointer hover:bg-muted/30" onClick={() => navigate(`/admin/orders/${first.id}`)}>
-                              <div className="flex -space-x-3 shrink-0">
-                                {thumbs.map((th) => (
-                                  th.src ? (
-                                    <img key={th.id} src={th.src} alt={th.alt} className="w-10 h-10 rounded-xl object-cover border-2 border-card" />
-                                  ) : (
-                                    <div key={th.id} className="w-10 h-10 rounded-xl bg-muted border-2 border-card flex items-center justify-center">
-                                      <Package className="w-4 h-4 text-muted-foreground" />
-                                    </div>
-                                  )
-                                ))}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-mono text-[11px] text-muted-foreground truncate">{pg.paymentRef || `#${first.id.slice(0, 8)}`}</p>
-                                <p className="font-bold text-sm truncate">{first.buyer_name || "Unknown buyer"}</p>
-                                <p className="text-[11px] text-muted-foreground">
-                                  {pg.lines.length} item{pg.lines.length > 1 ? "s" : ""}{pg.sellerCount > 1 ? ` · ${pg.sellerCount} sellers` : ""} · {ORDER_STATUS[status]?.label || status} · {ageLabel(pg.createdAt)} ago{isAging ? " · aging" : ""}
-                                </p>
-                              </div>
-                              <p className="font-black shrink-0">{formatNaira(pg.total)}</p>
-                              <Eye className="w-4 h-4 text-muted-foreground shrink-0" />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-              {!loading && purchaseGroups.length === 0 && (
-                <div className="text-center py-12 bg-card border border-card-border rounded-2xl">
-                  <ShoppingCart className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-                  <p className="font-semibold text-sm">No orders found</p>
-                </div>
-              )}
-              {/* Bulk actions and returns/refunds are not implemented — no confirmed
-                  return policy or bulk-update UI exists in the current codebase. */}
-            </div>
+            <OrdersPanel
+              orders={orders}
+              products={products}
+              users={users}
+              loading={loading}
+              statusFilter={orderFilter}
+              onStatusFilterChange={setOrderFilter}
+              onRefresh={refreshOrders}
+              cancellationRate={cancellationRate}
+              fulfillmentRate={fulfillmentRate}
+            />
           )}
 
           {/* ── FINANCE — new, real ledger, no payout execution ── */}
@@ -1204,4 +1123,4 @@ function TrendChart({ orders, rangeDays, metric, commissionRate }: { orders: any
       </div>
     </div>
   );
-    }
+        }
