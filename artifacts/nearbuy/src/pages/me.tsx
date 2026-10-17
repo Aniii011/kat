@@ -117,6 +117,14 @@ export default function Me() {
         setPhoneNumber(data.phone);
         localStorage.setItem("kat_phone", data.phone);
       }
+      // The saved delivery address lives on the account so it follows the buyer to any
+      // device. Separate, tolerant query: if the column isn't there yet, nothing breaks.
+      const { data: addr } = await supabase.from("profiles").select("address").eq("id", user.id).maybeSingle();
+      if (!cancelled && addr?.address) {
+        setAddress(addr.address);
+        setAddressInput(addr.address);
+        localStorage.setItem("kat_address", addr.address);
+      }
       setProfileLoading(false);
     };
 
@@ -226,6 +234,10 @@ export default function Me() {
     setAddress(addressInput);
     localStorage.setItem("kat_address", addressInput);
     setEditingAddress(false);
+    // Also keep it on the account (best effort) so it's there on every device.
+    if (user?.id) {
+      void supabase.from("profiles").update({ address: addressInput.trim() }).eq("id", user.id).then(() => undefined, () => undefined);
+    }
   };
 
   const handleSignOut = async () => {
@@ -599,4 +611,4 @@ export default function Me() {
       </main>
     </div>
   );
-}
+             }
