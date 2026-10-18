@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useRoute, useLocation } from "wouter";
-import { ArrowLeft, Package, Printer, RotateCcw, Copy, Check, X, Gift } from "lucide-react";
+import { ArrowLeft, Package, Printer, Copy, Check, X, Gift, Lock } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
@@ -13,14 +13,20 @@ function formatNaira(n: number) {
   return "₦" + Number(n || 0).toLocaleString("en-NG");
 }
 
-const STATUS_FLOW: { key: OrderStatus; label: string }[] = [
-  { key: "accepted", label: "Accept" },
-  { key: "preparing", label: "Preparing" },
-  { key: "ready_for_pickup", label: "Ready" },
-  { key: "out_for_delivery", label: "Delivering" },
-  { key: "delivered", label: "Delivered" },
-  { key: "completed", label: "Complete" },
+// The order trail. A status can only move to the NEXT step (the database enforces
+// this too). Cancel is allowed only up to "Ready for pickup", and needs a reason.
+const TRAIL: { key: OrderStatus; label: string; action: string }[] = [
+  { key: "pending", label: "Order placed", action: "Order placed" },
+  { key: "accepted", label: "Accepted", action: "Accept order" },
+  { key: "preparing", label: "Preparing", action: "Start preparing" },
+  { key: "ready_for_pickup", label: "Ready for pickup", action: "Mark ready for pickup" },
+  { key: "out_for_delivery", label: "Out for delivery", action: "Send out for delivery" },
+  { key: "delivered", label: "Delivered", action: "Mark delivered" },
+  { key: "completed", label: "Completed", action: "Complete order" },
 ];
+const rankOf = (s?: string | null) => TRAIL.findIndex((x) => x.key === (s || "pending"));
+const CAN_CANCEL_UP_TO_RANK = 3; // ready_for_pickup
+const ALL_STATUSES = [...TRAIL.map((x) => ({ key: x.key as string, label: x.label })), { key: "cancelled", label: "Cancelled" }];
 
 interface AdminOrderDetailProps {
   /** When set, the page renders inside the Orders side panel instead of as a full page. */
@@ -45,7 +51,11 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
   const [lines, setLines] = useState<any[]>([]);
   const [productsById, setProductsById] = useState<Record<string, any>>({});
   const [sellersById, setSellersById] = useState<Record<string, any>>({});
-  const [events, setEvents] = useState<{ status: string; created_at: string }[]>([]);
+  const [events, setEvents] = useState<{ status: string; created_at: string; note?: string | null; actor_id?: string | null }[]>([]);
+  const [actorNames, setActorNames] = useState<Record<string, string>>({});
+  const [correcting, setCorrecting] = useState(false);
+  const [correctTarget, setCorrectTarget] = useState("");
+  const [correctReason, setCorrectReason] = useState("");
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
@@ -108,10 +118,17 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
     }
     const { data: ev } = await supabase
       .from("order_events")
-      .select("status, created_at")
+      .select("*")
       .eq("order_id", orderId)
       .order("created_at", { ascending: true });
     setEvents(ev || []);
+    const actorIds = Array.from(new Set((ev || []).map((e: any) => e.actor_id).filter(Boolean)));
+    if (actorIds.length > 0) {
+      const { data: people } = await supabase.from("profiles").select("*").in("id", actorIds);
+      const names: Record<string, string> = {};
+      (people || []).forEach((p: any) => { names[p.id] = p.full_name || p.store_name || "Team member"; });
+      setActorNames(names);
+    }
     setLoading(false);
   };
 
@@ -125,16 +142,23 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
   const targetIds: string[] = liveIds.length ? liveIds : lines.map((l) => l.id);
 
   const applyStatus = async (newStatus: string) => {
-    if (!order || targetIds.length === 0) return;
+    if (!order) return;
+    // One purchase = one status: every row still BEHIND the new status moves with it.
+    // (A seller may already have moved one item ahead; that row is left alone.)
+    const ids = liveIds.filter((id) => {
+      const row = lines.find((l) => l.id === id);
+      return rankOf(row?.admin_status) < rankOf(newStatus);
+    });
+    if (ids.length === 0) return;
     setUpdating(true);
     const now = new Date().toISOString();
-    // One purchase = one status: every row in the purchase moves together.
-    const { error } = await supabase.from("orders").update({ admin_status: newStatus, updated_at: now }).in("id", targetIds);
+    const { error } = await supabase.from("orders").update({ admin_status: newStatus, updated_at: now }).in("id", ids);
     if (!error) {
-      await supabase.from("order_events").insert(targetIds.map((id) => ({ order_id: id, status: newStatus })));
-      setLines((prev) => prev.map((l) => targetIds.includes(l.id) ? { ...l, admin_status: newStatus } : l));
+      await supabase.from("order_events").insert(ids.map((id) => ({ order_id: id, status: newStatus })));
+      setLines((prev) => prev.map((l) => ids.includes(l.id) ? { ...l, admin_status: newStatus } : l));
       setOrder((prev: any) => ({ ...prev, admin_status: newStatus }));
-      setEvents((prev) => [...prev, { status: newStatus, created_at: now }]);
+      setEvents((prev) => [...prev, { status: newStatus, created_at: now, actor_id: user?.id }]);
+      if (user?.id && !actorNames[user.id]) setActorNames((n) => ({ ...n, [user.id]: (user as any).name || "You" }));
       onChanged?.();
     } else {
       alert("Failed to update status: " + error.message);
@@ -166,16 +190,45 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
     setUpdating(false);
   };
 
-  const handleUndo = async () => {
-    // The status before the current one, from the real event log —
-    // not a guess, an actual prior recorded state.
-    if (events.length < 2) return;
-    const previous = events[events.length - 2].status;
-    if (!window.confirm(`Revert this order's status back to "${STATUS_META[previous as OrderStatus]?.label || previous}"?`)) return;
-    await applyStatus(previous);
+  const allIds: string[] = lines.map((l) => l.id);
+
+  const nextStep = (() => {
+    const r = rankOf(status);
+    return status === "cancelled" || r < 0 || r >= TRAIL.length - 1 ? null : TRAIL[r + 1];
+  })();
+  const canCancel = status !== "cancelled" && rankOf(status) >= 0 && rankOf(status) <= CAN_CANCEL_UP_TO_RANK;
+  const isFinal = status === "completed" || status === "cancelled";
+
+  const advance = async () => {
+    if (!nextStep) return;
+    if (!window.confirm(`${nextStep.action}?\n\nThis moves the order forward and can't be undone.`)) return;
+    await applyStatus(nextStep.key);
   };
 
-  const allIds: string[] = lines.map((l) => l.id);
+  // The ONE way back: needs a reason, is logged permanently, admins only (database-enforced).
+  const handleCorrect = async () => {
+    if (!correctTarget || correctReason.trim().length < 5) {
+      alert("Pick the right status and write a reason (at least 5 characters).");
+      return;
+    }
+    if (!window.confirm(`Correct this order to "${ALL_STATUSES.find((s) => s.key === correctTarget)?.label}"?\n\nThis is recorded permanently with your reason.`)) return;
+    setUpdating(true);
+    const { error } = await supabase.rpc("admin_correct_order_status", {
+      p_order_ids: allIds.length ? allIds : [order.id],
+      p_status: correctTarget,
+      p_reason: correctReason.trim(),
+    });
+    setUpdating(false);
+    if (error) {
+      alert("Could not correct the status: " + error.message);
+      return;
+    }
+    setCorrecting(false);
+    setCorrectReason("");
+    setCorrectTarget("");
+    await load();
+    onChanged?.();
+  };
 
   const handleSaveNote = async () => {
     setSavingNote(true);
@@ -384,41 +437,99 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
           )}
         </div>
 
-        {/* Status actions */}
-        <div className="no-print">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs text-muted-foreground">Tap to update status — the checkmark shows the current one</p>
-            {events.length >= 2 && (
-              <button onClick={handleUndo} disabled={updating} className="flex items-center gap-1 text-xs font-bold text-muted-foreground shrink-0">
-                <RotateCcw className="w-3.5 h-3.5" /> Undo
-              </button>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {STATUS_FLOW.map(({ key, label }) => {
-              const isCurrent = status === key;
+        {/* Order trail — forward only */}
+        <div className="no-print space-y-3">
+          <p className="text-xs text-muted-foreground">Order trail — each step can only move forward</p>
+          <ol className="rounded-2xl bg-muted p-4 space-y-0">
+            {TRAIL.map((step, i) => {
+              const r = rankOf(status);
+              const done = status !== "cancelled" && i < r;
+              const current = status !== "cancelled" && i === r;
+              const when = [...events].reverse().find((e) => e.status === step.key)?.created_at;
               return (
-                <Button
-                  key={key}
-                  variant={isCurrent ? "default" : "outline"}
-                  disabled={updating || isCurrent}
-                  onClick={() => applyStatus(key)}
-                  className={isCurrent ? "ring-2 ring-primary ring-offset-1" : ""}
-                >
-                  {isCurrent ? `✓ ${label}` : label}
-                </Button>
+                <li key={step.key} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${done ? "bg-emerald-500 text-white" : current ? "bg-primary text-primary-foreground ring-4 ring-primary/20" : "bg-background border border-border text-muted-foreground"}`}>
+                      {done ? "✓" : i + 1}
+                    </span>
+                    {i < TRAIL.length - 1 && <span className={`w-px flex-1 min-h-[18px] ${done ? "bg-emerald-500" : "bg-border"}`} />}
+                  </div>
+                  <div className="pb-3 -mt-0.5">
+                    <p className={`text-sm ${current ? "font-bold" : done ? "font-medium" : "text-muted-foreground"}`}>{step.label}</p>
+                    {when && (done || current) && (
+                      <p className="text-[11px] text-muted-foreground">{new Date(when).toLocaleString("en-NG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</p>
+                    )}
+                  </div>
+                </li>
               );
             })}
-            <Button
-              variant="destructive"
-              className="col-span-2"
-              disabled={updating || status === "cancelled"}
-              onClick={handleCancel}
-            >
-              {status === "cancelled" ? "✓ Cancelled" : "Cancel Order"}
+          </ol>
+
+          {status === "cancelled" && (
+            <div className="rounded-2xl bg-red-500/10 text-red-600 dark:text-red-400 px-4 py-3 text-sm flex items-center gap-2">
+              <Lock className="w-4 h-4 shrink-0" /> Cancelled — this order is closed.
+            </div>
+          )}
+          {status === "completed" && (
+            <div className="rounded-2xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-4 py-3 text-sm flex items-center gap-2">
+              <Lock className="w-4 h-4 shrink-0" /> Completed — this order is closed.
+            </div>
+          )}
+
+          {nextStep && (
+            <Button className="w-full h-11 rounded-xl font-bold" disabled={updating} onClick={advance}>
+              {updating ? "Updating…" : `${nextStep.action} →`}
             </Button>
-          </div>
+          )}
+          {canCancel && (
+            <Button variant="outline" className="w-full rounded-xl text-red-600 border-red-500/40 hover:bg-red-500/10" disabled={updating} onClick={handleCancel}>
+              Cancel order (reason required)
+            </Button>
+          )}
+          {!canCancel && !isFinal && (
+            <p className="text-[11px] text-muted-foreground text-center">It's already out for delivery, so it can no longer be cancelled.</p>
+          )}
+
+          {/* The only way back */}
+          {!correcting ? (
+            <button onClick={() => setCorrecting(true)} className="block mx-auto text-[11px] text-muted-foreground underline underline-offset-2">
+              Pressed the wrong status? Correct a mistake
+            </button>
+          ) : (
+            <div className="rounded-2xl border border-amber-500/40 bg-amber-500/5 p-3 space-y-2">
+              <p className="text-xs font-semibold">Correct a mistake</p>
+              <p className="text-[11px] text-muted-foreground">This is the only way to move an order back. It is recorded permanently with your name and reason.</p>
+              <select value={correctTarget} onChange={(e) => setCorrectTarget(e.target.value)} className="w-full h-9 rounded-xl border border-input bg-background px-3 text-sm">
+                <option value="">Set status to…</option>
+                {ALL_STATUSES.filter((s) => s.key !== status).map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+              </select>
+              <Textarea value={correctReason} onChange={(e) => setCorrectReason(e.target.value)} placeholder="Why? (e.g. Pressed Delivered by mistake)" className="rounded-xl min-h-[60px]" />
+              <div className="flex gap-2">
+                <Button size="sm" className="rounded-full" disabled={updating} onClick={handleCorrect}>Apply correction</Button>
+                <Button size="sm" variant="outline" className="rounded-full" onClick={() => { setCorrecting(false); setCorrectReason(""); setCorrectTarget(""); }}>Cancel</Button>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* History: who did what, when */}
+        {events.length > 0 && (
+          <div className="no-print">
+            <p className="text-xs text-muted-foreground mb-2">History</p>
+            <ul className="space-y-1.5">
+              {[...events].reverse().map((e, i) => (
+                <li key={i} className="text-xs rounded-xl bg-muted px-3 py-2">
+                  <span className="font-semibold">{ALL_STATUSES.find((s) => s.key === e.status)?.label || e.status}</span>
+                  <span className="text-muted-foreground">
+                    {" · "}{new Date(e.created_at).toLocaleString("en-NG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+                    {" · "}{e.actor_id ? (actorNames[e.actor_id] || "Team member") : "System"}
+                  </span>
+                  {e.note && <p className={`mt-0.5 ${String(e.note).startsWith("CORRECTION") ? "text-amber-700 dark:text-amber-400 font-medium" : "text-muted-foreground"}`}>{e.note}</p>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Note to customer */}
         <div className="no-print">
@@ -537,4 +648,4 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
       </main>
     </div>
   );
-        }
+         }
