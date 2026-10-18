@@ -55,6 +55,11 @@ export default function WishlistView() {
   const hasDeliveryAddress: boolean = wishlist?.has_delivery_address ?? !!wishlist?.delivery_address;
   const recipientFirstName: string =
     wishlist?.recipient_first_name ?? (String(wishlist?.delivery_name || "").trim().split(" ")[0] || "");
+  // "Anike's Birthday wishlist": owner's first name + the list's own title.
+  const wishlistBase = String(wishlist?.name || "").replace(/\s*wish\s?list\s*$/i, "").trim();
+  const wishlistTitle: string = recipientFirstName
+    ? `${recipientFirstName}'s ${wishlistBase ? wishlistBase + " " : ""}wishlist`
+    : String(wishlist?.name || "Wishlist");
   const recipientHasValidPhone: boolean = wishlist?.has_valid_delivery_phone ?? looksLikePhone(wishlist?.delivery_phone);
 
   // Start a gift checkout. Nothing is marked "purchased" here: that happens on the
@@ -130,7 +135,7 @@ export default function WishlistView() {
               <ArrowLeft className="w-4 h-4" />
             </button>
           </Link>
-          <h1 className="text-base font-black flex-1 truncate">{wishlist.emoji} {wishlist.name}</h1>
+          <h1 className="text-base font-black flex-1 truncate">{wishlist.emoji} {wishlistTitle}</h1>
         </div>
       </header>
 
@@ -177,9 +182,9 @@ export default function WishlistView() {
         {/* Hero */}
         <div className="bg-gradient-to-br from-primary/20 via-primary/10 to-accent/20 border border-primary/15 rounded-3xl p-5 text-center">
           <div className="text-5xl mb-2">{wishlist.emoji}</div>
-          <h2 className="text-xl font-black">{wishlist.name}</h2>
+          <h2 className="text-xl font-black">{wishlistTitle}</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {recipientFirstName ? `${recipientFirstName}'s wishlist` : "Wishlist"} · {availableItems.length} item{availableItems.length !== 1 ? "s" : ""} available
+            {availableItems.length} item{availableItems.length !== 1 ? "s" : ""} available
           </p>
           <p className="text-xs text-muted-foreground mt-3 bg-background/60 rounded-xl px-3 py-2">
             Pick an item below and buy it as a gift — it'll be delivered directly to them!
