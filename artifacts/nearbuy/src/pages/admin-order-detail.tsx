@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useRoute, useLocation } from "wouter";
-import { ArrowLeft, Package, Printer, Copy, Check, X, Gift, Lock } from "lucide-react";
+import { ArrowLeft, Package, Printer, Copy, Check, X, Gift, Lock, Mail } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,9 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
   const [sellersById, setSellersById] = useState<Record<string, any>>({});
   const [events, setEvents] = useState<{ status: string; created_at: string; note?: string | null; actor_id?: string | null }[]>([]);
   const [actorNames, setActorNames] = useState<Record<string, string>>({});
+  // Customer emails: what was sent for this purchase, and the result of the latest attempt.
+  const [emails, setEmails] = useState<{ kind: string; status: string; error?: string | null; sent_at?: string | null; created_at: string }[]>([]);
+  const [emailNote, setEmailNote] = useState<{ result: string; reason?: string } | null>(null);
   const [correcting, setCorrecting] = useState(false);
   const [correctTarget, setCorrectTarget] = useState("");
   const [correctReason, setCorrectReason] = useState("");
@@ -122,6 +125,11 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
       .eq("order_id", orderId)
       .order("created_at", { ascending: true });
     setEvents(ev || []);
+    if (o?.payment_ref) {
+      // If the email log table doesn't exist yet this simply returns nothing.
+      const { data: em } = await supabase.from("order_emails").select("*").eq("payment_ref", o.payment_ref);
+      setEmails(em || []);
+    }
     const actorIds = Array.from(new Set((ev || []).map((e: any) => e.actor_id).filter(Boolean)));
     if (actorIds.length > 0) {
       const { data: people } = await supabase.from("profiles").select("*").in("id", actorIds);
@@ -160,6 +168,7 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
       setEvents((prev) => [...prev, { status: newStatus, created_at: now, actor_id: user?.id }]);
       if (user?.id && !actorNames[user.id]) setActorNames((n) => ({ ...n, [user.id]: (user as any).name || "You" }));
       onChanged?.();
+      void sendCustomerEmail(undefined, order.id);
     } else {
       alert("Failed to update status: " + error.message);
     }
@@ -184,6 +193,7 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
       setNoteDraft(reason.trim());
       setEvents((prev) => [...prev, { status: "cancelled", created_at: now }]);
       onChanged?.();
+      void sendCustomerEmail(undefined, order.id);
     } else {
       alert("Failed to cancel: " + error.message);
     }
@@ -191,6 +201,35 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
   };
 
   const allIds: string[] = lines.map((l) => l.id);
+
+  // Ask the server to email the customer for the order's CURRENT status. The server decides
+  // which email (if any) applies and never sends the same one twice. This can never block
+  // or undo a status change: if it fails, the admin is told and can retry.
+  const sendCustomerEmail = async (kind?: string, orderRowId?: string) => {
+    const id = orderRowId || order?.id;
+    if (!id) return;
+    setEmailNote(null);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) { setEmailNote({ result: "failed", reason: "Your session expired. Sign in again to send the email." }); return; }
+      const res = await fetch("/api/order-status-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(kind ? { orderId: id, kind } : { orderId: id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      setEmailNote({ result: json.result || (res.ok ? "skipped" : "failed"), reason: json.reason });
+    } catch {
+      setEmailNote({ result: "failed", reason: "Could not reach the server." });
+    }
+    // refresh the log
+    const ref = order?.payment_ref;
+    if (ref) {
+      const { data: em } = await supabase.from("order_emails").select("*").eq("payment_ref", ref);
+      if (em) setEmails(em);
+    }
+  };
 
   const nextStep = (() => {
     const r = rankOf(status);
@@ -490,6 +529,19 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
             <p className="text-[11px] text-muted-foreground text-center">It's already out for delivery, so it can no longer be cancelled.</p>
           )}
 
+          {emailNote && emailNote.result === "sent" && (
+            <p className="text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 justify-center"><Mail className="w-3.5 h-3.5" /> Customer emailed</p>
+          )}
+          {emailNote && emailNote.result === "failed" && (
+            <div className="rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 px-3 py-2 text-xs space-y-1">
+              <p>The status was saved, but the customer email didn't send{emailNote.reason ? `: ${emailNote.reason}` : "."}</p>
+              <button className="underline font-semibold" onClick={() => sendCustomerEmail()}>Try again</button>
+            </div>
+          )}
+          {emailNote && emailNote.result === "skipped" && emailNote.reason?.includes("not configured") && (
+            <p className="text-[11px] text-muted-foreground text-center">Customer emails aren't switched on yet.</p>
+          )}
+
           {/* The only way back */}
           {!correcting ? (
             <button onClick={() => setCorrecting(true)} className="block mx-auto text-[11px] text-muted-foreground underline underline-offset-2">
@@ -511,6 +563,29 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
             </div>
           )}
         </div>
+
+        {/* Customer emails (what was sent for this purchase) */}
+        {emails.length > 0 && (
+          <div className="no-print">
+            <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1"><Mail className="w-3 h-3" /> Customer emails</p>
+            <ul className="space-y-1.5">
+              {emails.map((e) => (
+                <li key={e.kind} className="text-xs rounded-xl bg-muted px-3 py-2 flex items-center justify-between gap-2">
+                  <span>
+                    <span className="font-semibold">{({ placed: "Order confirmed", out_for_delivery: "On its way", delivered: "Delivered", cancelled: "Cancelled" } as Record<string, string>)[e.kind] || e.kind}</span>
+                    <span className="text-muted-foreground">
+                      {" · "}{e.status === "sent" ? "sent" : e.status === "failed" ? "failed" : "sending"}
+                      {(e.sent_at || e.created_at) ? ` · ${new Date(e.sent_at || e.created_at).toLocaleString("en-NG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}` : ""}
+                    </span>
+                  </span>
+                  {e.status === "failed" && (
+                    <button className="underline font-semibold text-red-600 dark:text-red-400 shrink-0" onClick={() => sendCustomerEmail(e.kind)}>Retry</button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* History: who did what, when */}
         {events.length > 0 && (
@@ -648,4 +723,4 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
       </main>
     </div>
   );
-         }
+                                        }
