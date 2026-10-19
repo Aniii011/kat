@@ -1,3 +1,5 @@
+import { sendOrderEmail } from "./order-email.js";
+
 // Creates the order rows for a verified payment. Shared by verify-payment.js
 // (browser callback) and paystack-webhook.js (reconciliation), so both build
 // orders the same way and can never create duplicates for one payment.
@@ -108,5 +110,14 @@ export async function fulfillOrder(sb, { reference, intent, priced, buyerId, eve
       .eq("id", priced.coupon.id);
   }
 
+  // "Order confirmed" email. Only the request that actually CREATED the orders gets here,
+  // and the email log also guarantees one send per payment. A failure here is recorded
+  // but must never undo or fail an order that has already been paid and created.
+  try {
+    await sendOrderEmail(sb, { paymentRef: reference, kind: "placed", timeoutMs: 4000 });
+  } catch (e) {
+    console.error("Confirmation email step failed", { reference });
+  }
+
   return { state: "created", orderIds: created.map((o) => o.id) };
-}
+    }
