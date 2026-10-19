@@ -21,15 +21,14 @@ import Coupons from "@/components/admin/Coupons";
 import OrderDetailsDialog from "@/components/admin/OrderDetailsDialog"; // kept for reference; superseded by /admin/orders/:id full-page view
 import Announcements from "@/components/admin/Announcements";
 import { SUPPORT_EMAIL } from "@/lib/support";
+import { sellerNet, platformFee } from "@/lib/commission";
 import OrdersPanel from "@/components/admin/OrdersPanel";
 
 function formatNaira(n: number) { return "₦" + Number(n || 0).toLocaleString("en-NG"); }
 
-// NOTE: commission rate is hardcoded at 9.5% throughout the existing
-// codebase (Seller.tsx statements, this file's Settings display). There is
-// no confirmed configurable-settings table for it, so it stays a constant
-// here rather than being turned into a fake editable setting.
-const COMMISSION_RATE = 0.095;
+// Commission maths lives in lib/commission.ts and is shared with the seller
+// screens: buyers pay the seller's price + 9.5%, so the seller keeps
+// buyerAmount / 1.095 and KAT keeps the rest. (It is NOT 9.5% of the buyer amount.)
 
 function ageLabel(dateStr: string): string {
   const ms = Date.now() - new Date(dateStr).getTime();
@@ -210,7 +209,7 @@ export default function Admin() {
 
   // ── NEW derived data — all computed client-side from the four queries above, no new backend ──
   const gmv = totalRevenue;
-  const katCommissionRevenue = gmv * COMMISSION_RATE;
+  const katCommissionRevenue = platformFee(gmv);
   const netToSellers = gmv - katCommissionRevenue;
 
   // Payout-accurate figures: cancelled orders are never payable, and an order
@@ -219,7 +218,7 @@ export default function Admin() {
   const payableOrders = orders.filter((o) => o.admin_status === "delivered" || o.admin_status === "completed");
   const inProgressOrders = orders.filter((o) => o.admin_status !== "cancelled" && o.admin_status !== "delivered" && o.admin_status !== "completed");
   const payableGmv = payableOrders.reduce((s, o) => s + (o.total || o.amount || 0), 0);
-  const payableCommission = payableGmv * COMMISSION_RATE;
+  const payableCommission = platformFee(payableGmv);
   const payableNetToSellers = payableGmv - payableCommission;
   const inProgressGmv = inProgressOrders.reduce((s, o) => s + (o.total || o.amount || 0), 0);
 
@@ -585,7 +584,7 @@ export default function Admin() {
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">This period ({analyticsRange}d)</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <Metric label="GMV" value={formatNaira(gmvInRange)} />
-                  <Metric label="KAT commission" value={formatNaira(gmvInRange * COMMISSION_RATE)} />
+                  <Metric label="KAT commission" value={formatNaira(platformFee(gmvInRange))} />
                   <Metric label="Orders" value={String(ordersInRange.length)} />
                   <Metric label="New sellers" value={String(sellersInRange)} />
                   <Metric label="New buyers" value={String(buyersInRange)} />
@@ -817,7 +816,7 @@ export default function Admin() {
 
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Commission trend</p>
-                <TrendChart orders={orders} rangeDays={analyticsRange} metric="commission" commissionRate={COMMISSION_RATE} />
+                <TrendChart orders={orders} rangeDays={analyticsRange} metric="commission" />
               </div>
 
               <div>
@@ -842,8 +841,8 @@ export default function Admin() {
                             <td className="p-2.5">{s.name}</td>
                             <td className="p-2.5 text-xs text-muted-foreground">{s.orders}</td>
                             <td className="p-2.5">{formatNaira(s.revenue)}</td>
-                            <td className="p-2.5">{formatNaira(s.revenue * COMMISSION_RATE)}</td>
-                            <td className="p-2.5 font-bold">{formatNaira(s.revenue * (1 - COMMISSION_RATE))}</td>
+                            <td className="p-2.5">{formatNaira(platformFee(s.revenue))}</td>
+                            <td className="p-2.5 font-bold">{formatNaira(sellerNet(s.revenue))}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -858,7 +857,7 @@ export default function Admin() {
                   {orders.filter((o) => o.admin_status !== "cancelled").slice(0, 10).map((o) => (
                     <div key={o.id} className="flex items-center justify-between py-2 text-sm">
                       <span>#{o.id.slice(0, 8)} · {new Date(o.created_at).toLocaleDateString()}</span>
-                      <span className="text-xs text-muted-foreground">{formatNaira(o.total || o.amount)} gross · {formatNaira((o.total || o.amount || 0) * COMMISSION_RATE)} commission</span>
+                      <span className="text-xs text-muted-foreground">{formatNaira(o.total || o.amount)} gross · {formatNaira(platformFee(o.total || o.amount || 0))} commission</span>
                     </div>
                   ))}
                   {orders.length === 0 && <p className="text-xs text-muted-foreground py-3">No transactions yet.</p>}
@@ -1058,7 +1057,7 @@ export default function Admin() {
                 <p className="text-sm font-bold">Platform Info</p>
                 {[
                   { label: "Platform Name", value: "KAT Marketplace" },
-                  { label: "Commission Rate", value: "9.5%" },
+                  { label: "Commission", value: "9.5% added to the seller's price" },
                   { label: "Support Contact", value: SUPPORT_EMAIL },
                   { label: "Version", value: "MVP 1.0" },
                 ].map((s) => (
@@ -1094,7 +1093,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 // Real bucketed chart — GMV or commission, computed from actual orders. No
 // fabricated data; zero-height bars where there's no revenue in a bucket.
-function TrendChart({ orders, rangeDays, metric, commissionRate }: { orders: any[]; rangeDays: number; metric: "revenue" | "commission"; commissionRate?: number }) {
+function TrendChart({ orders, rangeDays, metric }: { orders: any[]; rangeDays: number; metric: "revenue" | "commission" }) {
   const bucketCount = rangeDays <= 7 ? 7 : rangeDays <= 30 ? 10 : 12;
   const bucketMs = (rangeDays * 24 * 60 * 60 * 1000) / bucketCount;
   const now = Date.now();
@@ -1102,9 +1101,9 @@ function TrendChart({ orders, rangeDays, metric, commissionRate }: { orders: any
     const start = now - (bucketCount - i) * bucketMs;
     const end = start + bucketMs;
     const total = orders
-      .filter((o: any) => { const t = new Date(o.created_at).getTime(); return t >= start && t < end; })
+      .filter((o: any) => { const t = new Date(o.created_at).getTime(); return t >= start && t < end && o.admin_status !== "cancelled"; })
       .reduce((s: number, o: any) => s + (o.total || o.amount || 0), 0);
-    return metric === "commission" ? total * (commissionRate || 0) : total;
+    return metric === "commission" ? platformFee(total) : total;
   });
   const max = Math.max(...buckets, 1);
 
@@ -1123,4 +1122,4 @@ function TrendChart({ orders, rangeDays, metric, commissionRate }: { orders: any
       </div>
     </div>
   );
-        }
+   }
