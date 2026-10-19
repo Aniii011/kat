@@ -33,6 +33,7 @@ import { SELLER_CATEGORY_TO_TOP_CATEGORIES, SELLER_CATEGORIES, type SellerCatego
 import SellerCategoryGate from "@/components/seller/add-product/SellerCategoryGate";
 import AddProductComposer from "@/components/seller/add-product/AddProductComposer";
 import PackingListCard, { type PackingGroup } from "@/components/seller/PackingListCard";
+import { sellerNet } from "@/lib/commission";
 
 
 function formatNaira(n: number) {
@@ -440,7 +441,10 @@ export default function Seller() {
   const ordersThisWeek = orders.filter((o) => isSameDayOrAfter(o.created_at, 7));
   const ordersLastWeek = orders.filter((o) => !isSameDayOrAfter(o.created_at, 7) && isSameDayOrAfter(o.created_at, 14));
   const revenueThisWeek = ordersThisWeek.reduce((s, o) => s + (o.total || o.amount || 0), 0);
-  const netEarningsThisWeek = revenueThisWeek / 1.095;
+  // Cancelled orders earn nothing, so they are left out of the weekly figure.
+  const netEarningsThisWeek = sellerNet(
+    ordersThisWeek.filter((o) => o.admin_status !== "cancelled").reduce((s, o) => s + (o.total || o.amount || 0), 0),
+  );
   const weekOverWeekChange = ordersLastWeek.length > 0
     ? Math.round(((ordersThisWeek.length - ordersLastWeek.length) / ordersLastWeek.length) * 100)
     : null;
@@ -1272,7 +1276,7 @@ export default function Seller() {
 
           {section === "promotions" && <SellerPromotionsSection />}
 
-          {section === "earnings" && <SellerEarningsSection orders={orders} revenue={revenue} />}
+          {section === "earnings" && <SellerEarningsSection orders={orders} />}
 
           {section === "store" && (
             <SellerStoreSection
@@ -2031,24 +2035,36 @@ function SellerPromotionsSection() {
 }
 
 // ── EARNINGS ──
-function SellerEarningsSection({ orders, revenue }: any) {
-  const netEarnings = revenue / 1.095;
-  const commission = revenue - netEarnings;
+function SellerEarningsSection({ orders }: any) {
+  // Same rules as the admin Finance screen: only DELIVERED or COMPLETED sales are owed to
+  // you. Orders still in progress could yet be cancelled, and cancelled ones earn nothing.
+  const amountOf = (o: any) => o.total || o.amount || 0;
+  const owedOrders = orders.filter((o: any) => o.admin_status === "delivered" || o.admin_status === "completed");
+  const inProgressOrders = orders.filter((o: any) => !["cancelled", "delivered", "completed"].includes(o.admin_status || "pending"));
+  const owedGross = owedOrders.reduce((s: number, o: any) => s + amountOf(o), 0);
+  const netEarnings = sellerNet(owedGross);
+  const commission = owedGross - netEarnings;
+  const inProgressNet = sellerNet(inProgressOrders.reduce((s: number, o: any) => s + amountOf(o), 0));
 
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-black">Earnings</h2>
       <div className="border border-border rounded-2xl p-5 space-y-3">
         {[
-          { label: "Gross Revenue", value: formatNaira(revenue) },
-          { label: "KAT Commission (9.5%)", value: `-${formatNaira(commission)}`, negative: true },
-          { label: "Net Earnings owed to you", value: formatNaira(netEarnings), bold: true },
+          { label: "Delivered sales", value: formatNaira(owedGross) },
+          { label: "KAT commission (9.5% of your price)", value: `-${formatNaira(commission)}`, negative: true },
+          { label: "Net earnings owed to you", value: formatNaira(netEarnings), bold: true },
         ].map((row) => (
           <div key={row.label} className="flex items-center justify-between py-2 border-b border-border last:border-0">
             <p className="text-sm text-muted-foreground">{row.label}</p>
             <p className={`text-sm font-bold ${row.negative ? "text-destructive" : ""} ${row.bold ? "text-base" : ""}`}>{row.value}</p>
           </div>
         ))}
+        {inProgressOrders.length > 0 && (
+          <p className="text-xs text-muted-foreground pt-1">
+            Plus {formatNaira(inProgressNet)} from {inProgressOrders.length} order{inProgressOrders.length === 1 ? "" : "s"} still in progress. It becomes yours once delivered.
+          </p>
+        )}
       </div>
 
       <div>
@@ -2059,11 +2075,12 @@ function SellerEarningsSection({ orders, revenue }: any) {
           <div className="divide-y divide-border border-t border-b border-border">
             {orders.slice(0, 10).map((o: any) => {
               const gross = o.total || o.amount || 0;
-              const net = gross / 1.095;
+              const net = sellerNet(gross);
+              const cancelled = o.admin_status === "cancelled";
               return (
                 <div key={o.id} className="flex items-center justify-between py-2 text-sm">
                   <span>#{o.id.slice(0, 8)} · {new Date(o.created_at).toLocaleDateString()}</span>
-                  <span className="font-medium">{formatNaira(net)} net</span>
+                  <span className={cancelled ? "text-xs text-muted-foreground" : "font-medium"}>{cancelled ? "cancelled" : `${formatNaira(net)} net`}</span>
                 </div>
               );
             })}
@@ -2073,7 +2090,7 @@ function SellerEarningsSection({ orders, revenue }: any) {
 
       <p className="text-xs text-muted-foreground flex items-start gap-1.5">
         <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-        This is what KAT owes you from sales to date. Payouts are handled directly by the KAT team — there is currently no in-app withdrawal process.
+        This is what KAT owes you for delivered sales. Payouts are handled directly by the KAT team — there is currently no in-app withdrawal process.
       </p>
     </div>
   );
@@ -2231,4 +2248,4 @@ function EmptyState({ icon, title, action }: any) {
       {action}
     </div>
   );
-}
+    }
