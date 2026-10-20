@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   if (!user) return res.status(401).json({ ok: false, error: "Please sign in to continue." });
 
   try {
-    const priced = await priceOrder(supabaseAdmin, req.body?.orderIntent);
+    const priced = await priceOrder(supabaseAdmin, req.body?.orderIntent, { checkStock: true });
     if (!priced.ok) return res.status(400).json({ ok: false, error: priced.error });
 
     // Gift orders: make sure the wishlist item is still available before taking payment.
