@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Download, Gift, Package, RefreshCw, Search, X } from "lucide-react";
+import { AlertTriangle, Download, Gift, Package, RefreshCw, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import AdminOrderDetail from "@/pages/admin-order-detail";
@@ -52,10 +52,14 @@ const QUEUES: { key: string; label: string; statuses: string[] }[] = [
   { key: "q:delivery", label: "Delivery", statuses: ["out_for_delivery", "delivered"] },
   { key: "q:done", label: "Completed", statuses: ["completed"] },
   { key: "q:cancelled", label: "Cancelled", statuses: ["cancelled"] },
+  { key: "q:stock", label: "Stock issues", statuses: [] }, // matched by hasStockIssue(), not by status
 ];
 
-function matchesFilter(status: string, filter: string): boolean {
+const hasStockIssue = (g: PurchaseGroup) => g.lines.some((l: any) => !!l.stock_issue);
+
+function matchesFilter(status: string, filter: string, group?: PurchaseGroup): boolean {
   if (filter === "all") return true;
+  if (filter === "q:stock") return !!group && hasStockIssue(group);
   const q = QUEUES.find((x) => x.key === filter);
   if (q) return q.statuses.includes(status);
   return status === filter; // an exact status picked in the Status dropdown
@@ -126,7 +130,7 @@ export default function OrdersPanel({
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
-    QUEUES.forEach((q) => { c[q.key] = allGroups.filter((g) => matchesFilter(g.headlineStatus, q.key)).length; });
+    QUEUES.forEach((q) => { c[q.key] = allGroups.filter((g) => matchesFilter(g.headlineStatus, q.key, g)).length; });
     return c;
   }, [allGroups]);
 
@@ -135,7 +139,7 @@ export default function OrdersPanel({
     const range = DATE_RANGES.find((d) => d.key === dateKey)?.days ?? null;
     const cutoff = range ? Date.now() - range * 24 * 60 * 60 * 1000 : 0;
     let list = allGroups.filter((g) => {
-      if (!matchesFilter(g.headlineStatus, statusFilter)) return false;
+      if (!matchesFilter(g.headlineStatus, statusFilter, g)) return false;
       if (range && new Date(g.createdAt).getTime() < cutoff) return false;
       if (!q) return true;
       return g.lines.some((o: any) => {
@@ -234,7 +238,7 @@ export default function OrdersPanel({
 
       {/* Queue tabs with counts */}
       <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
-        {QUEUES.map((q) => {
+        {QUEUES.filter((q) => q.key !== "q:stock" || (counts[q.key] ?? 0) > 0 || statusFilter === q.key).map((q) => {
           const active = statusFilter === q.key;
           return (
             <button
@@ -337,6 +341,7 @@ export default function OrdersPanel({
                               <p className="font-semibold truncate max-w-[150px] flex items-center gap-1">
                                 {f.buyer_name || "Unknown"}
                                 {isGift(g) && <Gift className="w-3 h-3 text-primary shrink-0" aria-label="Gift order" />}
+                                {hasStockIssue(g) && <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" aria-label="Stock problem" />}
                               </p>
                               <p className="text-[11px] text-muted-foreground">{customerLabel(g)}</p>
                             </div>
@@ -378,6 +383,7 @@ export default function OrdersPanel({
                       <p className="font-bold text-sm truncate flex items-center gap-1">
                         {f.buyer_name || "Unknown buyer"}
                         {isGift(g) && <Gift className="w-3 h-3 text-primary shrink-0" />}
+                        {hasStockIssue(g) && <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" aria-label="Stock problem" />}
                       </p>
                       <p className="text-[11px] text-muted-foreground">
                         {g.lines.length} item{g.lines.length > 1 ? "s" : ""}{g.sellerCount > 1 ? ` · ${g.sellerCount} sellers` : ""} · {ageLabel(g.createdAt)}
@@ -438,4 +444,4 @@ export default function OrdersPanel({
       )}
     </div>
   );
-  }
+    }
