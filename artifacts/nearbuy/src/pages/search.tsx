@@ -42,15 +42,80 @@ function levenshtein(a: string, b: string): number {
 // product's title — e.g. "perfum" ~ "perfume", "shooz" ~ "shoes".
 function fuzzyTitleMatch(title: string, query: string): boolean {
   const q = query.toLowerCase();
-  const words = title.toLowerCase().split(/\s+/);
-  // Allow more typo tolerance for longer queries, none for very short ones
-  // (a 1-2 char query fuzzy-matching against everything would be noise).
-  const maxDistance = q.length <= 3 ? 0 : q.length <= 6 ? 1 : 2;
+  // Short words are never fuzzy-matched: with 4 letters or fewer a single
+  // typo allowance matches unrelated real words ("gown" ~ "down", "shoe" ~
+  // "show"), which is exactly how unrelated products ended up in results.
+  if (q.length < 5) return false;
+  const words = title.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3);
+  const maxDistance = q.length <= 6 ? 1 : 2;
   return words.some((w) => {
-    if (w.includes(q) || q.includes(w)) return true;
+    if (w.includes(q) || (w.length >= 4 && q.includes(w))) return true;
     if (Math.abs(w.length - q.length) > maxDistance) return false;
     return levenshtein(w, q) <= maxDistance;
   });
+}
+
+// Words buyers use interchangeably. Searching one also searches the others.
+const SEARCH_SYNONYMS: Record<string, string[]> = {
+  gown: ["dress", "maxi"], dress: ["gown"],
+  trouser: ["pants", "trousers"], trousers: ["pants", "trouser"], pants: ["trousers", "trouser"],
+  sneaker: ["trainers", "sneakers"], sneakers: ["trainers", "sneaker"], trainers: ["sneakers", "sneaker"],
+  tee: ["t-shirt", "tshirt"], tshirt: ["t-shirt", "tee"], "t-shirt": ["tshirt", "tee"],
+  jeans: ["denim"], denim: ["jeans"],
+  purse: ["bag", "handbag"], handbag: ["bag", "purse"], bag: ["handbag", "purse"],
+  slides: ["slippers", "sandals"], slippers: ["slides"],
+  jewelry: ["jewellery"], jewellery: ["jewelry"],
+  singlet: ["tank"], hoodie: ["sweatshirt"], sweatshirt: ["hoodie"],
+};
+
+// Removes characters that would break PostgREST's or() filter syntax.
+function cleanSearchToken(raw: string): string {
+  return raw.toLowerCase().replace(/[,()"'\\%*]/g, "").trim();
+}
+
+function termVariants(token: string): string[] {
+  const out = new Set<string>([token]);
+  if (token.length > 3 && token.endsWith("s")) out.add(token.slice(0, -1));
+  for (const v of [...out]) for (const s of SEARCH_SYNONYMS[v] ?? []) out.add(s);
+  return [...out].filter(Boolean);
+}
+
+// One or() clause for a single word of the query: any variant matching any
+// searchable field. Very short words (1-2 letters) only match the START of a
+// word in the title, so typing "g" doesn't match everything that has a g.
+function tokenFilter(token: string): string {
+  const parts: string[] = [];
+  for (const v of termVariants(token)) {
+    if (v.length >= 3) {
+      parts.push(
+        `title.ilike.%${v}%`,
+        `description.ilike.%${v}%`,
+        `category.ilike.%${v}%`,
+        `seller_name.ilike.%${v}%`,
+        `attributes->>subcategory.ilike.%${v}%`
+      );
+    } else {
+      parts.push(`title.ilike.${v}%`, `title.ilike.% ${v}%`);
+    }
+  }
+  return parts.join(",");
+}
+
+// Anonymous, device-local id used only so "popular searches" can count how
+// many different people searched a term (one person can't make it popular).
+function getAnonId(): string {
+  try {
+    let id = localStorage.getItem("kat_anon_id");
+    if (!id) {
+      id = (typeof crypto !== "undefined" && "randomUUID" in crypto)
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2) + Date.now().toString(36);
+      localStorage.setItem("kat_anon_id", id);
+    }
+    return id;
+  } catch {
+    return "anon";
+  }
 }
 
 const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL", "36", "37", "38", "39", "40", "41", "42"];
@@ -206,6 +271,10 @@ export default function Search() {
   const imageRef = useRef<HTMLInputElement>(null);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loggedTermRef = useRef<string>("");
+  // Latest-request counter: a slow response for an earlier keystroke ("g")
+  // must never overwrite the results of the current query ("gown").
+  const searchReqId = useRef(0);
+  const resultsCountRef = useRef(0);
   const { addItem } = useCart();
 
   useEffect(() => {
@@ -221,20 +290,38 @@ export default function Search() {
     if (data) setFeatured(data);
   };
 
+  // "Popular" = what different people searched in the last 14 days, not
+  // all-time totals. Needs popular_searches_recent.sql to have been run; if it
+  // hasn't, the section is hidden rather than showing stale data.
   const fetchPopularSearches = async () => {
-    const { data } = await supabase
-      .from("search_queries")
-      .select("term")
-      .order("search_count", { ascending: false })
-      .limit(10);
-    if (data && data.length > 0) setPopularSearches(data.map((d) => d.term));
+    const load = async (minSearchers: number) => {
+      const { data, error } = await supabase.rpc("get_popular_searches", {
+        days_back: 14, max_terms: 10, min_searchers: minSearchers,
+      });
+      if (error || !data) return null;
+      return (data as { term: string }[]).map((d) => d.term);
+    };
+
+    let terms = await load(2);
+    if (terms === null) { setPopularSearches([]); return; }
+    if (terms.length < 3) {
+      // Early on there may not be enough overlap between people. Fall back
+      // to anything searched in the window, minus this person's own searches.
+      const mine = new Set(loadRecentSearches().map((t) => t.toLowerCase()));
+      const loose = (await load(1)) ?? [];
+      terms = loose.filter((t) => !mine.has(t.toLowerCase()));
+    }
+    setPopularSearches(terms);
   };
 
   const logSearch = async (term: string) => {
-    const cleaned = term.trim().toLowerCase();
-    if (cleaned.length < 2 || cleaned === loggedTermRef.current) return;
+    const cleaned = term.trim().toLowerCase().replace(/\s+/g, " ");
+    if (cleaned.length < 3 || cleaned === loggedTermRef.current) return;
+    // Only count searches that actually found something, so "popular" never
+    // surfaces a term that leads to an empty page.
+    if (resultsCountRef.current === 0) return;
     loggedTermRef.current = cleaned;
-    await supabase.rpc("increment_search", { search_term: cleaned });
+    await supabase.rpc("log_search", { p_term: cleaned, p_searcher: getAnonId() });
   };
 
   const addRecentSearch = (term: string) => {
@@ -263,14 +350,15 @@ export default function Search() {
   };
 
   const searchProducts = useCallback(async (q: string) => {
+    const myReq = ++searchReqId.current;
     setLoading(true);
     let queryBuilder = supabase.from("products").select("*").neq("status", "draft").eq("is_active", true);
 
-    if (q.trim()) {
-      queryBuilder = queryBuilder.or(
-        `title.ilike.%${q}%,description.ilike.%${q}%,category.ilike.%${q}%,seller_name.ilike.%${q}%`
-      );
-    }
+    const tokens = q.split(/\s+/).map(cleanSearchToken).filter(Boolean).slice(0, 4);
+    // Every word must match somewhere (AND), each word can match any field
+    // or any of its synonyms (OR): "black gown" finds a black dress.
+    for (const t of tokens) queryBuilder = queryBuilder.or(tokenFilter(t));
+
     if (selectedCategory) queryBuilder = queryBuilder.eq("category", selectedCategory);
     if (priceRange[0] > 0) queryBuilder = queryBuilder.gte("price", priceRange[0]);
     if (priceRange[1] < 100000) queryBuilder = queryBuilder.lte("price", priceRange[1]);
@@ -280,28 +368,41 @@ export default function Search() {
     else queryBuilder = queryBuilder.order("created_at", { ascending: false });
 
     const { data } = await queryBuilder.limit(50);
+    if (myReq !== searchReqId.current) return; // a newer search has started
     let finalResults = data || [];
 
-    // Typo-tolerant fallback: only kicks in when the exact match came up
-    // thin, and only for real search terms (not category/price filtering
-    // alone) — avoids the cost of a broad scan on every keystroke.
-    if (q.trim().length >= 3 && finalResults.length < 3) {
+    // Typo-tolerant fallback: only when nothing matched at all, and only for
+    // real words (5+ letters) so short terms never fuzzy-match unrelated items.
+    const fuzzyTokens = tokens.filter((t) => t.length >= 5);
+    if (finalResults.length === 0 && tokens.length > 0 && fuzzyTokens.length === tokens.length) {
       const { data: broad } = await supabase
         .from("products")
         .select("*")
         .neq("status", "draft").eq("is_active", true)
         .order("created_at", { ascending: false })
         .limit(300);
+      if (myReq !== searchReqId.current) return;
 
       if (broad) {
-        const existingIds = new Set(finalResults.map((r: any) => r.id));
-        const fuzzyMatches = broad.filter(
-          (p: any) => !existingIds.has(p.id) && fuzzyTitleMatch(p.title || "", q.trim())
+        finalResults = broad.filter((p: any) =>
+          tokens.every((t) => fuzzyTitleMatch(p.title || "", t)) &&
+          (!selectedCategory || p.category === selectedCategory) &&
+          p.price >= priceRange[0] && (priceRange[1] >= 100000 || p.price <= priceRange[1])
         );
-        finalResults = [...finalResults, ...fuzzyMatches];
       }
     }
 
+    // Put products whose TITLE matches before ones that only mention the
+    // word in a description (stable: keeps the chosen sort within each group).
+    if (tokens.length > 0 && (sortBy === "rating" || sortBy === "new")) {
+      const inTitle = (p: any) => {
+        const title = (p.title || "").toLowerCase();
+        return tokens.every((t) => termVariants(t).some((v) => title.includes(v)));
+      };
+      finalResults = [...finalResults.filter(inTitle), ...finalResults.filter((p: any) => !inTitle(p))];
+    }
+
+    resultsCountRef.current = finalResults.length;
     setResults(finalResults);
     setLoading(false);
   }, [selectedCategory, priceRange, sortBy]);
@@ -310,6 +411,8 @@ export default function Search() {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
     if (isImageSearch) return; // visual search results stay active; filters don't trigger keyword search
     if (!query.trim() && !selectedCategory && priceRange[0] === 0 && priceRange[1] === 100000) {
+      searchReqId.current++; // drop any search still in flight
+      resultsCountRef.current = 0;
       setResults([]);
       setLoading(false);
       return;
@@ -436,6 +539,12 @@ export default function Search() {
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") inputRef.current?.blur(); }}
+              enterKeyHint="search"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
               placeholder="Search KAT..."
               className="w-full h-10 pl-9 pr-10 rounded-full bg-muted border border-transparent focus:border-primary outline-none text-sm focus:ring-1 focus:ring-primary transition-all"
             />
@@ -744,7 +853,7 @@ export default function Search() {
         )}
 
         {/* Loading skeleton */}
-        {loading && (
+        {loading && results.length === 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="rounded-2xl overflow-hidden bg-card border border-card-border animate-pulse">
@@ -783,8 +892,8 @@ export default function Search() {
         )}
 
         {/* Results grid */}
-        {!loading && !imageSearchLoading && (
-          <div className="space-y-3">
+        {(!loading || results.length > 0) && !imageSearchLoading && (
+          <div className={`space-y-3 transition-opacity ${loading ? "opacity-60" : ""}`}>
             {!isSearching && featured.length > 0 && (
               <p className="text-sm font-bold">New Arrivals</p>
             )}
@@ -800,4 +909,4 @@ export default function Search() {
       </main>
     </div>
   );
-}
+    }
