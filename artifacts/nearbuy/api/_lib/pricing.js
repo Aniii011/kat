@@ -22,7 +22,9 @@ function readVariants(raw) {
         : { color: r?.color, size: r?.size, shoeSize: r?.shoeSize };
     const price =
       r?.price !== undefined && r?.price !== null && r?.price !== "" ? Number(r.price) : undefined;
-    return { attributes, price: Number.isFinite(price) ? price : undefined };
+    const rawStock = r?.stock;
+    const stock = rawStock !== undefined && rawStock !== null && rawStock !== "" && Number.isFinite(Number(rawStock)) ? Number(rawStock) : undefined;
+    return { attributes, price: Number.isFinite(price) ? price : undefined, stock };
   });
 }
 
@@ -61,7 +63,42 @@ function unitPriceFor(product, item) {
   return allowed.has(claimed) ? claimed : null;
 }
 
-export async function priceOrder(sb, intent) {
+// Is there enough stock for everything in the cart? Returns an error message, or null.
+// Same variant matching as unitPriceFor. Products with no stock number are never blocked.
+function stockProblem(lines) {
+  const need = new Map(); // "product|variant" -> { product, variant, qty }
+  for (const { item, product, quantity } of lines) {
+    if (product.in_stock === false) return `"${product.title || "An item"}" is sold out.`;
+    const variants = readVariants(product.variants);
+    const color = norm(item.selectedColor);
+    const size = norm(item.selectedSize);
+    const matches = variants.filter(
+      (v) => (!color || attr(v, "color") === color) && (!size || attr(v, "size") === size || attr(v, "shoesize") === size)
+    );
+    const variant = matches.length === 1 && matches[0].stock !== undefined ? matches[0] : null;
+    const idx = variant ? variants.indexOf(variant) : "";
+    const key = `${product.id}|${idx}`;
+    const entry = need.get(key) || { product, variant, qty: 0, color: item.selectedColor, size: item.selectedSize };
+    entry.qty += quantity;
+    need.set(key, entry);
+  }
+  for (const { product, variant, qty, color, size } of need.values()) {
+    const available = variant ? variant.stock : product.stock_count;
+    if (available === null || available === undefined || !Number.isFinite(Number(available))) continue; // not tracked
+    const title = product.title || "An item";
+    const options = [color, size].filter(Boolean).join(", ");
+    if (Number(available) <= 0) return `"${title}"${options ? ` (${options})` : ""} is sold out.`;
+    if (qty > Number(available)) {
+      return `Only ${available} of "${title}"${options ? ` (${options})` : ""} left. Please reduce the quantity.`;
+    }
+  }
+  return null;
+}
+
+// options.checkStock is for CHECKOUT only (before payment). It must stay off after payment,
+// so a customer who has already paid is never turned away by a stock check.
+export async function priceOrder(sb, intent, options = {}) {
+  const checkStock = options.checkStock === true;
   if (!intent || !Array.isArray(intent.items) || intent.items.length === 0 || intent.items.length > MAX_LINES) {
     return fail("Your cart is empty or invalid.");
   }
@@ -78,10 +115,18 @@ export async function priceOrder(sb, intent) {
 
   // 1. Products and their real prices
   const ids = [...new Set(intent.items.map((i) => i.listingId))];
-  const { data: products, error: productsError } = await sb
+  const baseColumns = "id, seller_id, store_id, seller_name, title, image_url, price, seller_price, variants";
+  let checkingStock = checkStock;
+  let { data: products, error: productsError } = await sb
     .from("products")
-    .select("id, seller_id, store_id, seller_name, title, image_url, price, seller_price, variants")
+    .select(checkStock ? `${baseColumns}, in_stock, stock_count` : baseColumns)
     .in("id", ids);
+  if (productsError && checkStock) {
+    // If the stock columns can't be read, price the order without the stock check
+    // rather than blocking every checkout.
+    checkingStock = false;
+    ({ data: products, error: productsError } = await sb.from("products").select(baseColumns).in("id", ids));
+  }
 
   if (productsError) return fail("Could not load products. Please try again.");
 
@@ -99,6 +144,11 @@ export async function priceOrder(sb, intent) {
     const quantity = Number(item.quantity);
     lines.push({ item, product, unitPrice, quantity });
     subtotal += unitPrice * quantity;
+  }
+
+  if (checkingStock) {
+    const problem = stockProblem(lines);
+    if (problem) return fail(problem);
   }
 
   // 2. Delivery fee for the chosen area (standard or door, whichever matches)
@@ -156,4 +206,4 @@ export async function priceOrder(sb, intent) {
   if (!Number.isInteger(total) || total <= 0) return fail("Your order total is invalid.");
 
   return { ok: true, lines, subtotal, delivery, discount, total, coupon };
-}
+  }
