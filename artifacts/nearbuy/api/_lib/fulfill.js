@@ -1,4 +1,5 @@
 import { sendOrderEmail } from "./order-email.js";
+import { reserveStockForOrders } from "./stock.js";
 
 // Creates the order rows for a verified payment. Shared by verify-payment.js
 // (browser callback) and paystack-webhook.js (reconciliation), so both build
@@ -75,7 +76,7 @@ export async function fulfillOrder(sb, { reference, intent, priced, buyerId, eve
     payment_ref: reference,
   }));
 
-  const { data: created, error: insertError } = await sb.from("orders").insert(rows).select("id");
+  const { data: created, error: insertError } = await sb.from("orders").insert(rows).select("id, product_id, quantity, variant");
 
   if (insertError || !created) {
     console.error("Order creation failed", { reference, code: insertError?.code });
@@ -110,6 +111,14 @@ export async function fulfillOrder(sb, { reference, intent, priced, buyerId, eve
       .eq("id", priced.coupon.id);
   }
 
+  // Take the stock in one safe database step. A paid order is never refused here; if the unit
+  // was already gone it is flagged for the team instead (see _lib/stock.js).
+  try {
+    await reserveStockForOrders(sb, created);
+  } catch (e) {
+    console.error("Stock step failed", { reference });
+  }
+
   // "Order confirmed" email. Only the request that actually CREATED the orders gets here,
   // and the email log also guarantees one send per payment. A failure here is recorded
   // but must never undo or fail an order that has already been paid and created.
@@ -120,4 +129,4 @@ export async function fulfillOrder(sb, { reference, intent, priced, buyerId, eve
   }
 
   return { state: "created", orderIds: created.map((o) => o.id) };
-    }
+}
