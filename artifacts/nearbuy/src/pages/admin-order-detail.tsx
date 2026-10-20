@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useRoute, useLocation } from "wouter";
-import { ArrowLeft, Package, Printer, Copy, Check, X, Gift, Lock, Mail } from "lucide-react";
+import { ArrowLeft, Package, Printer, Copy, Check, X, Gift, Lock, Mail, AlertTriangle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
@@ -424,6 +424,17 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
           <a href={`tel:${order.buyer_phone}`} className="text-primary text-sm block">{order.buyer_phone}</a>
         </div>
 
+        {lines.some((l) => l.stock_issue) && (
+          <div className="no-print rounded-2xl border border-amber-500/50 bg-amber-500/10 px-4 py-3 flex gap-3" role="alert">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="text-sm space-y-1">
+              <p className="font-bold">Stock problem</p>
+              <p className="text-xs">{lines.find((l) => l.stock_issue)?.stock_issue}</p>
+              <p className="text-xs text-muted-foreground">Contact the buyer, or cancel this order and refund them. Cancelling will not change the product's stock.</p>
+            </div>
+          </div>
+        )}
+
         {customer && (
           <div className="rounded-2xl bg-muted p-4 flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -723,4 +734,4 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
       </main>
     </div>
   );
-                                        }
+        }
