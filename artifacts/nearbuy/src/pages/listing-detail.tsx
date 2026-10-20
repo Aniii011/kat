@@ -380,7 +380,13 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-2">
           <button
-            onClick={() => navigate("/")}
+            onClick={() => {
+              // Go back to wherever the buyer came from (Home with their
+              // category/scroll intact, Search results, a store, etc.).
+              // Only fall back to Home when there is no history to go back to.
+              if (window.history.length > 1) window.history.back();
+              else navigate("/");
+            }}
             className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -1173,4 +1179,4 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
-               }
+      }
