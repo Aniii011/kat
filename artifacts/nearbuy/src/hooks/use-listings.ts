@@ -108,19 +108,35 @@ async function resolveStoreNames(listings: Listing[]): Promise<void> {
   }
 }
 
+// Remembers the last result per filter set for the lifetime of the page, so
+// coming back to Home (e.g. from a product via the back button) shows the
+// listings instantly instead of a skeleton. It still refetches in the
+// background, so fresh data replaces the cached copy as soon as it arrives.
+const listingsCache = new Map<string, Listing[]>();
+function listingsCacheKey(filters?: { category?: string; aesthetic?: string; isThrift?: boolean; search?: string }) {
+  return JSON.stringify([filters?.category ?? null, filters?.isThrift ?? null, filters?.aesthetic ?? null, filters?.search ?? null]);
+}
+
 export function useListings(filters?: {
   category?: string;
   aesthetic?: string;
   isThrift?: boolean;
   search?: string;
 }) {
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = listingsCacheKey(filters);
+  const [listings, setListings] = useState<Listing[]>(() => listingsCache.get(cacheKey) ?? []);
+  const [loading, setLoading] = useState(() => !listingsCache.has(cacheKey));
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchListings() {
-      setLoading(true);
+      const cached = listingsCache.get(cacheKey);
+      if (cached) {
+        setListings(cached);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
       setError(null);
 
       let query = supabase
@@ -160,6 +176,7 @@ export function useListings(filters?: {
       } else {
         const mapped = (data ?? []).map(rowToListing);
         await resolveStoreNames(mapped);
+        listingsCache.set(cacheKey, mapped);
         setListings(mapped);
       }
       setLoading(false);
@@ -218,4 +235,4 @@ export function useListing(id: string | null) {
   }, [id]);
 
   return { listing, loading, error };
-}
+  }
