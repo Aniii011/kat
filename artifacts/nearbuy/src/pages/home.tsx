@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useListings } from "@/hooks/use-listings";
@@ -58,6 +58,21 @@ const DEFAULT_ANNOUNCEMENT_ITEMS = [
   "Trusted by thousands",
 ];
 
+const HOME_RESTORE_FLAG = "kat_home_restore";
+const HOME_SCROLL_KEY = "kat_home_scroll";
+
+// Reads the selected category / subcategory / vibe from the URL so they
+// survive going into a product and coming back (and a page refresh).
+function readHomeFiltersFromUrl(): { cat: TopCategory | "All"; sub: string | null; vibe: string | null } {
+  if (typeof window === "undefined") return { cat: "All", sub: null, vibe: null };
+  const p = new URLSearchParams(window.location.search);
+  const rawCat = p.get("cat");
+  const cat = rawCat && (TOP_CATEGORIES as readonly string[]).includes(rawCat) ? (rawCat as TopCategory) : "All";
+  const sub = cat !== "All" ? p.get("sub") : null;
+  const vibe = p.get("vibe");
+  return { cat, sub: sub || null, vibe: vibe || null };
+}
+
 function ProductCard({
   listing, index, onSave, saved,
 }: {
@@ -71,6 +86,8 @@ function ProductCard({
   const [addedToCart, setAddedToCart] = useState(false);
 
   const handleCardTap = () => {
+    // Tell Home to put the buyer back at this scroll position when they return.
+    try { sessionStorage.setItem(HOME_RESTORE_FLAG, "1"); } catch {}
     logInteraction({
       listingId: listing.id,
       eventType: "tap",
@@ -245,9 +262,10 @@ function CardSkeleton() {
 }
 
 export default function Home() {
-  const [topCategory, setTopCategory] = useState<TopCategory | "All">("All");
-  const [subCategory, setSubCategory] = useState<string | null>(null);
-  const [selectedAesthetic, setSelectedAesthetic] = useState<string | null>(null);
+  const [initialFilters] = useState(readHomeFiltersFromUrl);
+  const [topCategory, setTopCategory] = useState<TopCategory | "All">(initialFilters.cat);
+  const [subCategory, setSubCategory] = useState<string | null>(initialFilters.sub);
+  const [selectedAesthetic, setSelectedAesthetic] = useState<string | null>(initialFilters.vibe);
   const [sortBy, setSortBy] = useState("featured");
   const [saveTarget, setSaveTarget] = useState<Listing | null>(null);
   const [showAuth, setShowAuth] = useState(false);
@@ -354,6 +372,51 @@ export default function Home() {
     }
     return result;
   }, [topCategory, subCategory, selectedAesthetic, sortBy, allListings, affinity]);
+
+  // Keep the URL in sync with the selection (replace, not push, so the back
+  // button doesn't have to step through every chip the buyer tapped).
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (topCategory !== "All") params.set("cat", topCategory);
+    if (topCategory !== "All" && subCategory) params.set("sub", subCategory);
+    if (selectedAesthetic) params.set("vibe", selectedAesthetic);
+    const qs = params.toString();
+    const next = window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash;
+    const current = window.location.pathname + window.location.search + window.location.hash;
+    if (next !== current) window.history.replaceState(window.history.state, "", next);
+  }, [topCategory, subCategory, selectedAesthetic]);
+
+  // Remember how far the buyer had scrolled, and put them back there when
+  // they return from a product.
+  const scrollYRef = useRef(0);
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    const onScroll = () => { scrollYRef.current = window.scrollY; };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      try {
+        sessionStorage.setItem(
+          HOME_SCROLL_KEY,
+          JSON.stringify({ search: window.location.search, y: scrollYRef.current })
+        );
+      } catch {}
+    };
+  }, []);
+
+  useEffect(() => {
+    if (restoredRef.current || loading || filteredListings.length === 0) return;
+    restoredRef.current = true;
+    try {
+      const shouldRestore = sessionStorage.getItem(HOME_RESTORE_FLAG) === "1";
+      sessionStorage.removeItem(HOME_RESTORE_FLAG);
+      if (!shouldRestore) return;
+      const saved = JSON.parse(sessionStorage.getItem(HOME_SCROLL_KEY) || "null");
+      if (saved && saved.search === window.location.search && typeof saved.y === "number") {
+        requestAnimationFrame(() => window.scrollTo(0, saved.y));
+      }
+    } catch {}
+  }, [loading, filteredListings.length]);
 
   const thriftPreview = allListings.filter((l) => l.isThrift).slice(0, 3);
 
@@ -672,4 +735,4 @@ export default function Home() {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
     </div>
   );
-  }
+}
