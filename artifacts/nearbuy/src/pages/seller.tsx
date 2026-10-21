@@ -34,6 +34,7 @@ import SellerCategoryGate from "@/components/seller/add-product/SellerCategoryGa
 import AddProductComposer from "@/components/seller/add-product/AddProductComposer";
 import PackingListCard, { type PackingGroup } from "@/components/seller/PackingListCard";
 import { sellerNet } from "@/lib/commission";
+import { getListingSubcategories } from "@/lib/subcategories";
 
 
 function formatNaira(n: number) {
@@ -147,7 +148,10 @@ export default function Seller() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [department, setDepartment] = useState("");
-  const [subcategory, setSubcategory] = useState("");
+  // A product can carry several subcategories (e.g. Polo Shirts + Shirts).
+  // `subcategory` stays as the main (first) one for code that needs just one.
+  const [subcategories, setSubcategories] = useState<string[]>([]);
+  const subcategory = subcategories[0] ?? "";
   const [categoryTouched, setCategoryTouched] = useState(false);
   const [selectedAesthetics, setSelectedAesthetics] = useState<string[]>([]);
   const [aestheticsTouched, setAestheticsTouched] = useState(false);
@@ -485,7 +489,7 @@ export default function Seller() {
 
   const resetForm = () => {
     setEditingProductId(null); setTitle(""); setBasePrice(""); setDescription("");
-    setCategory(""); setDepartment(""); setSubcategory(""); setCategoryTouched(false);
+    setCategory(""); setDepartment(""); setSubcategories([]); setCategoryTouched(false);
     setSelectedAesthetics([]); setAestheticsTouched(false);
     setIsThrift(false); setThriftCondition("");
     setPackageSize(""); setSellerNote(""); setStockCount("");
@@ -514,7 +518,7 @@ export default function Seller() {
     setTitle(p.title || ""); setBasePrice(String(p.seller_price ?? p.price ?? "")); setDescription(p.description || "");
     setCategory(p.category || "");
     setDepartment(["Woman", "Men", "Kids"].includes(p.category) ? p.category : "");
-    setSubcategory(p.attributes?.subcategory || "");
+    setSubcategories(getListingSubcategories(p.attributes));
     setCategoryTouched(false);
     setSelectedAesthetics(p.aesthetics || []);
     setAestheticsTouched(false);
@@ -827,7 +831,10 @@ export default function Seller() {
         ...Object.fromEntries(
           Object.entries(attributeValues).filter(([k, v]) => !NATIVE_ATTRIBUTE_COLUMNS.has(k) && v)
         ),
-        ...(subcategory ? { subcategory } : {}),
+        // `subcategory` (main one) is kept for older code; `subcategories` is the full list.
+        // undefined clears a stale value left in existingAttributes.
+        subcategory: subcategories[0] ?? undefined,
+        subcategories: subcategories.length > 0 ? subcategories : undefined,
       },
     };
 
@@ -971,7 +978,7 @@ export default function Seller() {
         generatingAI={generatingAI}
         aiError={aiError}
         department={department} onDepartmentChange={(v) => { setDepartment(v); setCategoryTouched(true); }}
-        subcategory={subcategory} onSubcategoryChange={(v) => { setSubcategory(v); setCategoryTouched(true); }}
+        subcategories={subcategories} onSubcategoriesChange={(v) => { setSubcategories(v); setCategoryTouched(true); }}
         color={color} onColorChange={(v) => { setColor(v); setColorTouched(true); }}
         size={size} onSizeChange={(v) => { setSize(v); setSizeTouched(true); }}
         fit={fit} onFitChange={setFit}
@@ -2248,4 +2255,4 @@ function EmptyState({ icon, title, action }: any) {
       {action}
     </div>
   );
-    }
+}
