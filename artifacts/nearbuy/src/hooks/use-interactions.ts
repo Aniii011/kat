@@ -18,6 +18,12 @@ export interface AffinityScores {
   aestheticScores: Record<string, number>;
 }
 
+// Bumped whenever a search is recorded, so Home knows its cached interest
+// scores are out of date and re-reads them (taps/views don't bump this, so the
+// feed stays put while someone browses products and comes back).
+let searchSignalVersion = 0;
+export const getSearchSignalVersion = () => searchSignalVersion;
+
 const EMPTY_AFFINITY: AffinityScores = { categoryScores: {}, subcategoryScores: {}, aestheticScores: {} };
 
 // How many days back a signal takes to lose half its weight. Recent taps
@@ -81,6 +87,8 @@ function weightOf(eventType: string, ts: number, now: number): number {
 export function useInteractions(userId: string | null) {
   const logInteraction = async ({ listingId, eventType, category, subcategories, aesthetics, searchTerm }: LogInteractionParams) => {
     if (eventType !== "search" && !listingId) return;
+
+    if (eventType === "search" && (category || (subcategories && subcategories.length > 0))) searchSignalVersion++;
 
     // Always remember it on this device (only events that carry a signal).
     if (category || (subcategories && subcategories.length > 0) || (aesthetics && aesthetics.length > 0)) {
