@@ -298,6 +298,19 @@ html { scroll-behavior: smooth; }
    a light background. In dark mode, swap them for deep tints with light text. */
 .dark { color-scheme: dark; }
 
+/* Dark (black) mode, default Mulberry accent: keep the exact same mulberry as
+   light mode instead of the lightened pink. Only applies when no other accent
+   is chosen (the other accents keep their own dark-mode shades). */
+html.dark:not([class*="accent-"]) {
+  --primary: var(--accent-h) var(--accent-s) var(--accent-l);
+  --ring: var(--accent-h) var(--accent-s) var(--accent-l);
+  --sidebar-primary: var(--accent-h) var(--accent-s) var(--accent-l);
+  --sidebar-ring: var(--accent-h) var(--accent-s) var(--accent-l);
+  /* Text/icons that sit on the soft accent background need to stay readable
+     on black, so this one stays a lighter tint of the same mulberry. */
+  --accent-foreground: var(--accent-h) var(--accent-s) 72%;
+}
+
 .dark .text-emerald-600, .dark .text-emerald-700 { color: #34d399; }
 .dark .bg-emerald-50, .dark .bg-emerald-100 { background-color: rgb(2 44 34 / 0.55); }
 .dark .hover\:bg-emerald-200:hover { background-color: rgb(2 44 34 / 0.8); }
