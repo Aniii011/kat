@@ -10,7 +10,8 @@ import {
 import { useBoards } from "@/hooks/use-boards";
 import { useAuth } from "@/context/auth-context";
 import { useCart } from "@/hooks/use-cart";
-import { useInteractions } from "@/hooks/use-interactions";
+import { useInteractions, type AffinityScores } from "@/hooks/use-interactions";
+import { getListingSubcategories, popularCustomSubcategories, subKey, topCategoryOf } from "@/lib/subcategories";
 import ThemeSwitcher from "@/components/theme-switcher";
 import HeaderCartButton from "@/components/header-cart-button";
 import { flyToCart } from "@/lib/cart-feedback";
@@ -58,6 +59,45 @@ const DEFAULT_ANNOUNCEMENT_ITEMS = [
   "Trusted by thousands",
 ];
 
+// ── Feed ranking ──
+// A new random seed on every full page load (refresh) so the feed is not the
+// exact same order each time, but it stays the same while the buyer navigates
+// around the app, so coming back from a product shows the same feed.
+const FEED_SEED = Math.random();
+
+// Interest scores are fetched once and reused for a while, for the same reason:
+// the feed shouldn't reshuffle under the buyer when they come back from a
+// product they just tapped. New taps take effect on the next refresh/visit.
+const AFFINITY_TTL_MS = 10 * 60 * 1000;
+let affinityCache: { scores: AffinityScores; userId: string | null; at: number } | null = null;
+
+function seededRandom(id: string, seed: number): number {
+  let h = (2166136261 ^ Math.floor(seed * 4294967295)) >>> 0;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) % 100000) / 100000;
+}
+
+// Stops the feed showing one seller (or one look) over and over in a row:
+// takes the ranked list and, where possible, avoids more than 2 in a row from
+// the same seller.
+function spreadSellers(ranked: Listing[]): Listing[] {
+  const out: Listing[] = [];
+  const pending = [...ranked];
+  while (pending.length > 0) {
+    const last = out.slice(-2).map((l) => l.sellerId ?? l.sellerName);
+    let idx = 0;
+    if (last.length === 2 && last[0] === last[1]) {
+      const alt = pending.findIndex((l) => (l.sellerId ?? l.sellerName) !== last[0]);
+      if (alt !== -1) idx = alt;
+    }
+    out.push(pending.splice(idx, 1)[0]);
+  }
+  return out;
+}
+
 const HOME_RESTORE_FLAG = "kat_home_restore";
 const HOME_SCROLL_KEY = "kat_home_scroll";
 
@@ -92,6 +132,7 @@ function ProductCard({
       listingId: listing.id,
       eventType: "tap",
       category: listing.category,
+      subcategories: getListingSubcategories(listing.attributes),
       aesthetics: listing.aesthetics,
     });
   };
@@ -292,19 +333,32 @@ export default function Home() {
   const allListings = remoteListings;
   const { isSaved } = useBoards();
   const { getAffinityScores } = useInteractions(user?.id ?? null);
-  const [affinity, setAffinity] = useState<{ categoryScores: Record<string, number>; aestheticScores: Record<string, number> }>({ categoryScores: {}, aestheticScores: {} });
+  const [affinity, setAffinity] = useState<AffinityScores>(
+    () => affinityCache?.scores ?? { categoryScores: {}, subcategoryScores: {}, aestheticScores: {} }
+  );
+  // The feed waits for interest scores (briefly) so it doesn't render in one
+  // order and then jump to another a moment later.
+  const [affinityReady, setAffinityReady] = useState(() => affinityCache !== null);
 
   useEffect(() => {
-    if (!user?.id) {
-      setAffinity({ categoryScores: {}, aestheticScores: {} });
+    const userId = user?.id ?? null;
+    if (affinityCache && affinityCache.userId === userId && Date.now() - affinityCache.at < AFFINITY_TTL_MS) {
+      setAffinity(affinityCache.scores);
+      setAffinityReady(true);
       return;
     }
     let cancelled = false;
+    const giveUp = setTimeout(() => { if (!cancelled) setAffinityReady(true); }, 2000);
     getAffinityScores().then((scores) => {
-      if (!cancelled) setAffinity(scores);
+      affinityCache = { scores, userId, at: Date.now() };
+      if (cancelled) return;
+      setAffinity(scores);
+      setAffinityReady(true);
     });
-    return () => { cancelled = true; };
+    return () => { cancelled = true; clearTimeout(giveUp); };
   }, [user?.id]);
+
+  const feedLoading = loading || !affinityReady;
 
   const openLogin = () => { setAuthMode("login"); setShowAuth(true); };
   const openSignup = () => { setAuthMode("signup"); setShowAuth(true); };
@@ -312,17 +366,26 @@ export default function Home() {
   const userName = (user?.name || user?.email || "User").split(" ")[0];
   const userInitials = (user?.name || user?.email || "KA").slice(0, 2).toUpperCase();
 
-  const subcats =
-    topCategory !== "All" ? (SUBCATEGORIES[topCategory as TopCategory] ?? []) : [];
+  // Preset subcategories, plus custom ones sellers use a lot (so a subcategory
+  // a seller typed shows up as a chip once enough products use it).
+  const subcats = useMemo(() => {
+    if (topCategory === "All") return [];
+    const presets = SUBCATEGORIES[topCategory as TopCategory] ?? [];
+    const customs = popularCustomSubcategories(
+      allListings.map((l) => ({ top: topCategoryOf(l.category, l.isThrift), subs: getListingSubcategories(l.attributes) })),
+      [topCategory]
+    );
+    return [...presets, ...customs];
+  }, [topCategory, allListings]);
 
   const filteredListings = useMemo(() => {
     let result = allListings.filter((l) => {
       if (topCategory === "Thrift") return l.isThrift;
       if (topCategory === "Deals")  return !l.isThrift && (l.discount ?? 0) > 0;
 
-      const listingSubcategory = (l.attributes?.subcategory as string | undefined) ?? "";
       const matchesSub = !subCategory ||
-        listingSubcategory.toLowerCase() === subCategory.toLowerCase() ||
+        // A product can have several subcategories — match any of them.
+        getListingSubcategories(l.attributes).some((s) => subKey(s) === subKey(subCategory)) ||
         // Fallback for legacy seed data, which never had attributes.subcategory
         // and instead stored the subcategory-style value directly on category.
         l.category === subCategory ||
@@ -355,20 +418,41 @@ export default function Home() {
     else if (sortBy === "rating")     result = [...result].sort((a, b) => b.rating - a.rating);
     else if (sortBy === "discount")   result = [...result].sort((a, b) => (b.discount ?? 0) - (a.discount ?? 0));
     else {
-      // Default view: rank by the signed-in user's own affinity (what
-      // they've tapped/viewed/searched), falling back to the existing
-      // featured-first order for anyone with no signal yet — guests and
-      // brand-new accounts see exactly the same order as before.
+      // Default view ("featured"): a blend of what THIS person has shown
+      // interest in (category, subcategory, vibe — signed in or not), how
+      // popular and fresh a product is, and a per-load random factor so the
+      // feed varies between visits and a shopper isn't shown the same few
+      // items every time. Strong interests still win; the random part keeps
+      // room for discovery.
+      const maxOf = (m: Record<string, number>) => Math.max(1, ...Object.values(m));
+      const maxCat = maxOf(affinity.categoryScores);
+      const maxSub = maxOf(affinity.subcategoryScores);
+      const maxAes = maxOf(affinity.aestheticScores);
+      const popularityOf = (l: Listing) =>
+        Math.log1p(l.sold ?? 0) * 1.0 + Math.log1p(l.reviewCount ?? 0) * 0.7 + (l.rating ?? 0) / 5;
+      const maxPop = Math.max(1, ...result.map(popularityOf));
+      const recencyIndex = new Map(allListings.map((l, i) => [l.id, i])); // newest first
+      const total = Math.max(1, allListings.length - 1);
+
       const scoreOf = (l: Listing) => {
-        let score = affinity.categoryScores[l.category] ?? 0;
-        for (const a of l.aesthetics ?? []) score += affinity.aestheticScores[a] ?? 0;
-        return score;
+        const subScore = Math.max(0, ...getListingSubcategories(l.attributes).map((s) => affinity.subcategoryScores[s] ?? 0));
+        const interest =
+          0.5 * ((affinity.categoryScores[l.category] ?? 0) / maxCat) +
+          0.3 * (subScore / maxSub) +
+          0.2 * ((l.aesthetics ?? []).reduce((n, a) => n + (affinity.aestheticScores[a] ?? 0), 0) / maxAes);
+        const popularity = popularityOf(l) / maxPop;
+        const freshness = 1 - (recencyIndex.get(l.id) ?? total) / total;
+        const jitter = seededRandom(l.id, FEED_SEED);
+        return (
+          0.45 * Math.min(1, interest) +
+          0.2 * popularity +
+          0.15 * freshness +
+          (l.isFeatured ? 0.1 : 0) +
+          0.35 * jitter
+        );
       };
-      result = [...result].sort((a, b) => {
-        const diff = scoreOf(b) - scoreOf(a);
-        if (diff !== 0) return diff;
-        return (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0);
-      });
+      const scored = new Map(result.map((l) => [l.id, scoreOf(l)]));
+      result = spreadSellers([...result].sort((a, b) => (scored.get(b.id) ?? 0) - (scored.get(a.id) ?? 0)));
     }
     return result;
   }, [topCategory, subCategory, selectedAesthetic, sortBy, allListings, affinity]);
@@ -405,7 +489,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (restoredRef.current || loading || filteredListings.length === 0) return;
+    if (restoredRef.current || feedLoading || filteredListings.length === 0) return;
     restoredRef.current = true;
     try {
       const shouldRestore = sessionStorage.getItem(HOME_RESTORE_FLAG) === "1";
@@ -416,7 +500,7 @@ export default function Home() {
         requestAnimationFrame(() => window.scrollTo(0, saved.y));
       }
     } catch {}
-  }, [loading, filteredListings.length]);
+  }, [feedLoading, filteredListings.length]);
 
   const thriftPreview = allListings.filter((l) => l.isThrift).slice(0, 3);
 
@@ -644,7 +728,7 @@ export default function Home() {
 
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs text-muted-foreground">
-            {loading ? "Loading..." : filteredListings.length === 0 ? "No items yet" : "\u00A0"}
+            {feedLoading ? "Loading..." : filteredListings.length === 0 ? "No items yet" : "\u00A0"}
           </p>
           <select
             value={sortBy}
@@ -659,7 +743,7 @@ export default function Home() {
           </select>
         </div>
 
-        {loading ? (
+        {feedLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {Array.from({ length: 10 }).map((_, i) => <CardSkeleton key={i} />)}
           </div>
