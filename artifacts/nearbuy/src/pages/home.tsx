@@ -10,7 +10,7 @@ import {
 import { useBoards } from "@/hooks/use-boards";
 import { useAuth } from "@/context/auth-context";
 import { useCart } from "@/hooks/use-cart";
-import { useInteractions, type AffinityScores } from "@/hooks/use-interactions";
+import { useInteractions, getSearchSignalVersion, type AffinityScores } from "@/hooks/use-interactions";
 import { getListingSubcategories, popularCustomSubcategories, subKey, topCategoryOf } from "@/lib/subcategories";
 import ThemeSwitcher from "@/components/theme-switcher";
 import HeaderCartButton from "@/components/header-cart-button";
@@ -69,7 +69,7 @@ const FEED_SEED = Math.random();
 // the feed shouldn't reshuffle under the buyer when they come back from a
 // product they just tapped. New taps take effect on the next refresh/visit.
 const AFFINITY_TTL_MS = 10 * 60 * 1000;
-let affinityCache: { scores: AffinityScores; userId: string | null; at: number } | null = null;
+let affinityCache: { scores: AffinityScores; userId: string | null; at: number; v: number } | null = null;
 
 function seededRandom(id: string, seed: number): number {
   let h = (2166136261 ^ Math.floor(seed * 4294967295)) >>> 0;
@@ -342,7 +342,7 @@ export default function Home() {
 
   useEffect(() => {
     const userId = user?.id ?? null;
-    if (affinityCache && affinityCache.userId === userId && Date.now() - affinityCache.at < AFFINITY_TTL_MS) {
+    if (affinityCache && affinityCache.userId === userId && affinityCache.v === getSearchSignalVersion() && Date.now() - affinityCache.at < AFFINITY_TTL_MS) {
       setAffinity(affinityCache.scores);
       setAffinityReady(true);
       return;
@@ -350,7 +350,7 @@ export default function Home() {
     let cancelled = false;
     const giveUp = setTimeout(() => { if (!cancelled) setAffinityReady(true); }, 2000);
     getAffinityScores().then((scores) => {
-      affinityCache = { scores, userId, at: Date.now() };
+      affinityCache = { scores, userId, at: Date.now(), v: getSearchSignalVersion() };
       if (cancelled) return;
       setAffinity(scores);
       setAffinityReady(true);
@@ -819,4 +819,4 @@ export default function Home() {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode={authMode} />
     </div>
   );
-                }
+              }
