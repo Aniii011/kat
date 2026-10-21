@@ -2,6 +2,7 @@ import React from "react";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { SellerCategoryId } from "@/lib/seller-categories";
+import { HOME_APPLIANCES_SUBCATEGORY, GYM_WEAR_SUBCATEGORY } from "@/lib/product-attributes";
 import { type ProductVariant, lowestVariantPrice } from "@/lib/product-variants";
 import PhotosSection from "./PhotosSection";
 import NameDescriptionSection from "./NameDescriptionSection";
@@ -48,7 +49,7 @@ interface AddProductComposerProps {
 
   // Subcategory
   department: string; onDepartmentChange: (v: string) => void;
-  subcategory: string; onSubcategoryChange: (v: string) => void;
+  subcategories: string[]; onSubcategoriesChange: (v: string[]) => void;
 
   // Shared descriptive fields
   color: string; onColorChange: (v: string) => void;
@@ -101,7 +102,7 @@ export default function AddProductComposer(props: AddProductComposerProps) {
     existingImages, imagePreviews, onAddImages, onRemoveExistingImage, onRemoveNewImage,
     videoPreview, existingVideoUrl, onAddVideo, onRemoveVideo,
     title, onTitleChange, description, onDescriptionChange, showAIGenerate, onGenerateAI, generatingAI, aiError,
-    department, onDepartmentChange, subcategory, onSubcategoryChange,
+    department, onDepartmentChange, subcategories, onSubcategoriesChange,
     color, onColorChange, size, onSizeChange, fit, onFitChange, material, onMaterialChange,
     occasion, onOccasionChange, audience, onAudienceChange, aesthetics, onAestheticsChange,
     brand, onBrandChange, thriftCondition, onThriftConditionChange,
@@ -190,7 +191,7 @@ export default function AddProductComposer(props: AddProductComposerProps) {
       case "Home":
         return (
           <HomeComposer
-            subcategory={subcategory}
+            subcategory={subcategories.includes(HOME_APPLIANCES_SUBCATEGORY) ? HOME_APPLIANCES_SUBCATEGORY : (subcategories[0] ?? "")}
             material={material} onMaterialChange={onMaterialChange}
             powerSource={powerSource} onPowerSourceChange={onPowerSourceChange}
             selectedColors={selectedColors} setSelectedColors={setSelectedColors}
@@ -213,7 +214,7 @@ export default function AddProductComposer(props: AddProductComposerProps) {
       case "Gym & Outdoor":
         return (
           <GymComposer
-            subcategory={subcategory}
+            subcategory={subcategories.includes(GYM_WEAR_SUBCATEGORY) ? GYM_WEAR_SUBCATEGORY : (subcategories[0] ?? "")}
             material={material} onMaterialChange={onMaterialChange}
             selectedColors={selectedColors} setSelectedColors={setSelectedColors}
             selectedSizes={selectedSizes} setSelectedSizes={setSelectedSizes}
@@ -272,8 +273,8 @@ export default function AddProductComposer(props: AddProductComposerProps) {
           sellerCategory={sellerCategory}
           department={department}
           onDepartmentChange={onDepartmentChange}
-          subcategory={subcategory}
-          onSubcategoryChange={onSubcategoryChange}
+          subcategories={subcategories}
+          onSubcategoriesChange={onSubcategoriesChange}
         />
 
         {renderCategoryComposer()}
@@ -307,7 +308,7 @@ export default function AddProductComposer(props: AddProductComposerProps) {
           buyerPrice={buyerPrice}
           expandedContent={
             <div className="space-y-1 text-xs text-muted-foreground">
-              <p>{[department || null, subcategory].filter(Boolean).join(" › ") || "No category selected yet"}</p>
+              <p>{[department || null, subcategories.join(", ") || null].filter(Boolean).join(" › ") || "No category selected yet"}</p>
               {description && <p className="line-clamp-3">{description}</p>}
               {variants.length > 0 && <p>{variants.length} variant(s) configured</p>}
               <p>Stock: {stock || "—"}</p>
@@ -335,4 +336,4 @@ export default function AddProductComposer(props: AddProductComposerProps) {
       </div>
     </div>
   );
-            }
+  }
