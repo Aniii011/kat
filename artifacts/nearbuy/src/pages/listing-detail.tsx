@@ -6,6 +6,7 @@ import { useListing, useListings } from "@/hooks/use-listings";
 import { useCart } from "@/hooks/use-cart";
 import { useInteractions } from "@/hooks/use-interactions";
 import ThemeSwitcher from "@/components/theme-switcher";
+import { getListingSubcategories } from "@/lib/subcategories";
 import { flyToCart } from "@/lib/cart-feedback";
 import {
   ArrowLeft, Star, ShoppingBag, Shield, RotateCcw,
@@ -97,6 +98,7 @@ export default function ListingDetail() {
       listingId: listing.id,
       eventType: "view",
       category: listing.category,
+      subcategories: getListingSubcategories(listing.attributes),
       aesthetics: listing.aesthetics,
     });
   }, [listing?.id, user?.id]);
@@ -1179,4 +1181,4 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
-      }
+    }
