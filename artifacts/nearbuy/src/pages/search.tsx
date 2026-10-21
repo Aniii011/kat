@@ -6,9 +6,11 @@ import { supabase } from "@/lib/supabase";
 import { useCart } from "@/hooks/use-cart";
 import { useInteractions } from "@/hooks/use-interactions";
 import { useAuth } from "@/context/auth-context";
+import { getListingSubcategories } from "@/lib/subcategories";
+import { loadSuggestVocab, getSuggestions, type SuggestVocab } from "@/lib/search-suggest";
 import {
   Search as SearchIcon, X, SlidersHorizontal, Star, BadgeCheck,
-  ArrowLeft, Camera, Image, ShoppingBag, CheckCircle2, Loader2, Play,
+  ArrowLeft, Camera, Image, ShoppingBag, CheckCircle2, Loader2, Play, ArrowUpLeft,
 } from "lucide-react";
 import { Sparkles, Flame, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -246,15 +248,6 @@ export default function Search() {
   const [imageSearchError, setImageSearchError] = useState("");
   const [imageSearchPreview, setImageSearchPreview] = useState<string | null>(null);
 
-  // Log the search term once it settles, not on every keystroke.
-  useEffect(() => {
-    const trimmed = query.trim();
-    if (trimmed.length < 2) return;
-    const timeout = setTimeout(() => {
-      logInteraction({ eventType: "search", searchTerm: trimmed });
-    }, 800);
-    return () => clearTimeout(timeout);
-  }, [query]);
 
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
   const [addedId, setAddedId] = useState<string | null>(null);
@@ -275,6 +268,18 @@ export default function Search() {
   // must never overwrite the results of the current query ("gown").
   const searchReqId = useRef(0);
   const resultsCountRef = useRef(0);
+  // The products the latest settled search returned, so what the buyer
+  // searched for can feed their interest scores (see logSearchInterest).
+  const lastResultsRef = useRef<{ q: string; rows: any[] }>({ q: "", rows: [] });
+  const loggedInterestRef = useRef("");
+
+  // Typeahead + keyboard handling.
+  const [inputFocused, setInputFocused] = useState(false);
+  const [committed, setCommitted] = useState(false); // buyer pressed Enter / picked a suggestion
+  const [vocab, setVocab] = useState<SuggestVocab | null>(null);
+  const lastTypeAt = useRef(0);
+  const lastPointerAt = useRef(0);
+  const intentionalBlur = useRef(false);
   const { addItem } = useCart();
 
   useEffect(() => {
@@ -283,6 +288,18 @@ export default function Search() {
     fetchPopularSearches();
     setRecentSearches(loadRecentSearches());
     setRecentlyViewed(loadRecentlyViewed());
+    loadSuggestVocab().then(setVocab);
+
+    // Remember when the buyer last touched the screen, so a keyboard that
+    // closes on its own right after a keystroke can be told apart from the
+    // buyer deliberately tapping away.
+    const markPointer = () => { lastPointerAt.current = Date.now(); };
+    window.addEventListener("pointerdown", markPointer, true);
+    window.addEventListener("touchstart", markPointer, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", markPointer, true);
+      window.removeEventListener("touchstart", markPointer, true);
+    };
   }, []);
 
   const fetchFeatured = async () => {
@@ -314,6 +331,34 @@ export default function Search() {
     setPopularSearches(terms);
   };
 
+  // A search is a signal of interest: someone searching "gown" wants dresses.
+  // Looks at what the search actually returned and records the category and
+  // subcategories most of those products share, so Home leans that way.
+  const logSearchInterest = (term: string) => {
+    const lower = term.toLowerCase();
+    if (loggedInterestRef.current === lower) return;
+    const snap = lastResultsRef.current;
+    if (snap.q !== lower || snap.rows.length === 0) return;
+    loggedInterestRef.current = lower;
+
+    const top = snap.rows.slice(0, 12);
+    const catCount = new Map<string, number>();
+    const subCount = new Map<string, number>();
+    for (const p of top) {
+      if (p.category) catCount.set(p.category, (catCount.get(p.category) ?? 0) + 1);
+      for (const s of new Set(getListingSubcategories(p.attributes))) subCount.set(s, (subCount.get(s) ?? 0) + 1);
+    }
+    const best = [...catCount.entries()].sort((a, b) => b[1] - a[1])[0];
+    const category = best && best[1] / top.length >= 0.4 ? best[0] : undefined;
+    const subcategories = [...subCount.entries()]
+      .filter(([, n]) => n / top.length >= 0.3)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 2)
+      .map(([s]) => s);
+
+    logInteraction({ eventType: "search", category, subcategories, searchTerm: term });
+  };
+
   const logSearch = async (term: string) => {
     const cleaned = term.trim().toLowerCase().replace(/\s+/g, " ");
     if (cleaned.length < 3 || cleaned === loggedTermRef.current) return;
@@ -329,6 +374,14 @@ export default function Search() {
     if (cleaned.length < 2) return;
     setRecentSearches((prev) => {
       const next = [cleaned, ...prev.filter((t) => t.toLowerCase() !== cleaned.toLowerCase())].slice(0, 8);
+      saveRecentSearches(next);
+      return next;
+    });
+  };
+
+  const removeRecentSearch = (term: string) => {
+    setRecentSearches((prev) => {
+      const next = prev.filter((t) => t !== term);
       saveRecentSearches(next);
       return next;
     });
@@ -403,6 +456,7 @@ export default function Search() {
     }
 
     resultsCountRef.current = finalResults.length;
+    lastResultsRef.current = { q: q.trim().toLowerCase(), rows: finalResults };
     setResults(finalResults);
     setLoading(false);
   }, [selectedCategory, priceRange, sortBy]);
@@ -434,6 +488,7 @@ export default function Search() {
       logSearch(trimmed);
       addRecentSearch(trimmed);
       fetchPopularSearches();
+      logSearchInterest(trimmed);
     }, 1200);
     return () => { if (logTimeout.current) clearTimeout(logTimeout.current); };
   }, [query]);
@@ -523,6 +578,32 @@ export default function Search() {
   const isSearching = query || selectedCategory || activeFilters > 0 || isImageSearch;
   const showIdleDiscovery = !query && !imageSearchLoading && !isSearching;
 
+  // Buyer is mid-typing: show "did you mean" suggestions instead of results.
+  const showTypeahead = inputFocused && query.trim().length > 0 && !committed && !isImageSearch;
+  const suggestions = showTypeahead
+    ? getSuggestions(vocab, query, { popular: popularSearches, recent: recentSearches })
+    : [];
+
+  const commitSearch = (term: string) => {
+    const cleaned = term.trim();
+    if (!cleaned) return;
+    intentionalBlur.current = true;
+    setQuery(cleaned);
+    setCommitted(true);
+    addRecentSearch(cleaned);
+    inputRef.current?.blur();
+  };
+
+  const handleInputBlur = () => {
+    setInputFocused(false);
+    const now = Date.now();
+    // The keyboard closed within a moment of a keystroke and the buyer did not
+    // touch the screen: that was not them, so put the cursor back.
+    const unintended = !intentionalBlur.current && now - lastTypeAt.current < 400 && now - lastPointerAt.current > 600;
+    intentionalBlur.current = false;
+    if (unintended) setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 0);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
@@ -538,18 +619,20 @@ export default function Search() {
             <input
               ref={inputRef}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") inputRef.current?.blur(); }}
+              onChange={(e) => { lastTypeAt.current = Date.now(); setCommitted(false); setQuery(e.target.value); }}
+              onFocus={() => { setInputFocused(true); setCommitted(false); }}
+              onBlur={handleInputBlur}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitSearch(query); } }}
               enterKeyHint="search"
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="none"
               spellCheck={false}
               placeholder="Search KAT..."
-              className="w-full h-10 pl-9 pr-10 rounded-full bg-muted border border-transparent focus:border-primary outline-none text-sm focus:ring-1 focus:ring-primary transition-all"
+              className="w-full h-10 pl-9 pr-10 rounded-full bg-muted border border-transparent focus:border-primary outline-none text-sm focus:ring-1 focus:ring-primary transition-colors"
             />
             {query && (
-              <button onClick={() => { setQuery(""); clearImageSearch(); }} className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-muted-foreground/20 flex items-center justify-center">  <X className="w-3 h-3" />
+              <button onMouseDown={(e) => e.preventDefault()} onClick={() => { setQuery(""); setCommitted(false); clearImageSearch(); inputRef.current?.focus(); }} className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-muted-foreground/20 flex items-center justify-center">  <X className="w-3 h-3" />
               </button>
             )}
           </div>
@@ -700,6 +783,53 @@ export default function Search() {
       </AnimatePresence>
 
       <main className="max-w-5xl mx-auto px-3 py-4 pb-24">
+        {/* Typeahead: likely searches from the first letter typed */}
+        {showTypeahead && (
+          <div className="-mx-3 -mt-4 mb-2 bg-background">
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => commitSearch(query)}
+              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted transition-colors border-b border-border"
+            >
+              <SearchIcon className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span className="text-sm truncate">Search for <span className="font-semibold">“{query.trim()}”</span></span>
+            </button>
+            {suggestions.map((s) => {
+              const typedLen = query.trim().toLowerCase().replace(/\s+/g, " ").length;
+              return (
+                <div key={s.key} className="flex items-center hover:bg-muted transition-colors">
+                  <button
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => commitSearch(s.text)}
+                    className="flex-1 min-w-0 flex items-center gap-3 pl-4 py-3 text-left"
+                  >
+                    <SearchIcon className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <span className="text-sm truncate">
+                      {s.prefix ? (
+                        <>
+                          <span className="text-muted-foreground">{s.text.slice(0, typedLen)}</span>
+                          <span className="font-semibold">{s.text.slice(typedLen)}</span>
+                        </>
+                      ) : (
+                        s.text
+                      )}
+                    </span>
+                  </button>
+                  <button
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => { lastTypeAt.current = Date.now(); setQuery(s.text + " "); inputRef.current?.focus(); }}
+                    aria-label={`Use ${s.text} in the search box`}
+                    className="px-4 py-3 text-muted-foreground hover:text-foreground"
+                  >
+                    <ArrowUpLeft className="w-4 h-4" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className={showTypeahead ? "hidden" : undefined}>
 
         {/* Image search loading */}
         {imageSearchLoading && (
@@ -777,15 +907,23 @@ export default function Search() {
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm font-bold">Recent searches</p>
                   <button onClick={clearRecentSearches} className="text-[11px] text-muted-foreground font-medium hover:text-destructive transition-colors">
-                    Clear
+                    Clear all
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {recentSearches.map((term) => (
-                    <button key={term} onClick={() => setQuery(term)}
-                      className="text-xs px-3 py-1.5 rounded-full bg-muted hover:bg-accent border border-border hover:border-primary transition-all font-medium">
-                      {term}
-                    </button>
+                    <span key={term} className="inline-flex items-center rounded-full bg-muted border border-border hover:border-primary transition-all">
+                      <button onClick={() => commitSearch(term)} className="text-xs pl-3 pr-1.5 py-1.5 font-medium">
+                        {term}
+                      </button>
+                      <button
+                        onClick={() => removeRecentSearch(term)}
+                        aria-label={`Remove ${term} from recent searches`}
+                        className="pr-2 pl-0.5 py-1.5 text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
                   ))}
                 </div>
               </div>
@@ -796,7 +934,7 @@ export default function Search() {
                 <p className="text-sm font-bold mb-3 flex items-center gap-1.5"><Flame className="w-4 h-4 text-primary" /> Popular searches</p>
                 <div className="flex flex-wrap gap-2">
                   {popularSearches.map((term) => (
-                    <button key={term} onClick={() => setQuery(term)}
+                    <button key={term} onClick={() => commitSearch(term)}
                       className="text-xs px-3 py-1.5 rounded-full bg-muted hover:bg-accent border border-border hover:border-primary transition-all font-medium">
                       {shortenSearchLabel(term)}
                     </button>
@@ -906,7 +1044,8 @@ export default function Search() {
             </div>
           </div>
         )}
+        </div>
       </main>
     </div>
   );
-       }
+    }
