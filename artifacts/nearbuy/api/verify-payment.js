@@ -15,13 +15,10 @@ export default async function handler(req, res) {
   const user = await getAuthedUser(req);
   if (!user) return res.status(401).json({ verified: false, error: "Please sign in to continue." });
 
-  const { reference, orderIntent } = req.body || {};
+  const { reference } = req.body || {};
 
   if (typeof reference !== "string" || !/^KAT-[A-Za-z0-9-]{8,80}$/.test(reference)) {
     return res.status(400).json({ verified: false, error: "Payment reference is invalid." });
-  }
-  if (!orderIntent || !Array.isArray(orderIntent.items)) {
-    return res.status(400).json({ verified: false, error: "Order information is missing." });
   }
 
   try {
@@ -43,8 +40,20 @@ export default async function handler(req, res) {
       return res.status(200).json({ verified: false, reason: "Payment verification failed." });
     }
 
+    // The order comes from the metadata Paystack stored with this exact payment
+    // (the same source the webhook uses), never from the request body. That way the
+    // order that gets created is always the one that was actually paid for.
+    const orderIntent = transaction?.metadata?.orderIntent;
+    if (!orderIntent || !Array.isArray(orderIntent.items)) {
+      console.error("verify-payment: payment has no order details", { reference });
+      return res.status(409).json({
+        verified: false,
+        error: `We received your payment but couldn't confirm your order. ${SUPPORT_NOTE}: ${reference}`,
+      });
+    }
+
     // 3. The payment must belong to this signed-in buyer.
-    if (transaction?.metadata?.orderIntent?.buyerId !== user.id) {
+    if (orderIntent.buyerId !== user.id) {
       console.error("verify-payment: buyer mismatch", { reference });
       return res.status(403).json({ verified: false, error: "This payment belongs to a different account." });
     }
@@ -124,4 +133,4 @@ export default async function handler(req, res) {
     console.error("verify-payment error", error?.message);
     return res.status(500).json({ verified: false, error: "Payment verification failed. Please try again." });
   }
-}
+          }
