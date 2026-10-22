@@ -104,11 +104,27 @@ export async function fulfillOrder(sb, { reference, intent, priced, buyerId, eve
   }
 
   // Count the coupon use on the server (the browser no longer touches coupons)
+  // The count goes up in one atomic database step (use_coupon), so two checkouts at the
+  // same moment can't both take the last use. A paid order is never refused here; if the
+  // coupon was already at its limit it is flagged for the team instead.
   if (priced.coupon) {
-    await sb
-      .from("coupons")
-      .update({ times_used: (priced.coupon.times_used || 0) + 1 })
-      .eq("id", priced.coupon.id);
+    const { data: counted, error: couponError } = await sb.rpc("use_coupon", {
+      p_coupon_id: String(priced.coupon.id),
+    });
+    if (couponError && couponError.code === "PGRST202") {
+      // use_coupon() has not been created yet: fall back to the old behaviour.
+      await sb
+        .from("coupons")
+        .update({ times_used: (priced.coupon.times_used || 0) + 1 })
+        .eq("id", priced.coupon.id);
+    } else if (couponError) {
+      console.error("Coupon use count failed", { reference, code: couponError.code });
+    } else if (counted === false) {
+      console.error("COUPON OVER LIMIT: a paid order used a coupon already at its limit. Needs manual review.", {
+        reference,
+        coupon: priced.coupon.code,
+      });
+    }
   }
 
   // Take the stock in one safe database step. A paid order is never refused here; if the unit
