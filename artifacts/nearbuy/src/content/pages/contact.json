@@ -1,0 +1,21 @@
+{
+  "title": "Contact KAT",
+  "intro": "The fastest way to reach KAT is by email at support@kat.com.ng. We read every message and reply as soon as we can. KAT does not have a phone line or WhatsApp support at the moment, so please use email for anything you need help with.",
+  "sections": [
+    {
+      "title": "What to include in your email",
+      "bullets": [
+        "For an order: your order reference (shown on the order confirmation and in your Orders page) and the email address on your account.",
+        "For a payment problem: the Paystack payment reference if you have it, and the time of the payment.",
+        "For a return or refund: your order reference, the item concerned and a short description of the problem, with photos if the item arrived damaged.",
+        "For selling on KAT: your store name and the email address on your seller account."
+      ]
+    },
+    {
+      "title": "Business details",
+      "body": [
+        "KAT is an online marketplace serving customers in Nigeria. You can find the full rules for buyers and sellers in the Terms of Service and an explanation of how personal information is handled in the Privacy Policy."
+      ]
+    }
+  ]
+}
