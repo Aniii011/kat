@@ -14,7 +14,7 @@ export type LegalSection = {
 
 type LegalPageProps = {
   title: string;
-  updated: string;
+  updated?: string;
   intro: string;
   sections: LegalSection[];
 };
@@ -43,7 +43,7 @@ export default function LegalPage({ title, updated, intro, sections }: LegalPage
 
       <article className="max-w-2xl mx-auto px-4 pt-6 pb-10">
         <h1 className="text-[28px] font-bold tracking-tight [font-family:'Outfit',sans-serif]">{title}</h1>
-        <p className="text-xs text-muted-foreground mt-1">Last updated: {updated}</p>
+        {updated && <p className="text-xs text-muted-foreground mt-1">Last updated: {updated}</p>}
         <p className="text-sm text-muted-foreground leading-relaxed mt-5">{intro}</p>
 
         <div className="mt-8 space-y-8">
@@ -69,6 +69,8 @@ export default function LegalPage({ title, updated, intro, sections }: LegalPage
         </div>
 
         <div className="mt-10 pt-6 border-t border-border flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+          <Link href="/about" className="hover:text-foreground underline underline-offset-2">About</Link>
+          <Link href="/contact" className="hover:text-foreground underline underline-offset-2">Contact</Link>
           <Link href="/privacy" className="hover:text-foreground underline underline-offset-2">Privacy Policy</Link>
           <Link href="/terms" className="hover:text-foreground underline underline-offset-2">Terms of Service</Link>
           <a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-foreground underline underline-offset-2">
@@ -78,4 +80,4 @@ export default function LegalPage({ title, updated, intro, sections }: LegalPage
       </article>
     </div>
   );
-}
+    }
