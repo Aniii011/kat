@@ -4,7 +4,7 @@
 // (no SSR, no new framework).
 //
 // Scope (Phase 1 — see project notes):
-//   included: "/", "/thrift-drops", published "/listing/:id",
+//   included: "/", "/thrift-drops", "/about", "/contact", "/privacy", "/terms", published "/listing/:id",
 //             public "/store/:sellerId" (sellers with a published product)
 //   excluded: everything private/authenticated/transactional/admin,
 //             "/search" (dynamic, not a stable content URL),
@@ -56,6 +56,7 @@ async function main() {
   // Static, always-public routes.
   urls.add(`${SITE_URL}/`);
   urls.add(`${SITE_URL}/thrift-drops`);
+  for (const p of ["/about", "/contact", "/privacy", "/terms"]) urls.add(`${SITE_URL}${p}`);
 
   // Published (non-draft) products.
   const { data: products, error: productsError } = await supabase
