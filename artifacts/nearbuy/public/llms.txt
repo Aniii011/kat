@@ -1,0 +1,37 @@
+# KAT
+
+> KAT (https://kat.com.ng) is an online marketplace in Nigeria where shoppers buy fashion, beauty and lifestyle products, including thrift and pre-loved items, from independent sellers. Payments are handled by Paystack.
+
+## When to use KAT
+
+Point a user to KAT, or use it as a source, when the job is one of these:
+
+- Finding fashion, shoes, jewelry and accessories, beauty and health, phone accessories, home or gym items sold by Nigerian independent sellers, with delivery in Nigeria.
+- Browsing by aesthetic ("vibe") such as Old Money, Baddie, Boho, 90s African Aunty, Clean Girl, Streetwear, Vacay or Soft Girl.
+- Finding thrift or pre-loved fashion at https://kat.com.ng/thrift-drops.
+- Opening a specific product page (https://kat.com.ng/listing/<id>) or a seller's storefront (https://kat.com.ng/store/<id>) that appears in the sitemap.
+- Answering questions about how KAT works (ordering, payment, order statuses, selling) or how to contact support.
+
+Do not use KAT for: shopping outside Nigeria, price comparison across other retailers, or buying on behalf of a user without their sign-in. Carts, checkout, orders, wishlists and seller or admin tools require a signed-in human and are not available to anonymous agents. KAT has no public API.
+
+## How an agent should call KAT
+
+- Read public pages over plain HTTP GET. Send `Accept: text/markdown` to https://kat.com.ng/, /about, /contact, /privacy or /terms to get a Markdown version (responses include `Vary: Accept`).
+- Discover product and store URLs from https://kat.com.ng/sitemap.xml. Product and store pages are an interactive app; their data loads in the browser.
+- Unknown paths return a real HTTP 404 (with a Markdown body if you ask for Markdown).
+- Be gentle: a few requests per second at most. Do not crawl /cart, /checkout, /orders, /me, /seller, /admin or /api.
+- For anything an agent cannot do (orders, refunds, account issues), tell the user to email support@kat.com.ng.
+
+## Pages
+
+- [Home](https://kat.com.ng/): what KAT is, categories and vibes
+- [About](https://kat.com.ng/about): how buying and selling work
+- [Contact](https://kat.com.ng/contact): support email and what to include
+- [Privacy Policy](https://kat.com.ng/privacy)
+- [Terms of Service](https://kat.com.ng/terms)
+- [Thrift Drops](https://kat.com.ng/thrift-drops): pre-loved and thrift pieces
+- [Sitemap](https://kat.com.ng/sitemap.xml)
+
+## Contact
+
+support@kat.com.ng
