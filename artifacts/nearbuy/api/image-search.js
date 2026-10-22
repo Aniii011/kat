@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { embedImage, cleanMimeType, MAX_IMAGE_BASE64_CHARS } from "./_lib/embedding.js";
+import { checkRateLimit } from "./_lib/rate-limit.js";
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
@@ -107,16 +108,11 @@ export default async function handler(req, res) {
   const limit = parseInt(process.env.IMAGE_SEARCH_RATE_LIMIT || "5", 10);
   const windowSeconds = parseInt(process.env.IMAGE_SEARCH_RATE_WINDOW_SECONDS || "60", 10);
 
-  const { data: rateData, error: rateError } = await supabase.rpc("check_rate_limit", {
-    p_key: `image-search:${ip}`,
-    p_window_seconds: windowSeconds,
-    p_limit: limit,
-  });
-
-  if (rateError) {
-    console.error("Rate limit check failed:", rateError);
-  } else if (rateData?.[0]?.is_limited) {
-    res.setHeader("Retry-After", String(rateData[0].retry_after_seconds));
+  // Rate limiting goes through the server-only helper (service-role client), so
+  // check_rate_limit() no longer needs to be callable by anonymous browsers.
+  const rate = await checkRateLimit(`image-search:${ip}`, limit, windowSeconds);
+  if (rate.limited) {
+    res.setHeader("Retry-After", String(rate.retryAfter));
     return res.status(429).json({ error: "Too many image searches, please try again shortly." });
   }
 
@@ -146,4 +142,4 @@ export default async function handler(req, res) {
     tags: tagsResult.status === "fulfilled" ? tagsResult.value : [],
     products: productsResult.value,
   });
-    }
+}
