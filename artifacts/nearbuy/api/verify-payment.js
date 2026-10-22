@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   }
 
   // 1. Who is asking? The buyer comes from the verified login token, never from the request body.
-  const user = await getAuthedUser(req);
+  const user = await getAuthedUser(req, { allowBanned: true }); // a paid order is always completed
   if (!user) return res.status(401).json({ verified: false, error: "Please sign in to continue." });
 
   const { reference } = req.body || {};
@@ -133,4 +133,4 @@ export default async function handler(req, res) {
     console.error("verify-payment error", error?.message);
     return res.status(500).json({ verified: false, error: "Payment verification failed. Please try again." });
   }
-          }
+}
