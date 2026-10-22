@@ -1,0 +1,33 @@
+{
+  "title": "About KAT",
+  "intro": "KAT is an online marketplace built for Nigeria. It brings independent fashion, beauty and lifestyle sellers together in one place, so shoppers can discover new pieces, thrift finds and everyday essentials without hopping between separate stores and chat threads.",
+  "sections": [
+    {
+      "title": "Who sells on KAT",
+      "body": [
+        "Everything on KAT is sold by independent sellers. Each seller has their own storefront with their products, and shoppers can follow the stores they like to keep up with new drops."
+      ]
+    },
+    {
+      "title": "How buying works",
+      "bullets": [
+        "Browse by category, by vibe (such as Old Money, Boho or Streetwear), or search with a photo.",
+        "Pay online with Paystack. KAT never sees or stores your full card details.",
+        "Orders are accepted automatically once payment succeeds, and you can follow each status change (preparing, ready for pickup, out for delivery, delivered) in your account.",
+        "Reviews are open to verified buyers only, after an order has been delivered."
+      ]
+    },
+    {
+      "title": "How selling works",
+      "body": [
+        "Independent sellers apply for a store, upload product listings with photos and variants, and manage incoming orders from a seller dashboard. Orders from several sellers can be brought together at a central hub before delivery."
+      ]
+    },
+    {
+      "title": "Contact and policies",
+      "body": [
+        "Questions about KAT, an order or selling? Email support@kat.com.ng. You can read how we handle personal information in the Privacy Policy and the rules for buyers and sellers in the Terms of Service."
+      ]
+    }
+  ]
+}
