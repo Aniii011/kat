@@ -33,6 +33,8 @@ import Reviews from "@/pages/reviews";
 import Following from "@/pages/following";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
+import About from "@/pages/about";
+import Contact from "@/pages/contact";
 
 const queryClient = new QueryClient();
 
@@ -62,6 +64,8 @@ function Router() {
       <Route path="/admin/orders/:id" component={AdminOrderDetail} />
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/auth/callback" component={AuthCallback} />
+      <Route path="/about" component={About} />
+      <Route path="/contact" component={Contact} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
       {/* Kept so the link already saved in Google Cloud (/term) doesn't 404 */}
