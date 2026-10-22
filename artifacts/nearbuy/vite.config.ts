@@ -2,6 +2,18 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
+import { pageToHtml, jsonLdScript, PAGES } from "./api/_lib/site-content.js";
+
+// Puts the homepage copy and JSON-LD into the raw HTML so crawlers and AI
+// agents that don't run JavaScript still get real content. React replaces
+// the fallback as soon as it mounts, so the visible app is unchanged.
+const seoShell = () => ({
+  name: "kat-seo-shell",
+  transformIndexHtml: (html: string) =>
+    html
+      .replace("<!--SEO_CONTENT-->", () => pageToHtml(PAGES["/"]))
+      .replace("<!--SEO_JSONLD-->", () => jsonLdScript()),
+});
 
 const port = Number(process.env.PORT) || 3000;
 const basePath = process.env.BASE_PATH || "/";
@@ -11,6 +23,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    seoShell(),
     ...(process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined
       ? [
           (await import("@replit/vite-plugin-runtime-error-modal")).default(),
