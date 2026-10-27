@@ -22,7 +22,9 @@ export default function WishlistView() {
   const [wishlist, setWishlist] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [giftingItem, setGiftingItem] = useState<any>(null);
+  // The friend can choose one OR SEVERAL items, then pay for them all in one checkout.
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [giftDialogOpen, setGiftDialogOpen] = useState(false);
   const [gifterName, setGifterName] = useState("");
   const [purchasing, setPurchasing] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
@@ -60,13 +62,25 @@ export default function WishlistView() {
   const wishlistTitle: string = recipientFirstName
     ? `${recipientFirstName}'s ${wishlistBase ? wishlistBase + " " : ""}wishlist`
     : String(wishlist?.name || "Wishlist");
+  // can_gift = street address AND state AND city saved. Falls back to the old rule until the
+  // database function is updated.
+  const canGift: boolean = wishlist?.can_gift ?? hasDeliveryAddress;
+  const deliveryCovered: boolean = wishlist?.delivery_covered === true;
+  const isAvailable = (item: any) => item.available !== false; // sold out / switched off => false
   const recipientHasValidPhone: boolean = wishlist?.has_valid_delivery_phone ?? looksLikePhone(wishlist?.delivery_phone);
 
-  // Start a gift checkout. Nothing is marked "purchased" here: that happens on the
-  // server only after the payment is confirmed (see api/_lib/fulfill.js).
-  const handleGiftItem = (item: any) => {
+  const selectedItems = items.filter((i) => selectedIds.includes(i.id) && !i.is_purchased && isAvailable(i));
+  const selectedTotal = selectedItems.reduce((s, i) => s + Number(i.price || 0), 0);
+
+  const toggleItem = (id: string) =>
+    setSelectedIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : cur.length >= 10 ? cur : [...cur, id]));
+
+  // Start a gift checkout for every selected item. Nothing is marked "purchased" here: that
+  // happens on the server only after the payment is confirmed (see api/_lib/fulfill.js).
+  const handleGiftSelected = () => {
     const name = gifterName.trim();
-    if (!name || !hasDeliveryAddress) return;
+    const chosen = items.filter((i) => selectedIds.includes(i.id) && !i.is_purchased && isAvailable(i));
+    if (!name || !canGift || chosen.length === 0) return;
 
     // Paying needs an account. Ask them to sign in, then they tap the button again.
     if (!user) {
@@ -77,20 +91,21 @@ export default function WishlistView() {
     setPurchasing(true);
 
     // The gift is checked out on its own, never mixed into the buyer's cart.
-    sessionStorage.setItem("kat_checkout_items", JSON.stringify([{
+    sessionStorage.setItem("kat_checkout_items", JSON.stringify(chosen.map((item) => ({
       listingId: item.product_id,
       title: item.title,
       price: Number(item.price),
       imageUrl: item.image_url,
       sellerName: "KAT",
       quantity: 1,
-    }]));
+    }))));
 
-    // Who it is for and who it is from. The server re-reads the recipient's real
-    // details from the wishlist, so nothing here can redirect the delivery.
+    // Who it is for and who it is from. The server re-reads the recipient's real details
+    // from the wishlist, so nothing here can redirect the delivery.
     sessionStorage.setItem("kat_gift_checkout", JSON.stringify({
-      wishlistItemId: item.id,
-      productId: item.product_id,
+      wishlistId,
+      wishlistItemIds: chosen.map((i) => i.id),
+      productIds: chosen.map((i) => i.product_id),
       from: name,
       // Only a first name and "do we need a phone from you" travel to checkout.
       // The recipient's phone and street address never reach the gifter's browser.
@@ -100,7 +115,7 @@ export default function WishlistView() {
       },
     }));
 
-    setGiftingItem(null);
+    setGiftDialogOpen(false);
     setPurchasing(false);
     navigate("/checkout");
   };
@@ -141,40 +156,49 @@ export default function WishlistView() {
 
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
 
-        {/* Gift modal */}
-        {giftingItem && (
+        {/* Gift dialog (one or several items) */}
+        {giftDialogOpen && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center px-4 pb-4 sm:pb-0">
-            <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-card border border-card-border rounded-3xl p-6 max-w-sm w-full shadow-xl space-y-4">
+            <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-card border border-card-border rounded-3xl p-6 max-w-sm w-full shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
               <h3 className="font-black text-base flex items-center gap-2"><Gift className="w-4 h-4 text-primary" /> Buy as a Gift</h3>
-              <div className="flex gap-3 items-center bg-muted rounded-xl p-3">
-                <img src={giftingItem.image_url} alt={giftingItem.title} className="w-12 h-12 rounded-xl object-contain bg-background shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold line-clamp-1">{giftingItem.title}</p>
-                  <p className="text-sm font-black text-primary">{formatNaira(giftingItem.price)}</p>
-                </div>
+              <div className="space-y-2">
+                {selectedItems.map((item) => (
+                  <div key={item.id} className="flex gap-3 items-center bg-muted rounded-xl p-3">
+                    <img src={item.image_url} alt={item.title} className="w-12 h-12 rounded-xl object-contain bg-background shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold line-clamp-1">{item.title}</p>
+                      <p className="text-sm font-black text-primary">{formatNaira(item.price)}</p>
+                    </div>
+                  </div>
+                ))}
+                <p className="text-sm font-bold flex justify-between px-1"><span>Items</span><span>{formatNaira(selectedTotal)}</span></p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground mb-2">Your name (so they know who gifted it)</p>
                 <Input placeholder="Your name" value={gifterName} onChange={(e) => setGifterName(e.target.value)} className="rounded-xl h-11" autoFocus />
               </div>
-              {hasDeliveryAddress ? (
+              {canGift ? (
                 <div className="bg-primary/5 border border-primary/20 rounded-xl p-3">
-                  <p className="text-xs font-semibold text-primary flex items-center gap-1"><Package className="w-3.5 h-3.5" /> Delivery to:</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{recipientFirstName ? `${recipientFirstName}'s` : "Their"} saved address — kept private, only our delivery team sees it.</p>
-                  <p className="text-[11px] text-muted-foreground mt-1.5">At checkout you'll pick their state and city so we can price delivery.</p>
+                  <p className="text-xs font-semibold text-primary flex items-center gap-1"><Package className="w-3.5 h-3.5" /> Delivered to {recipientFirstName || "them"}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Their address stays private, only our delivery team sees it.</p>
+                  <p className="text-[11px] text-muted-foreground mt-1.5">
+                    {deliveryCovered
+                      ? "Delivery for this list is already covered by an earlier gift, so you won't pay for it."
+                      : "At checkout you can choose to pay delivery so the gifts can be sent. It's optional."}
+                  </p>
                 </div>
               ) : (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-                  <p className="text-xs font-semibold text-amber-700">This wishlist has no delivery address yet, so it can't be gifted. Ask the owner to add one.</p>
+                  <p className="text-xs font-semibold text-amber-700">This wishlist isn't ready to be gifted yet. Ask the owner to finish adding their delivery details.</p>
                 </div>
               )}
-              {!user && hasDeliveryAddress && (
+              {!user && canGift && (
                 <p className="text-[11px] text-muted-foreground text-center">You'll be asked to sign in before you pay.</p>
               )}
-              <Button className="w-full rounded-full font-bold h-12 gap-2" onClick={() => handleGiftItem(giftingItem)} disabled={!gifterName.trim() || !hasDeliveryAddress || purchasing}>
-                {purchasing ? "Processing..." : <><ShoppingBag className="w-4 h-4" /> Buy this Gift — {formatNaira(giftingItem.price)}</>}
+              <Button className="w-full rounded-full font-bold h-12 gap-2" onClick={handleGiftSelected} disabled={!gifterName.trim() || !canGift || purchasing || selectedItems.length === 0}>
+                {purchasing ? "Processing..." : <><ShoppingBag className="w-4 h-4" /> Continue to pay — {formatNaira(selectedTotal)}</>}
               </Button>
-              <Button variant="ghost" size="sm" className="w-full rounded-full" onClick={() => setGiftingItem(null)}>Cancel</Button>
+              <Button variant="ghost" size="sm" className="w-full rounded-full" onClick={() => setGiftDialogOpen(false)}>Cancel</Button>
             </motion.div>
           </div>
         )}
@@ -187,7 +211,7 @@ export default function WishlistView() {
             {availableItems.length} item{availableItems.length !== 1 ? "s" : ""} available
           </p>
           <p className="text-xs text-muted-foreground mt-3 bg-background/60 rounded-xl px-3 py-2">
-            Pick an item below and buy it as a gift — it'll be delivered directly to them!
+            Pick one or more items and buy them as a gift. KAT delivers them directly, and their address stays private.
           </p>
         </div>
 
@@ -195,21 +219,41 @@ export default function WishlistView() {
         {availableItems.length > 0 && (
           <div className="space-y-2">
             <p className="text-sm font-bold">Available to gift</p>
-            {availableItems.map((item) => (
-              <motion.div key={item.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                className="bg-card border border-card-border rounded-2xl p-3 flex gap-3 items-center">
-                <Link href={`/listing/${item.product_id}`}>
-                  <img src={item.image_url} alt={item.title} className="w-16 h-16 rounded-xl object-contain bg-muted shrink-0 cursor-pointer" />
-                </Link>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold line-clamp-2 leading-tight">{item.title}</p>
-                  <p className="text-sm font-black text-primary mt-0.5">{formatNaira(item.price)}</p>
-                </div>
-                <Button size="sm" className="rounded-full text-xs shrink-0 gap-1" onClick={() => { setGiftingItem(item); setGifterName(""); }}>
-                  <Gift className="w-3.5 h-3.5" /> Gift
-                </Button>
-              </motion.div>
-            ))}
+            {!canGift && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <p className="text-xs font-semibold text-amber-700">This wishlist isn't ready to be gifted yet. Ask the owner to finish adding their delivery details.</p>
+              </div>
+            )}
+            {availableItems.map((item) => {
+              const available = isAvailable(item);
+              const picked = selectedIds.includes(item.id);
+              return (
+                <motion.div key={item.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                  className={`bg-card border rounded-2xl p-3 flex gap-3 items-center ${picked ? "border-primary" : "border-card-border"} ${available ? "" : "opacity-60"}`}>
+                  <Link href={`/listing/${item.product_id}`}>
+                    <img src={item.image_url} alt={item.title} className="w-16 h-16 rounded-xl object-contain bg-muted shrink-0 cursor-pointer" />
+                  </Link>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold line-clamp-2 leading-tight">{item.title}</p>
+                    <p className="text-sm font-black text-primary mt-0.5">{formatNaira(item.price)}</p>
+                    {!available && <p className="text-xs font-semibold text-muted-foreground mt-0.5">Currently sold out</p>}
+                    {available && typeof item.stock_left === "number" && item.stock_left > 0 && item.stock_left <= 3 && (
+                      <p className="text-xs font-semibold text-amber-600 mt-0.5">Only {item.stock_left} left</p>
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={picked ? "default" : "outline"}
+                    className="rounded-full text-xs shrink-0 gap-1"
+                    disabled={!available || !canGift}
+                    aria-pressed={picked}
+                    onClick={() => toggleItem(item.id)}
+                  >
+                    {picked ? <><CheckCircle2 className="w-3.5 h-3.5" /> Added</> : <><Gift className="w-3.5 h-3.5" /> {available ? "Gift" : "Sold out"}</>}
+                  </Button>
+                </motion.div>
+              );
+            })}
           </div>
         )}
 
@@ -247,7 +291,16 @@ export default function WishlistView() {
         </div>
       </div>
 
+      {selectedItems.length > 0 && !giftDialogOpen && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-md bg-foreground text-background rounded-full shadow-xl pl-5 pr-2 py-2 flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold">{selectedItems.length} item{selectedItems.length > 1 ? "s" : ""} · {formatNaira(selectedTotal)}</p>
+          <Button size="sm" className="rounded-full font-bold gap-1" onClick={() => setGiftDialogOpen(true)}>
+            <Gift className="w-3.5 h-3.5" /> Gift {selectedItems.length > 1 ? "these" : "this"}
+          </Button>
+        </div>
+      )}
+
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
-    }
+              }
