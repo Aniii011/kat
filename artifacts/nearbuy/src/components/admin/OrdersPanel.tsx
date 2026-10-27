@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Download, Gift, Package, RefreshCw, Search, X } from "lucide-react";
+import { AlertTriangle, Clock, Download, Gift, Package, RefreshCw, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import AdminOrderDetail from "@/pages/admin-order-detail";
@@ -53,13 +53,18 @@ const QUEUES: { key: string; label: string; statuses: string[] }[] = [
   { key: "q:done", label: "Completed", statuses: ["completed"] },
   { key: "q:cancelled", label: "Cancelled", statuses: ["cancelled"] },
   { key: "q:stock", label: "Stock issues", statuses: [] }, // matched by hasStockIssue(), not by status
+  { key: "q:waiting", label: "Awaiting delivery", statuses: [] }, // gifts nobody has paid delivery for yet
 ];
 
 const hasStockIssue = (g: PurchaseGroup) => g.lines.some((l: any) => !!l.stock_issue);
+// A gift still at KAT whose delivery has not been paid or requested. It cannot be sent out yet.
+const isWaitingGift = (g: PurchaseGroup) =>
+  g.lines.some((l: any) => l.wishlist_id && l.delivery_cleared === false && !["out_for_delivery", "delivered", "completed", "cancelled"].includes(l.admin_status || "pending"));
 
 function matchesFilter(status: string, filter: string, group?: PurchaseGroup): boolean {
   if (filter === "all") return true;
   if (filter === "q:stock") return !!group && hasStockIssue(group);
+  if (filter === "q:waiting") return !!group && isWaitingGift(group);
   const q = QUEUES.find((x) => x.key === filter);
   if (q) return q.statuses.includes(status);
   return status === filter; // an exact status picked in the Status dropdown
@@ -238,7 +243,7 @@ export default function OrdersPanel({
 
       {/* Queue tabs with counts */}
       <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
-        {QUEUES.filter((q) => q.key !== "q:stock" || (counts[q.key] ?? 0) > 0 || statusFilter === q.key).map((q) => {
+        {QUEUES.filter((q) => !["q:stock", "q:waiting"].includes(q.key) || (counts[q.key] ?? 0) > 0 || statusFilter === q.key).map((q) => {
           const active = statusFilter === q.key;
           return (
             <button
@@ -342,6 +347,7 @@ export default function OrdersPanel({
                                 {f.buyer_name || "Unknown"}
                                 {isGift(g) && <Gift className="w-3 h-3 text-primary shrink-0" aria-label="Gift order" />}
                                 {hasStockIssue(g) && <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" aria-label="Stock problem" />}
+                                {isWaitingGift(g) && <Clock className="w-3 h-3 text-sky-500 shrink-0" aria-label="Waiting for delivery" />}
                               </p>
                               <p className="text-[11px] text-muted-foreground">{customerLabel(g)}</p>
                             </div>
@@ -384,6 +390,7 @@ export default function OrdersPanel({
                         {f.buyer_name || "Unknown buyer"}
                         {isGift(g) && <Gift className="w-3 h-3 text-primary shrink-0" />}
                         {hasStockIssue(g) && <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" aria-label="Stock problem" />}
+                        {isWaitingGift(g) && <Clock className="w-3 h-3 text-sky-500 shrink-0" aria-label="Waiting for delivery" />}
                       </p>
                       <p className="text-[11px] text-muted-foreground">
                         {g.lines.length} item{g.lines.length > 1 ? "s" : ""}{g.sellerCount > 1 ? ` · ${g.sellerCount} sellers` : ""} · {ageLabel(g.createdAt)}
@@ -444,4 +451,4 @@ export default function OrdersPanel({
       )}
     </div>
   );
-    }
+                   }
