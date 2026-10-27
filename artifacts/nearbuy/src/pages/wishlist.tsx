@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/auth-context";
 import { useWishlist } from "@/hooks/use-wishlist";
 import { supabase } from "@/lib/supabase";
+import { NIGERIAN_STATES } from "@/lib/nigeriaStates";
 import {
   ArrowLeft, Plus, Heart, Share2, Trash2, ShoppingBag,
   MapPin, Edit3, X, Check, Gift, Lock, CheckCircle2,
@@ -28,10 +29,37 @@ export default function WishlistPage() {
   const [deliveryName, setDeliveryName] = useState("");
   const [deliveryPhone, setDeliveryPhone] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [deliveryState, setDeliveryState] = useState("");
+  const [deliveryCity, setDeliveryCity] = useState("");
+  const [cityOptions, setCityOptions] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
   const [creating, setCreating] = useState(false);
 
   const activeList = wishlists.find((w) => w.id === activeWishlist) || wishlists[0];
+
+  // A list can only be shared and gifted once it has a street address AND a state AND a city.
+  // (The state/city are only used to work out the delivery fee; gifters never see them.)
+  const hasFullDelivery = (w: any) => !!(w?.delivery_address && w?.delivery_state && w?.delivery_city);
+
+  const openDeliveryEditor = (w: any) => {
+    setEditingDelivery(w.id);
+    setDeliveryName(w.delivery_name || user?.name || "");
+    setDeliveryPhone(w.delivery_phone || "");
+    setDeliveryAddress(w.delivery_address || "");
+    setDeliveryState(w.delivery_state || "");
+    setDeliveryCity(w.delivery_city || "");
+  };
+
+  // Only areas KAT actually delivers to can be chosen, so the fee can always be worked out.
+  useEffect(() => {
+    if (!deliveryState) { setCityOptions([]); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.from("delivery_areas").select("city").eq("state", deliveryState).eq("active", true).order("city");
+      if (!cancelled) setCityOptions(Array.from(new Set((data || []).map((r: any) => r.city))));
+    })();
+    return () => { cancelled = true; };
+  }, [deliveryState]);
 
   useEffect(() => {
     if (wishlists.length > 0 && !activeWishlist) {
@@ -61,11 +89,8 @@ export default function WishlistPage() {
   };
 
   const handleShare = async (wishlist: any) => {
-    if (!wishlist.delivery_address) {
-      setEditingDelivery(wishlist.id);
-      setDeliveryName(wishlist.delivery_name || user.name || "");
-      setDeliveryPhone(wishlist.delivery_phone || "");
-      setDeliveryAddress(wishlist.delivery_address || "");
+    if (!hasFullDelivery(wishlist)) {
+      openDeliveryEditor(wishlist);
       return;
     }
     const url = `${window.location.origin}/wishlist/${wishlist.id}`;
@@ -87,11 +112,13 @@ export default function WishlistPage() {
       delivery_name: deliveryName,
       delivery_phone: deliveryPhone,
       delivery_address: deliveryAddress,
+      delivery_state: deliveryState,
+      delivery_city: deliveryCity,
     });
     setEditingDelivery(null);
     // Now share
     const wishlist = wishlists.find((w) => w.id === wishlistId);
-    if (wishlist) handleShare({ ...wishlist, delivery_address: deliveryAddress });
+    if (wishlist) handleShare({ ...wishlist, delivery_address: deliveryAddress, delivery_state: deliveryState, delivery_city: deliveryCity });
   };
 
   return (
@@ -151,13 +178,35 @@ export default function WishlistPage() {
                     <X className="w-4 h-4" />
                   </button>
                 </div>
-                <p className="text-xs text-muted-foreground">Your address is needed so gift buyers know where to send your items.</p>
+                <p className="text-xs text-muted-foreground">Your address is needed so KAT can deliver your gifts. Your friends never see it, and your state and city are only used to work out the delivery fee.</p>
                 <div className="space-y-2">
                   <Input placeholder="Your full name" value={deliveryName} onChange={(e) => setDeliveryName(e.target.value)} className="rounded-xl h-10" />
                   <Input placeholder="Phone number" value={deliveryPhone} onChange={(e) => setDeliveryPhone(e.target.value)} className="rounded-xl h-10" type="tel" />
-                  <Input placeholder="Delivery address" value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} className="rounded-xl h-10" />
+                  <Input placeholder="Street address" value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} className="rounded-xl h-10" />
+                  <select
+                    aria-label="State"
+                    value={deliveryState}
+                    onChange={(e) => { setDeliveryState(e.target.value); setDeliveryCity(""); }}
+                    className="w-full h-10 rounded-xl border border-input bg-background px-3 text-sm"
+                  >
+                    <option value="">State</option>
+                    {NIGERIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <select
+                    aria-label="City or area"
+                    value={deliveryCity}
+                    onChange={(e) => setDeliveryCity(e.target.value)}
+                    disabled={!deliveryState}
+                    className="w-full h-10 rounded-xl border border-input bg-background px-3 text-sm disabled:opacity-50"
+                  >
+                    <option value="">{deliveryState ? "City or area" : "Choose a state first"}</option>
+                    {cityOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  {deliveryState && cityOptions.length === 0 && (
+                    <p className="text-[11px] text-amber-700">KAT doesn't deliver to {deliveryState} yet, so gifts can't be sent there.</p>
+                  )}
                 </div>
-                <Button className="w-full rounded-full font-bold" onClick={() => saveDelivery(editingDelivery)} disabled={!deliveryName.trim() || !deliveryAddress.trim()}>
+                <Button className="w-full rounded-full font-bold" onClick={() => saveDelivery(editingDelivery)} disabled={!deliveryName.trim() || !deliveryAddress.trim() || !deliveryState || !deliveryCity}>
                   Save & Share Wishlist
                 </Button>
               </motion.div>
@@ -211,21 +260,27 @@ export default function WishlistPage() {
                   </div>
 
                   {/* Delivery address */}
-                  {activeList.delivery_address ? (
+                  {activeList.delivery_address && !hasFullDelivery(activeList) ? (
+                    <button onClick={() => openDeliveryEditor(activeList)}
+                      className="w-full flex items-start gap-2 text-left p-3 rounded-xl border-2 border-dashed border-amber-400 bg-amber-50 text-xs text-amber-800 font-medium">
+                      <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      <span>Add your state and city so friends can gift you. Until then this list can't be shared.</span>
+                    </button>
+                  ) : activeList.delivery_address ? (
                     <div className="flex items-start gap-2 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-2.5">
                       <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Delivery address set ✓</p>
-                        <p className="text-[11px] text-muted-foreground truncate">{activeList.delivery_address}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">{activeList.delivery_address}{activeList.delivery_city ? `, ${activeList.delivery_city}` : ""}{activeList.delivery_state ? `, ${activeList.delivery_state}` : ""}</p>
                       </div>
-                      <button onClick={() => { setEditingDelivery(activeList.id); setDeliveryName(activeList.delivery_name || ""); setDeliveryPhone(activeList.delivery_phone || ""); setDeliveryAddress(activeList.delivery_address || ""); }} className="shrink-0">
+                      <button onClick={() => openDeliveryEditor(activeList)} className="shrink-0">
                         <Edit3 className="w-3.5 h-3.5 text-muted-foreground" />
                       </button>
                     </div>
                   ) : (
-                    <button onClick={() => { setEditingDelivery(activeList.id); setDeliveryName(user.name || ""); setDeliveryPhone(""); setDeliveryAddress(""); }}
+                    <button onClick={() => openDeliveryEditor({ id: activeList.id })}
                       className="w-full flex items-center gap-2 p-3 rounded-xl border-2 border-dashed border-border hover:border-primary/50 transition-colors text-xs text-muted-foreground font-medium">
-                      <MapPin className="w-3.5 h-3.5" /> Add delivery address to share this wishlist
+                      <MapPin className="w-3.5 h-3.5" /> Add your delivery address, state and city to share this wishlist
                     </button>
                   )}
                 </div>
@@ -274,4 +329,4 @@ export default function WishlistPage() {
       </div>
     </div>
   );
-}
+              }
