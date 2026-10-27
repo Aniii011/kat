@@ -76,13 +76,13 @@ export function useWishlist(userId: string | null) {
 
   const addToWishlist = async (wishlistId: string, product: {
     id: string; title: string; price: number; imageUrl: string;
-  }) => {
+  }): Promise<{ ok: boolean; alreadyThere?: boolean; error?: string }> => {
     const existing = wishlists
       .find((w) => w.id === wishlistId)
       ?.items?.find((i) => i.product_id === product.id);
-    if (existing) return;
+    if (existing) return { ok: true, alreadyThere: true };
 
-    const { data } = await supabase.from("wishlist_items").insert({
+    const { data, error } = await supabase.from("wishlist_items").insert({
       wishlist_id: wishlistId,
       product_id: product.id,
       title: product.title,
@@ -90,21 +90,23 @@ export function useWishlist(userId: string | null) {
       image_url: product.imageUrl,
     }).select().single();
 
-    if (data) {
-      setWishlists((prev) => prev.map((w) =>
-        w.id === wishlistId ? { ...w, items: [...(w.items || []), data] } : w
-      ));
-    }
+    if (error || !data) return { ok: false, error: error?.message || "Could not add this item." };
+    setWishlists((prev) => prev.map((w) =>
+      w.id === wishlistId ? { ...w, items: [...(w.items || []), data] } : w
+    ));
+    return { ok: true };
   };
 
-  const removeFromWishlist = async (wishlistId: string, productId: string) => {
-    await supabase.from("wishlist_items")
+  const removeFromWishlist = async (wishlistId: string, productId: string): Promise<{ ok: boolean; error?: string }> => {
+    const { error } = await supabase.from("wishlist_items")
       .delete()
       .eq("wishlist_id", wishlistId)
       .eq("product_id", productId);
+    if (error) return { ok: false, error: error.message };
     setWishlists((prev) => prev.map((w) =>
       w.id === wishlistId ? { ...w, items: (w.items || []).filter((i) => i.product_id !== productId) } : w
     ));
+    return { ok: true };
   };
 
   const isInWishlist = useCallback((productId: string) =>
@@ -123,4 +125,4 @@ export function useWishlist(userId: string | null) {
     addToWishlist, removeFromWishlist,
     isInWishlist, getWishlistsForProduct,
   };
-}
+  }
