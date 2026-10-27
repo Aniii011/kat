@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { supabaseAdmin } from "./_lib/supabase-admin.js";
 import { priceOrder } from "./_lib/pricing.js";
 import { fulfillOrder } from "./_lib/fulfill.js";
-import { resolveGift } from "./_lib/gift.js";
+import { loadGiftContext, resolveGift } from "./_lib/gift.js";
 
 // Paystack signs the EXACT bytes it sends, so we need the raw body to check the
 // signature. Re-serialising parsed JSON can produce different bytes and fail.
@@ -67,7 +67,17 @@ export default async function handler(req, res) {
 
     // Same rule as the browser path: the order is priced from the database and
     // the amount actually paid has to match it.
-    const priced = await priceOrder(supabaseAdmin, intent);
+    const loadedGift = await loadGiftContext(supabaseAdmin, intent, { afterPayment: true });
+    if (!loadedGift.ok) {
+      console.error("PAYSTACK WEBHOOK: gift problem. Needs manual review.", { reference, reason: loadedGift.error });
+      return res.status(200).json({ received: true, note: "Needs manual review." });
+    }
+    const giftCtx = loadedGift.ctx;
+    const priced = await priceOrder(
+      supabaseAdmin,
+      giftCtx ? { ...intent, state: giftCtx.state, city: giftCtx.city } : intent,
+      { giftContext: giftCtx ? { state: giftCtx.state, city: giftCtx.city, includeDelivery: giftCtx.includeDelivery } : undefined },
+    );
     if (!priced.ok || currency !== "NGN" || amount !== priced.total * 100) {
       console.error("PAYSTACK WEBHOOK: payment does not match a valid order. Needs manual review.", {
         reference,
@@ -78,7 +88,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ received: true, note: "Needs manual review." });
     }
 
-    const giftCheck = await resolveGift(supabaseAdmin, intent, priced.lines);
+    const giftCheck = await resolveGift(supabaseAdmin, intent, priced.lines, { afterPayment: true });
     if (!giftCheck.ok) {
       console.error("PAYSTACK WEBHOOK: gift problem. Needs manual review.", { reference, reason: giftCheck.error });
       return res.status(200).json({ received: true, note: "Needs manual review." });
@@ -99,4 +109,4 @@ export default async function handler(req, res) {
     console.error("PAYSTACK WEBHOOK ERROR", err?.message);
     return res.status(500).json({ error: "Webhook processing failed" });
   }
-}
+      }
