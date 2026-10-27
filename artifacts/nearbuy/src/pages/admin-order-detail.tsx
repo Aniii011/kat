@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useRoute, useLocation } from "wouter";
-import { ArrowLeft, Package, Printer, Copy, Check, X, Gift, Lock, Mail, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Package, Printer, Copy, Check, X, Gift, Lock, Mail, AlertTriangle, Clock } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,8 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
   // Customer emails: what was sent for this purchase, and the result of the latest attempt.
   const [emails, setEmails] = useState<{ kind: string; status: string; error?: string | null; sent_at?: string | null; created_at: string }[]>([]);
   const [emailNote, setEmailNote] = useState<{ result: string; reason?: string } | null>(null);
+  // Other gifts for the same recipient that are still at KAT (they should go out in ONE parcel).
+  const [giftSiblings, setGiftSiblings] = useState<any[]>([]);
   const [correcting, setCorrecting] = useState(false);
   const [correctTarget, setCorrectTarget] = useState("");
   const [correctReason, setCorrectReason] = useState("");
@@ -125,6 +127,14 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
       .eq("order_id", orderId)
       .order("created_at", { ascending: true });
     setEvents(ev || []);
+    if (o?.wishlist_id) {
+      const { data: sib } = await supabase
+        .from("orders")
+        .select("id, payment_ref, admin_status, delivery_cleared, product_title, buyer_name")
+        .eq("wishlist_id", o.wishlist_id)
+        .in("admin_status", ["pending", "accepted", "preparing", "ready_for_pickup"]);
+      setGiftSiblings((sib || []).filter((s: any) => s.payment_ref !== o.payment_ref));
+    }
     if (o?.payment_ref) {
       // If the email log table doesn't exist yet this simply returns nothing.
       const { data: em } = await supabase.from("order_emails").select("*").eq("payment_ref", o.payment_ref);
@@ -230,6 +240,10 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
       if (em) setEmails(em);
     }
   };
+
+  // A gift is WAITING while nobody has paid for (or requested) its delivery. The database also
+  // refuses to send a waiting gift out, so this just explains it instead of showing a failing button.
+  const waitingForDelivery = lines.some((l) => l.wishlist_id && l.delivery_cleared === false);
 
   const nextStep = (() => {
     const r = rankOf(status);
@@ -424,6 +438,30 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
           <a href={`tel:${order.buyer_phone}`} className="text-primary text-sm block">{order.buyer_phone}</a>
         </div>
 
+        {lines.some((l) => l.wishlist_id) && (
+          <div className="no-print rounded-2xl border border-sky-500/40 bg-sky-500/5 px-4 py-3 flex gap-3">
+            <Clock className="w-5 h-5 text-sky-600 shrink-0 mt-0.5" />
+            <div className="text-sm space-y-1 min-w-0">
+              <p className="font-bold">{waitingForDelivery ? "Gift waiting for delivery" : "Gift ready to send together"}</p>
+              <p className="text-xs text-muted-foreground">
+                {waitingForDelivery
+                  ? "Nobody has paid for this delivery yet and the owner hasn't requested it. Hold it at KAT. It cannot be sent out until delivery is paid or requested."
+                  : "Delivery is covered. Send all the gifts for this recipient together in one parcel."}
+              </p>
+              {giftSiblings.length > 0 && (
+                <div className="pt-1">
+                  <p className="text-xs font-semibold">Same recipient, still at KAT ({giftSiblings.length}):</p>
+                  <ul className="text-xs text-muted-foreground list-disc pl-4">
+                    {giftSiblings.map((s) => (
+                      <li key={s.id}>{s.product_title || "Gift"} · {s.payment_ref ? String(s.payment_ref).replace(/^KAT-/, "#") : s.id.slice(0, 8)} · {s.delivery_cleared ? "delivery covered" : "waiting"}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {lines.some((l) => l.stock_issue) && (
           <div className="no-print rounded-2xl border border-amber-500/50 bg-amber-500/10 px-4 py-3 flex gap-3" role="alert">
             <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
@@ -527,8 +565,16 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
           )}
 
           {nextStep && (
-            <Button className="w-full h-11 rounded-xl font-bold" disabled={updating} onClick={advance}>
-              {updating ? "Updating…" : `${nextStep.action} →`}
+            <Button
+              className="w-full h-11 rounded-xl font-bold"
+              disabled={updating || (waitingForDelivery && nextStep.key === "out_for_delivery")}
+              onClick={advance}
+            >
+              {updating
+                ? "Updating…"
+                : waitingForDelivery && nextStep.key === "out_for_delivery"
+                  ? "Waiting for delivery to be paid or requested"
+                  : `${nextStep.action} →`}
             </Button>
           )}
           {canCancel && (
@@ -734,4 +780,4 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
       </main>
     </div>
   );
-        }
+    }
