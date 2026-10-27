@@ -21,6 +21,9 @@ export interface Wishlist {
   delivery_name?: string;
   delivery_phone?: string;
   delivery_address?: string;
+  // Used only to price delivery on the server. Never shown to gifters.
+  delivery_state?: string;
+  delivery_city?: string;
   is_public: boolean;
   created_at: string;
   items?: WishlistItem[];
@@ -120,4 +123,4 @@ export function useWishlist(userId: string | null) {
     addToWishlist, removeFromWishlist,
     isInWishlist, getWishlistsForProduct,
   };
-      }
+}
