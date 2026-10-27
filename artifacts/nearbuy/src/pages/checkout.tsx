@@ -7,7 +7,7 @@ import { SUPPORT_EMAIL } from "@/lib/support";
 import {
   ArrowLeft, MapPin, ShoppingBag, Lock,
 } from "lucide-react";
-import { Tag, Gift } from "lucide-react";
+import { Tag, Gift, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,12 +57,18 @@ export default function Checkout() {
   const [address, setAddress] = useState(localStorage.getItem("kat_address") || "");
   // Set when this checkout started from someone's wishlist (see pages/wishlist-view.tsx).
   const [gift, setGift] = useState<null | {
-    wishlistItemId: string;
-    productId: string;
+    wishlistId: string;
+    wishlistItemIds: string[];
+    productIds: string[];
     from: string;
     // First name only. The recipient's phone and street address stay on the server.
     recipient: { name: string; needsPhone?: boolean };
   }>(null);
+  // Gifts only: does THIS gifter also want to pay delivery (optional), and what the server says
+  // the gift costs. The browser never works out a gift's delivery fee or total itself.
+  const [giftPayDelivery, setGiftPayDelivery] = useState(false);
+  const [giftPreview, setGiftPreview] = useState<null | { subtotal: number; delivery: number; deliveryFee: number; deliveryCovered: boolean; discount: number; total: number }>(null);
+  const [giftPreviewError, setGiftPreviewError] = useState("");
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
   const [deliveryFee, setDeliveryFee] = useState(0);
@@ -96,19 +102,22 @@ export default function Checkout() {
         const parsed = JSON.parse(stored);
         setItems(parsed);
 
-        // A gift checkout only applies to exactly the one gifted item. If the buyer
-        // wandered off and came back through the cart, drop the stale gift.
+        // A gift checkout only applies to exactly the gifted items. If the buyer wandered off
+        // and came back through the cart, drop the stale gift.
         const rawGift = sessionStorage.getItem("kat_gift_checkout");
         if (rawGift) {
           try {
             const g = JSON.parse(rawGift);
+            const wishlistItemIds: string[] = Array.isArray(g.wishlistItemIds) ? g.wishlistItemIds : g.wishlistItemId ? [g.wishlistItemId] : [];
+            const productIds: string[] = Array.isArray(g.productIds) ? g.productIds : g.productId ? [g.productId] : [];
             const matches =
               Array.isArray(parsed) &&
-              parsed.length === 1 &&
-              parsed[0].listingId === g.productId &&
-              Number(parsed[0].quantity) === 1;
+              parsed.length > 0 &&
+              parsed.length === productIds.length &&
+              wishlistItemIds.length === productIds.length &&
+              parsed.every((p: any) => productIds.includes(p.listingId) && Number(p.quantity) === 1);
             if (matches) {
-              setGift(g);
+              setGift({ wishlistId: g.wishlistId || "", wishlistItemIds, productIds, from: g.from, recipient: g.recipient || { name: "" } });
               // The gifter never sees the recipient's phone or address. The server
               // reads the real ones from the wishlist when the order is created.
               setFullName(g.recipient?.name || "");
@@ -179,17 +188,21 @@ export default function Checkout() {
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   const citySelected = !!city;
   // Delivery is always the selected city's fee — no subtotal-based free delivery.
-  const delivery = citySelected
-    ? (deliveryMethod === "door" && doorDeliveryFee !== null ? doorDeliveryFee : deliveryFee)
-    : 0;
+  const delivery = gift
+    ? (giftPreview?.delivery ?? 0)
+    : citySelected
+      ? (deliveryMethod === "door" && doorDeliveryFee !== null ? doorDeliveryFee : deliveryFee)
+      : 0;
 
-  const discount = appliedCoupon
-    ? appliedCoupon.discount_type === "percent"
-      ? Math.round(subtotal * (appliedCoupon.discount_value / 100))
-      : Math.min(appliedCoupon.discount_value, subtotal)
-    : 0;
+  const discount = gift
+    ? (giftPreview?.discount ?? 0)
+    : appliedCoupon
+      ? appliedCoupon.discount_type === "percent"
+        ? Math.round(subtotal * (appliedCoupon.discount_value / 100))
+        : Math.min(appliedCoupon.discount_value, subtotal)
+      : 0;
 
-  const total = subtotal + delivery - discount;
+  const total = gift && giftPreview ? giftPreview.total : subtotal + delivery - discount;
 
   const phoneDigits = phone.trim().replace(/\D/g, "");
   // Nigerian numbers: 11 digits starting with 0 (e.g. 08012345678),
@@ -200,7 +213,7 @@ export default function Checkout() {
   // only asked for when the recipient has no usable phone saved on their wishlist.
   const giftNeedsPhone = !!gift && !!gift.recipient?.needsPhone;
   const canPlaceOrder = gift
-    ? (!giftNeedsPhone || isValidPhone) && !!state && !!city
+    ? (!giftNeedsPhone || isValidPhone) && !!giftPreview && !giftPreviewError
     : fullName.trim().length > 0 &&
       isValidPhone &&
       address.trim().length > 0 &&
@@ -275,13 +288,57 @@ export default function Checkout() {
     fullName: fullName.trim(),
     phone: phone.trim(),
     address: address.trim(),
-    state,
-    city,
-    deliveryFee: delivery,
+    // A gift is delivered to the owner's saved area, decided by the server. Nothing here can change it.
+    state: gift ? "" : state,
+    city: gift ? "" : city,
+    deliveryFee: gift ? 0 : delivery,
     couponCode: appliedCoupon?.code || null,
     buyerId: user?.id || null,
-    gift: gift ? { wishlistItemId: gift.wishlistItemId, from: gift.from } : null,
+    gift: gift
+      ? { wishlistId: gift.wishlistId, wishlistItemIds: gift.wishlistItemIds, from: gift.from, includeDelivery: giftPayDelivery }
+      : null,
   });
+
+  // Gifts: ask the server what this gift costs (items, the optional delivery, the total)
+  // whenever something that affects it changes. This is how the delivery line is shown without
+  // the gifter ever knowing the recipient's location.
+  useEffect(() => {
+    if (!gift || items.length === 0) return undefined;
+    let cancelled = false;
+    (async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        if (!cancelled) setGiftPreviewError("Please sign in to continue with this gift.");
+        return;
+      }
+      let q: any = null;
+      let ok = false;
+      try {
+        const res = await fetch("/api/quote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ orderIntent: makeOrderIntent(), preview: true }),
+        });
+        q = await res.json().catch(() => null);
+        ok = res.ok && !!q?.ok;
+      } catch {
+        ok = false;
+      }
+      if (cancelled) return;
+      if (!ok) {
+        setGiftPreview(null);
+        setGiftPreviewError(q?.error || "We couldn't check this gift. Please try again.");
+        // Someone else just covered delivery: untick it and look again.
+        if (/just paid/i.test(q?.error || "")) setGiftPayDelivery(false);
+        return;
+      }
+      setGiftPreviewError("");
+      setGiftPreview({ subtotal: q.subtotal, delivery: q.delivery, deliveryFee: q.deliveryFee ?? 0, deliveryCovered: !!q.deliveryCovered, discount: q.discount || 0, total: q.total });
+      if (q.deliveryCovered && giftPayDelivery) setGiftPayDelivery(false);
+    })();
+    return () => { cancelled = true; };
+  }, [gift, items, giftPayDelivery, appliedCoupon]);
 
   const handleSuccessfulPayment = async (response: any) => {
     if (paymentHandledRef.current) {
@@ -529,7 +586,7 @@ export default function Checkout() {
                   <Gift className="w-3.5 h-3.5" /> Gift for {gift.recipient.name || "your friend"}, from {gift.from}
                 </p>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  It will be delivered to their saved address, which stays private. Choose their state and city below so we can price delivery.
+                  It will be delivered to their saved address, which stays private. You can choose below whether to pay for delivery.
                 </p>
               </div>
             )}
@@ -561,6 +618,7 @@ export default function Checkout() {
             </div>
             )}
 
+            {!gift && (
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="state">State</Label>
@@ -663,6 +721,41 @@ export default function Checkout() {
                 </div>
               )}
             </div>
+            )}
+
+            {gift && (
+              <div className="space-y-3">
+                {giftPreviewError && (
+                  <p className="text-xs text-destructive bg-destructive/10 rounded-xl px-3 py-2" role="alert">{giftPreviewError}</p>
+                )}
+                {!giftPreview && !giftPreviewError && (
+                  <p className="text-xs text-muted-foreground">Checking your gift…</p>
+                )}
+                {giftPreview && giftPreview.deliveryCovered && (
+                  <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-3">
+                    <p className="text-sm font-semibold text-emerald-700 flex items-center gap-1.5">
+                      <Check className="w-4 h-4" /> Delivery already covered
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      An earlier gift already paid delivery for {gift.recipient.name || "their"}{gift.recipient.name ? "'s" : ""} parcel, so yours goes out with it at no extra cost.
+                    </p>
+                  </div>
+                )}
+                {giftPreview && !giftPreview.deliveryCovered && (
+                  <label className={`flex items-start gap-3 rounded-xl border-2 p-3 cursor-pointer ${giftPayDelivery ? "border-primary bg-primary/5" : "border-border"}`}>
+                    <input type="checkbox" className="mt-1" checked={giftPayDelivery} onChange={(e) => setGiftPayDelivery(e.target.checked)} />
+                    <span>
+                      <span className="block text-sm font-semibold">
+                        Also pay delivery ({formatNaira(giftPreview.deliveryFee)}) so {gift.recipient.name || "their"}{gift.recipient.name ? "'s" : ""} gifts can be sent
+                      </span>
+                      <span className="block text-xs text-muted-foreground mt-0.5">
+                        Optional. Gifts wait at KAT and go out together in one parcel once delivery has been paid for. If you don't, another friend or {gift.recipient.name || "the owner"} can.
+                      </span>
+                    </span>
+                  </label>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
@@ -736,7 +829,15 @@ export default function Checkout() {
             )}
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Delivery</span>
-              {!citySelected ? (
+              {gift ? (
+                giftPreview?.deliveryCovered ? (
+                  <span className="font-medium text-emerald-600">Covered by an earlier gift</span>
+                ) : delivery === 0 ? (
+                  <span className="font-medium text-muted-foreground">Not included</span>
+                ) : (
+                  <span className="font-medium">{formatNaira(delivery)}</span>
+                )
+              ) : !citySelected ? (
                 <span className="font-medium text-muted-foreground">Select delivery area</span>
               ) : (
                 <span className={`font-medium ${delivery === 0 ? "text-emerald-600" : ""}`}>
@@ -765,7 +866,7 @@ export default function Checkout() {
           <div className="hidden md:block space-y-2">
             {!canPlaceOrder && (
               <p className="text-xs text-center text-muted-foreground">
-                {gift ? "Choose their state and delivery area to continue" : "Fill in your name, phone, address, state and delivery area to continue"}
+                {gift ? (giftNeedsPhone && !isValidPhone ? "Enter the recipient's phone number to continue" : "Checking your gift…") : "Fill in your name, phone, address, state and delivery area to continue"}
               </p>
             )}
             {payCta}
@@ -778,7 +879,7 @@ export default function Checkout() {
         <div className="max-w-5xl mx-auto space-y-2">
           {!canPlaceOrder && (
             <p className="text-xs text-center text-muted-foreground">
-              {gift ? "Choose their state and delivery area to continue" : "Fill in your name, phone, address, state and delivery area to continue"}
+              {gift ? (giftNeedsPhone && !isValidPhone ? "Enter the recipient's phone number to continue" : "Checking your gift…") : "Fill in your name, phone, address, state and delivery area to continue"}
             </p>
           )}
           {payCta}
@@ -786,4 +887,4 @@ export default function Checkout() {
       </div>
     </div>
   );
-}
+    }
