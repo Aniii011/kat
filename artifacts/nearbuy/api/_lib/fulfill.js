@@ -48,8 +48,9 @@ export async function fulfillOrder(sb, { reference, intent, priced, buyerId, eve
     buyer_address: (gift ? gift.recipient.address : String(intent.address || "").slice(0, 400)) || null,
     buyer_phone: (gift ? gift.recipient.phone : String(intent.phone || "").slice(0, 30)) || null,
 
-    delivery_area: intent.city || null,
-    delivery_state: intent.state || null,
+    // A gift is delivered to the owner's saved area (from the wishlist), not one the browser sent.
+    delivery_area: (gift ? gift.city : intent.city) || null,
+    delivery_state: (gift ? gift.state : intent.state) || null,
     delivery_fee: priced.delivery,
 
     amount: unitPrice,
@@ -59,8 +60,14 @@ export async function fulfillOrder(sb, { reference, intent, priced, buyerId, eve
     variant: {
       color: item.selectedColor || null,
       size: item.selectedSize || null,
-      ...(gift ? { gift: { from: gift.from, wishlist_item_id: gift.itemId } } : {}),
+      ...(gift
+        ? { gift: { from: gift.from, wishlist_item_id: (gift.items || []).find((w) => String(w.product_id) === String(item.listingId))?.id || null } }
+        : {}),
     },
+    // Gifts: remember the wishlist, and whether delivery is already paid or requested. A gift
+    // WAITS at KAT (not cleared) until someone pays delivery, so one parcel can carry everything.
+    // (Only written for gifts, so ordinary orders never depend on the new columns.)
+    ...(gift ? { wishlist_id: gift.wishlistId, delivery_cleared: Boolean(gift.includeDelivery || gift.deliveryCovered) } : {}),
 
     coupon_code: priced.coupon ? priced.coupon.code : null,
     discount_amount: priced.discount,
@@ -89,17 +96,40 @@ export async function fulfillOrder(sb, { reference, intent, priced, buyerId, eve
     .insert(created.map((o) => ({ order_id: o.id, status: eventStatus, note: eventNote })));
   if (eventsError) console.error("Order events creation failed", { reference }); // orders exist: never re-run
 
-  // Gift: mark the wishlist item purchased now that payment is confirmed and the order exists.
-  // The "is_purchased = false" condition means two gifters can never overwrite each other.
+  // Gift: mark every wishlist item purchased now that payment is confirmed and the orders exist.
+  // The "is_purchased = false" condition means two gifters can never overwrite each other. A paid
+  // gift is never refused: if an item was already taken (or removed a moment ago) the order is
+  // kept and flagged for the team instead.
   if (gift) {
-    const { data: marked, error: giftError } = await sb
-      .from("wishlist_items")
-      .update({ is_purchased: true, purchased_by_name: gift.from })
-      .eq("id", gift.itemId)
-      .eq("is_purchased", false)
-      .select("id");
-    if (giftError || !marked || marked.length === 0) {
-      console.error("Gift item was not marked purchased", { reference });
+    for (const wanted of gift.itemIds) {
+      const { data: marked, error: giftError } = await sb
+        .from("wishlist_items")
+        .update({ is_purchased: true, purchased_by_name: gift.from })
+        .eq("id", wanted)
+        .eq("is_purchased", false)
+        .select("id");
+      if (giftError || !marked || marked.length === 0) {
+        console.error("Gift item was not marked purchased", { reference, wishlistItemId: wanted });
+        const product = (gift.items || []).find((w) => w.id === wanted)?.product_id;
+        const affected = (created || []).filter((o) => String(o.product_id) === String(product));
+        for (const o of affected) {
+          await sb.from("orders").update({
+            stock_issue: "Gift issue: this item was already gifted by someone else, or removed from the list, when this paid order was processed. Contact the buyer or refund.",
+          }).eq("id", o.id);
+        }
+      }
+    }
+
+    // This gifter paid delivery: every gift for this list that is still waiting at KAT now ships
+    // in the same parcel.
+    if (gift.includeDelivery) {
+      const { error: clearError } = await sb
+        .from("orders")
+        .update({ delivery_cleared: true })
+        .eq("wishlist_id", gift.wishlistId)
+        .eq("delivery_cleared", false)
+        .in("admin_status", ["pending", "accepted", "preparing", "ready_for_pickup"]);
+      if (clearError) console.error("Could not clear waiting gifts for delivery", { reference });
     }
   }
 
