@@ -15,7 +15,8 @@ import {
   MessageCircle, Flag, ChevronDown, ChevronUp, Play,
   CheckCircle2, Store, Tag, Zap,
 } from "lucide-react";
-import { Frown } from "lucide-react";
+import { Frown, Gift as GiftIcon } from "lucide-react";
+import AddToWishlistSheet from "@/components/AddToWishlistSheet";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -87,6 +88,7 @@ export default function ListingDetail() {
   const { listings: relatedAll } = useListings();
   const { addItem, saveForLater, removeSaved, isSaved, isInCart } = useCart();
   const { user } = useAuth();
+  const [showWishlistSheet, setShowWishlistSheet] = useState(false);
   const { logInteraction } = useInteractions(user?.id ?? null);
 
   // Logs a view once per listing load. Placed here, alongside the other
@@ -398,6 +400,13 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
           </div>
           <ThemeSwitcher />
           <button
+            onClick={() => setShowWishlistSheet(true)}
+            aria-label="Add to wishlist"
+            className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0"
+          >
+            <GiftIcon className="w-4 h-4" />
+          </button>
+          <button
             onClick={handleSaveForLater}
             className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0"
           >
@@ -544,6 +553,14 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
               </span>
             )}
           </div>
+
+          {/* Add to wishlist (a gift list friends can buy from), different from the heart which saves for later */}
+          <button
+            onClick={() => setShowWishlistSheet(true)}
+            className="w-full flex items-center justify-center gap-2 rounded-2xl border border-primary/40 text-primary font-semibold text-sm py-2.5 hover:bg-primary/5 transition-colors"
+          >
+            <GiftIcon className="w-4 h-4" /> Add to wishlist
+          </button>
 
           {/* Thrift deposit */}
           {listing.isThrift && listing.depositAmount && (
@@ -1178,6 +1195,12 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
           )}
         </DialogContent>
       </Dialog>
+      <AddToWishlistSheet
+        open={showWishlistSheet}
+        onClose={() => setShowWishlistSheet(false)}
+        product={{ id: listing.id, title: listing.title, price: listing.price, imageUrl: listing.imageUrl, inStock: listing.inStock }}
+        onNeedSignIn={() => setShowAuth(true)}
+      />
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
