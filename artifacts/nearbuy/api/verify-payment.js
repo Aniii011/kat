@@ -2,7 +2,7 @@ import { supabaseAdmin } from "./_lib/supabase-admin.js";
 import { getAuthedUser } from "./_lib/auth.js";
 import { priceOrder } from "./_lib/pricing.js";
 import { fulfillOrder } from "./_lib/fulfill.js";
-import { resolveGift } from "./_lib/gift.js";
+import { loadGiftContext, resolveGift } from "./_lib/gift.js";
 
 const SUPPORT_NOTE = "Please contact KAT support and quote this payment reference";
 
@@ -77,7 +77,22 @@ export default async function handler(req, res) {
 
     // 5. Work out what the order SHOULD cost from the database, and require the
     //    amount Paystack actually collected to match it exactly.
-    const priced = await priceOrder(supabaseAdmin, orderIntent);
+    // For a gift, the delivery area comes from the wishlist and the delivery fee is whatever this
+    // gifter chose, never re-decided now that they have paid.
+    const loadedGift = await loadGiftContext(supabaseAdmin, orderIntent, { afterPayment: true });
+    if (!loadedGift.ok) {
+      console.error("verify-payment: gift problem after payment", { reference, reason: loadedGift.error });
+      return res.status(409).json({
+        verified: false,
+        error: `We received your payment but couldn't complete the gift: ${loadedGift.error} ${SUPPORT_NOTE}: ${reference}`,
+      });
+    }
+    const giftCtx = loadedGift.ctx;
+    const priced = await priceOrder(
+      supabaseAdmin,
+      giftCtx ? { ...orderIntent, state: giftCtx.state, city: giftCtx.city } : orderIntent,
+      { giftContext: giftCtx ? { state: giftCtx.state, city: giftCtx.city, includeDelivery: giftCtx.includeDelivery } : undefined },
+    );
     if (!priced.ok) {
       console.error("verify-payment: could not price order", { reference, reason: priced.error });
       return res.status(409).json({
@@ -99,7 +114,7 @@ export default async function handler(req, res) {
     }
 
     // 6. Gift orders: re-check the wishlist item against the database.
-    const giftCheck = await resolveGift(supabaseAdmin, orderIntent, priced.lines);
+    const giftCheck = await resolveGift(supabaseAdmin, orderIntent, priced.lines, { afterPayment: true });
     if (!giftCheck.ok) {
       console.error("verify-payment: gift problem after payment", { reference, reason: giftCheck.error });
       return res.status(409).json({
