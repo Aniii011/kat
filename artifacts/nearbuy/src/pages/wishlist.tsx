@@ -290,10 +290,10 @@ export default function WishlistPage() {
                   <div className="text-center py-12 bg-card border border-card-border rounded-2xl">
                     <Heart className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
                     <p className="font-semibold text-sm">No items yet</p>
-                    <p className="text-xs text-muted-foreground mt-1">Tap the heart icon on any product to add it here</p>
-                    <Link href="/">
+                    <p className="text-xs text-muted-foreground mt-1">Add products you'd love to be gifted. You can do this before or after adding your delivery address.</p>
+                    <Link href={`/wishlists/${activeList.id}/add`}>
                       <Button size="sm" className="rounded-full mt-3 gap-1">
-                        <ShoppingBag className="w-3.5 h-3.5" /> Browse Products
+                        <ShoppingBag className="w-3.5 h-3.5" /> Add products
                       </Button>
                     </Link>
                   </div>
@@ -320,6 +320,11 @@ export default function WishlistPage() {
                         )}
                       </div>
                     ))}
+                    <Link href={`/wishlists/${activeList.id}/add`}>
+                      <Button variant="outline" size="sm" className="rounded-full w-full gap-1">
+                        <Plus className="w-3.5 h-3.5" /> Add more products
+                      </Button>
+                    </Link>
                   </div>
                 )}
               </div>
@@ -329,4 +334,4 @@ export default function WishlistPage() {
       </div>
     </div>
   );
-              }
+                               }
