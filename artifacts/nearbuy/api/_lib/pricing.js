@@ -152,8 +152,11 @@ export async function priceOrder(sb, intent, options = {}) {
   }
 
   // 2. Delivery fee for the chosen area (standard or door, whichever matches)
-  const state = String(intent.state || "").trim().slice(0, 80);
-  const city = String(intent.city || "").trim().slice(0, 80);
+  // A gift is delivered to the wishlist owner's saved area (from the database), never to a
+  // state/city the browser names, and the delivery fee is optional for the gifter.
+  const giftCtx = options.giftContext || null;
+  const state = giftCtx ? giftCtx.state : String(intent.state || "").trim().slice(0, 80);
+  const city = giftCtx ? giftCtx.city : String(intent.city || "").trim().slice(0, 80);
   if (!state || !city) return fail("Please choose a delivery area.");
 
   const { data: area, error: areaError } = await sb
@@ -168,14 +171,23 @@ export async function priceOrder(sb, intent, options = {}) {
   if (areaError) return fail("Could not check delivery. Please try again.");
   if (!area) return fail("Delivery to this area isn't available.");
 
-  const validFees = [area.delivery_fee, area.door_delivery_fee]
-    .filter((f) => f !== null && f !== undefined)
-    .map(Number);
-  const claimedFee = Number(intent.deliveryFee);
-  if (!validFees.includes(claimedFee)) {
-    return fail("The delivery fee for this area has changed. Please re-select your delivery option.");
+  let delivery;
+  let deliveryFee = null; // what delivery to this area costs (for display), even when this gifter isn't paying it
+  if (giftCtx) {
+    const standard = area.delivery_fee ?? area.door_delivery_fee;
+    if (standard === null || standard === undefined) return fail("Delivery to this area isn't available.");
+    deliveryFee = Number(standard);
+    delivery = giftCtx.includeDelivery ? deliveryFee : 0;
+  } else {
+    const validFees = [area.delivery_fee, area.door_delivery_fee]
+      .filter((f) => f !== null && f !== undefined)
+      .map(Number);
+    const claimedFee = Number(intent.deliveryFee);
+    if (!validFees.includes(claimedFee)) {
+      return fail("The delivery fee for this area has changed. Please re-select your delivery option.");
+    }
+    delivery = claimedFee;
   }
-  const delivery = claimedFee;
 
   // 3. Coupon, re-validated from the database (the browser's discount is ignored)
   let discount = 0;
@@ -205,5 +217,5 @@ export async function priceOrder(sb, intent, options = {}) {
   const total = subtotal + delivery - discount;
   if (!Number.isInteger(total) || total <= 0) return fail("Your order total is invalid.");
 
-  return { ok: true, lines, subtotal, delivery, discount, total, coupon };
-  }
+  return { ok: true, lines, subtotal, delivery, deliveryFee, discount, total, coupon };
+      }
