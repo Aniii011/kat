@@ -23,6 +23,7 @@ import Announcements from "@/components/admin/Announcements";
 import { SUPPORT_EMAIL } from "@/lib/support";
 import { sellerNet, platformFee } from "@/lib/commission";
 import OrdersPanel from "@/components/admin/OrdersPanel";
+import { buildMonthlyStatements, statementsToCsv, amountPaid, type PayoutRow } from "@/lib/statements";
 
 function formatNaira(n: number) { return "₦" + Number(n || 0).toLocaleString("en-NG"); }
 
@@ -93,6 +94,14 @@ export default function Admin() {
   const [products, setProducts] = useState<any[]>([]);
   const [storesById, setStoresById] = useState<Record<string, any>>({});
   const [financeSearch, setFinanceSearch] = useState("");
+  // Payout ledger: what KAT has already paid each store (see api/record-payout.js).
+  const [payouts, setPayouts] = useState<PayoutRow[]>([]);
+  const [payTarget, setPayTarget] = useState<null | { storeId: string; name: string; net: number; orders: number }>(null);
+  const [payNote, setPayNote] = useState("");
+  const [payBusy, setPayBusy] = useState(false);
+  const [payError, setPayError] = useState("");
+  const [payNotice, setPayNotice] = useState("");
+  const [statementStoreKey, setStatementStoreKey] = useState("");
   const [orders, setOrders] = useState<any[]>([]);
   const [orderEvents, setOrderEvents] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -114,13 +123,15 @@ export default function Admin() {
   // ── UNCHANGED: same fetch, same four queries, same shape ──
   const fetchAll = async () => {
     setLoading(true);
-    const [{ data: profilesData }, { data: productsData }, { data: ordersData }, { data: eventsData }, { data: storesData }] = await Promise.all([
+    const [{ data: profilesData }, { data: productsData }, { data: ordersData }, { data: eventsData }, { data: storesData }, { data: payoutsData }] = await Promise.all([
       supabase.from("profiles").select("*").order("created_at", { ascending: false }),
       supabase.from("products").select("*").order("created_at", { ascending: false }),
       supabase.from("orders").select("*").order("created_at", { ascending: false }),
       supabase.from("order_events").select("*"),
       supabase.from("stores").select("id, name, owner_id"),
+      supabase.from("seller_payouts").select("*").order("paid_at", { ascending: false }),
     ]);
+    if (payoutsData) setPayouts(payoutsData as PayoutRow[]);
     if (profilesData) {
       setSellers(profilesData.filter((p) => p.is_seller && !p.is_admin));
       setUsers(profilesData);
@@ -219,27 +230,91 @@ export default function Admin() {
   const inProgressOrders = orders.filter((o) => o.admin_status !== "cancelled" && o.admin_status !== "delivered" && o.admin_status !== "completed");
   const payableGmv = payableOrders.reduce((s, o) => s + (o.total || o.amount || 0), 0);
   const payableCommission = platformFee(payableGmv);
-  const payableNetToSellers = payableGmv - payableCommission;
+  // Orders already covered by a recorded payout are no longer owed.
+  const unpaidPayableOrders = payableOrders.filter((o) => !o.payout_id);
+  const unpaidGmv = unpaidPayableOrders.reduce((s, o) => s + (o.total || o.amount || 0), 0);
+  const payableNetToSellers = sellerNet(unpaidGmv);
+  const totalPaidOut = amountPaid(payouts);
   const inProgressGmv = inProgressOrders.reduce((s, o) => s + (o.total || o.amount || 0), 0);
 
-  // Payouts grouped by STORE, not by seller account — a seller with several
-  // stores gets a separate, correct line per store instead of one blended
-  // total. Falls back to seller_id only for products/orders with no
-  // store_id at all (pre-fix legacy rows).
-  const payoutsByStore: Record<string, { name: string; revenue: number; orders: number }> = {};
-  payableOrders.forEach((o) => {
+  // Payouts grouped by STORE, not by seller account. The payout ledger pays by the order's own
+  // store_id, so that is the key. Older orders with no store_id are still listed (grouped under
+  // the product's store or the seller) but cannot be marked paid here.
+  const keyForOrder = (o: any) => {
+    if (o.store_id) return o.store_id as string;
     const product = products.find((p) => p.id === o.product_id);
-    const key = product?.store_id || o.seller_id;
+    const fallback = product?.store_id || o.seller_id;
+    return fallback ? `legacy:${fallback}` : null;
+  };
+  const nameForOrder = (o: any) => {
+    const product = products.find((p) => p.id === o.product_id);
+    const store = storesById[o.store_id || product?.store_id];
+    const seller = users.find((u) => u.id === o.seller_id);
+    return store?.name || seller?.store_name || seller?.full_name || "Unknown store";
+  };
+  const payoutsByStore: Record<string, { storeId: string | null; name: string; revenue: number; orders: number }> = {};
+  unpaidPayableOrders.forEach((o) => {
+    const key = keyForOrder(o);
     if (!key) return;
     if (!payoutsByStore[key]) {
-      const store = storesById[product?.store_id];
-      const seller = users.find((u) => u.id === o.seller_id);
-      payoutsByStore[key] = { name: store?.name || seller?.store_name || seller?.full_name || "Unknown store", revenue: 0, orders: 0 };
+      payoutsByStore[key] = { storeId: key.startsWith("legacy:") ? null : key, name: nameForOrder(o), revenue: 0, orders: 0 };
     }
     payoutsByStore[key].revenue += o.total || o.amount || 0;
     payoutsByStore[key].orders += 1;
   });
   const allStorePayouts = Object.values(payoutsByStore).sort((a, b) => b.revenue - a.revenue);
+
+  // Every store that has delivered orders (paid or not), for the monthly statements.
+  const statementStores: { key: string; name: string }[] = [];
+  payableOrders.forEach((o) => {
+    const key = keyForOrder(o);
+    if (key && !statementStores.some((x) => x.key === key)) statementStores.push({ key, name: nameForOrder(o) });
+  });
+  statementStores.sort((a, b) => a.name.localeCompare(b.name));
+  const activeStatementKey = statementStoreKey || statementStores[0]?.key || "";
+  const activeStatementName = statementStores.find((x) => x.key === activeStatementKey)?.name || "Store";
+  const activeStatementOrders = payableOrders.filter((o) => keyForOrder(o) === activeStatementKey);
+  const activeStatementPayouts = payouts.filter((p) => p.store_id === activeStatementKey);
+  const activeStatements = buildMonthlyStatements(activeStatementOrders);
+  const storeNameById = (id: string) => storesById[id]?.name || "Store";
+
+  const downloadStatement = () => {
+    const csv = statementsToCsv(activeStatementName, activeStatements, activeStatementPayouts);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `kat-statement-${activeStatementName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Records that KAT has paid a store. The server decides which orders and the exact amount.
+  const recordPayout = async () => {
+    if (!payTarget) return;
+    setPayBusy(true);
+    setPayError("");
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Please sign in again.");
+      const res = await fetch("/api/record-payout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ storeId: payTarget.storeId, note: payNote }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) throw new Error(json?.error || "We couldn't record this payout. Nothing was saved.");
+      setPayNotice(`Recorded ${formatNaira(json.amount)} paid to ${payTarget.name} (${json.orderCount} order${json.orderCount === 1 ? "" : "s"}).`);
+      setPayTarget(null);
+      setPayNote("");
+      await fetchAll();
+    } catch (e: any) {
+      setPayError(e?.message || "Something went wrong. Nothing was saved.");
+    } finally {
+      setPayBusy(false);
+    }
+  };
 
   const gmvInRange = orders.filter((o) => isSameDayOrAfter(o.created_at, analyticsRange)).reduce((s, o) => s + (o.total || o.amount || 0), 0);
   const gmvPrevRange = orders.filter((o) => !isSameDayOrAfter(o.created_at, analyticsRange) && isSameDayOrAfter(o.created_at, analyticsRange * 2)).reduce((s, o) => s + (o.total || o.amount || 0), 0);
@@ -805,11 +880,18 @@ export default function Admin() {
           {section === "finance" && (
             <div className="space-y-5">
               <h2 className="text-lg font-black">Finance</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Metric label="Payable GMV (delivered/completed)" value={formatNaira(payableGmv)} />
                 <Metric label="KAT commission earned" value={formatNaira(payableCommission)} />
                 <Metric label="Owed to sellers now (net)" value={formatNaira(payableNetToSellers)} />
+                <Metric label="Paid out so far" value={formatNaira(totalPaidOut)} />
               </div>
+              {payNotice && (
+                <div className="rounded-xl bg-green-50 border border-green-200 px-3 py-2 text-xs font-semibold text-green-800 flex items-center justify-between gap-2">
+                  <span>{payNotice}</span>
+                  <button onClick={() => setPayNotice("")} className="text-green-800" aria-label="Dismiss"><X className="w-3.5 h-3.5" /></button>
+                </div>
+              )}
               <p className="text-xs text-muted-foreground -mt-2">
                 Only orders marked Delivered/Completed count here — cancelled orders are excluded, and orders still in progress ({formatNaira(inProgressGmv)} across {inProgressOrders.length} order{inProgressOrders.length === 1 ? "" : "s"}) aren't counted as owed yet since they could still be cancelled or returned.
               </p>
@@ -821,7 +903,7 @@ export default function Admin() {
 
               <div>
                 <div className="flex items-center justify-between mb-2 gap-3">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Amount owed per store ({allStorePayouts.length})</p>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Still owed per store ({allStorePayouts.length})</p>
                   <input
                     value={financeSearch}
                     onChange={(e) => setFinanceSearch(e.target.value)}
@@ -831,8 +913,8 @@ export default function Admin() {
                 </div>
                 {allStorePayouts.length === 0 ? <p className="text-xs text-muted-foreground">No completed sales yet.</p> : (
                   <div className="border border-border rounded-2xl overflow-x-auto max-h-96 overflow-y-auto">
-                    <table className="w-full text-sm min-w-[480px]">
-                      <thead className="sticky top-0 bg-background"><tr className="text-left text-xs text-muted-foreground border-b border-border"><th className="p-2.5 font-medium">Store</th><th className="p-2.5 font-medium">Orders</th><th className="p-2.5 font-medium">Gross sales</th><th className="p-2.5 font-medium">Commission</th><th className="p-2.5 font-medium">Net owed</th></tr></thead>
+                    <table className="w-full text-sm min-w-[560px]">
+                      <thead className="sticky top-0 bg-background"><tr className="text-left text-xs text-muted-foreground border-b border-border"><th className="p-2.5 font-medium">Store</th><th className="p-2.5 font-medium">Orders</th><th className="p-2.5 font-medium">Gross sales</th><th className="p-2.5 font-medium">Commission</th><th className="p-2.5 font-medium">Net owed</th><th className="p-2.5 font-medium"></th></tr></thead>
                       <tbody>
                         {allStorePayouts
                           .filter((s) => !financeSearch || s.name.toLowerCase().includes(financeSearch.toLowerCase()))
@@ -843,6 +925,19 @@ export default function Admin() {
                             <td className="p-2.5">{formatNaira(s.revenue)}</td>
                             <td className="p-2.5">{formatNaira(platformFee(s.revenue))}</td>
                             <td className="p-2.5 font-bold">{formatNaira(sellerNet(s.revenue))}</td>
+                            <td className="p-2.5 text-right">
+                              {s.storeId ? (
+                                <Button
+                                  size="sm"
+                                  className="rounded-full text-xs h-7"
+                                  onClick={() => { setPayError(""); setPayTarget({ storeId: s.storeId as string, name: s.name, net: sellerNet(s.revenue), orders: s.orders }); }}
+                                >
+                                  Mark as paid
+                                </Button>
+                              ) : (
+                                <span className="text-[11px] text-muted-foreground">No store on these orders</span>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -850,6 +945,80 @@ export default function Admin() {
                   </div>
                 )}
               </div>
+
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Payout history ({payouts.length})</p>
+                {payouts.length === 0 ? <p className="text-xs text-muted-foreground">No payouts recorded yet.</p> : (
+                  <div className="divide-y divide-border border-t border-b border-border max-h-72 overflow-y-auto">
+                    {payouts.map((p) => (
+                      <div key={p.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                        <div className="min-w-0">
+                          <p className="font-semibold truncate">{storeNameById(p.store_id)}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {new Date(p.paid_at).toLocaleDateString()} · {p.order_count} order{p.order_count === 1 ? "" : "s"}{p.note ? ` · ${p.note}` : ""}
+                          </p>
+                        </div>
+                        <span className="font-bold shrink-0">{formatNaira(p.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2 gap-3">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Monthly statement</p>
+                  {statementStores.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={activeStatementKey}
+                        onChange={(e) => setStatementStoreKey(e.target.value)}
+                        className="h-8 max-w-[10rem] rounded-full border border-input bg-background px-3 text-xs"
+                      >
+                        {statementStores.map((x) => <option key={x.key} value={x.key}>{x.name}</option>)}
+                      </select>
+                      <Button size="sm" variant="outline" className="rounded-full text-xs h-8" onClick={downloadStatement}>Download CSV</Button>
+                    </div>
+                  )}
+                </div>
+                {activeStatements.length === 0 ? <p className="text-xs text-muted-foreground">No delivered sales yet.</p> : (
+                  <div className="border border-border rounded-2xl overflow-x-auto">
+                    <table className="w-full text-sm min-w-[560px]">
+                      <thead><tr className="text-left text-xs text-muted-foreground border-b border-border"><th className="p-2.5 font-medium">Month</th><th className="p-2.5 font-medium">Orders</th><th className="p-2.5 font-medium">Gross</th><th className="p-2.5 font-medium">Commission</th><th className="p-2.5 font-medium">Seller net</th><th className="p-2.5 font-medium">Paid</th><th className="p-2.5 font-medium">Owed</th></tr></thead>
+                      <tbody>
+                        {activeStatements.map((m) => (
+                          <tr key={m.month} className="border-b border-border last:border-0">
+                            <td className="p-2.5">{m.label}</td>
+                            <td className="p-2.5 text-xs text-muted-foreground">{m.orders}</td>
+                            <td className="p-2.5">{formatNaira(m.gross)}</td>
+                            <td className="p-2.5">{formatNaira(m.commission)}</td>
+                            <td className="p-2.5 font-bold">{formatNaira(m.net)}</td>
+                            <td className="p-2.5">{formatNaira(m.paidNet)}</td>
+                            <td className="p-2.5">{formatNaira(m.owedNet)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <p className="text-[11px] text-muted-foreground mt-1.5">Months follow the date each order was placed. Monthly figures can differ from a payout by a naira or two because of rounding.</p>
+              </div>
+
+              {payTarget && (
+                <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center px-4 pb-4 sm:pb-0">
+                  <div className="bg-card border border-card-border rounded-3xl p-6 max-w-sm w-full shadow-xl space-y-4">
+                    <h3 className="font-black text-base">Record payout to {payTarget.name}</h3>
+                    <p className="text-sm">
+                      About <span className="font-black">{formatNaira(payTarget.net)}</span> for {payTarget.orders} delivered order{payTarget.orders === 1 ? "" : "s"}. The exact amount is confirmed when you save.
+                    </p>
+                    <p className="text-xs text-muted-foreground">Only tap Confirm after you have actually sent the money by bank transfer. This records it; it does not send any money.</p>
+                    <Input placeholder="Transfer reference or note (optional)" value={payNote} onChange={(e) => setPayNote(e.target.value)} maxLength={300} className="rounded-xl h-11" />
+                    {payError && <p className="text-xs text-destructive bg-destructive/10 rounded-xl px-3 py-2" role="alert">{payError}</p>}
+                    <Button className="w-full rounded-full font-bold h-11" onClick={recordPayout} disabled={payBusy}>{payBusy ? "Saving..." : "Confirm paid"}</Button>
+                    <Button variant="ghost" size="sm" className="w-full rounded-full" onClick={() => { setPayTarget(null); setPayError(""); }} disabled={payBusy}>Cancel</Button>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Recent transactions</p>
@@ -866,7 +1035,7 @@ export default function Admin() {
 
               <p className="text-xs text-muted-foreground flex items-start gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                This is a financial ledger only. KAT currently has no payout execution infrastructure — no withdrawal flow, bank details, or payout status exist in the system.
+                KAT does not send money from this screen. Pay each store by bank transfer yourself, then tap Mark as paid to record it. Bank details are not stored here.
               </p>
             </div>
           )}
@@ -1122,4 +1291,4 @@ function TrendChart({ orders, rangeDays, metric }: { orders: any[]; rangeDays: n
       </div>
     </div>
   );
-   }
+  }
