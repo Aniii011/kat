@@ -4,6 +4,7 @@ import { priceOrder } from "./_lib/pricing.js";
 import { fulfillOrder } from "./_lib/fulfill.js";
 import { loadGiftContext, resolveGift } from "./_lib/gift.js";
 import { buyerSigMatches } from "./_lib/buyer-sig.js";
+import { settleSendGifts } from "./_lib/send-gifts.js";
 
 // Paystack signs the EXACT bytes it sends, so we need the raw body to check the
 // signature. Re-serialising parsed JSON can produce different bytes and fail.
@@ -55,6 +56,29 @@ export default async function handler(req, res) {
 
   const { reference, amount, currency, metadata } = event.data || {};
   const intent = metadata?.orderIntent;
+
+  // "Send my gifts": the owner paid delivery for gifts waiting at KAT (no items in this payment).
+  if (metadata?.sendGifts) {
+    const sendGifts = metadata.sendGifts;
+    if (typeof reference !== "string" || !buyerSigMatches(reference, sendGifts.buyerId, metadata?.buyerSig)) {
+      console.error("PAYSTACK WEBHOOK: delivery payment signature missing or invalid. Needs manual review.", { reference });
+      return res.status(200).json({ received: true, note: "Needs manual review." });
+    }
+    try {
+      const result = await settleSendGifts(supabaseAdmin, {
+        reference,
+        wishlistId: sendGifts.wishlistId,
+        ownerId: sendGifts.buyerId,
+        amountKobo: amount,
+        currency,
+      });
+      if (result.state === "error") return res.status(500).json({ error: "Delivery reconciliation failed", reference });
+      return res.status(200).json({ received: true, state: result.state });
+    } catch (err) {
+      console.error("PAYSTACK WEBHOOK ERROR (send gifts)", err?.message);
+      return res.status(500).json({ error: "Webhook processing failed" });
+    }
+  }
 
   if (typeof reference !== "string" || !intent || typeof intent.buyerId !== "string") {
     console.error("PAYSTACK WEBHOOK: charge.success without usable order details", { reference });
