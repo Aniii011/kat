@@ -31,6 +31,10 @@ export default function MyGifts() {
   const [gifts, setGifts] = useState<MyGift[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
+  const [sendingFor, setSendingFor] = useState<string | null>(null);
+  const [sendError, setSendError] = useState("");
+  const [sendDone, setSendDone] = useState("");
 
   useEffect(() => {
     if (authLoading) return;
@@ -52,7 +56,73 @@ export default function MyGifts() {
       }
     })();
     return () => { cancelled = true; };
-  }, [user, authLoading]);
+  }, [user, authLoading, reloadKey]);
+
+  // The owner pays delivery for the gifts waiting on one list. The server works out the fee.
+  const sendMyGifts = async (wishlistId: string) => {
+    setSendError("");
+    setSendDone("");
+    setSendingFor(wishlistId);
+    try {
+      const PaystackPop = (window as any).PaystackPop;
+      if (!PaystackPop) throw new Error("Payment couldn't load. Please refresh the page and try again.");
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Please sign in again.");
+
+      const quoteRes = await fetch("/api/send-gifts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ wishlistId }),
+      });
+      const quote = await quoteRes.json().catch(() => null);
+      if (!quoteRes.ok || !quote?.ok) throw new Error(quote?.error || "We couldn't prepare your delivery. Please try again.");
+
+      const popup = new PaystackPop();
+      popup.newTransaction({
+        key:
+          (import.meta as any).env?.VITE_PAYSTACK_PUBLIC_KEY ||
+          "pk_test_f4a152b1348a3c6f5c4b415f3341691ea02b2e2c",
+        email: user?.email || "support@kat.ng",
+        amount: quote.amountKobo,
+        currency: "NGN",
+        reference: quote.reference,
+        metadata: {
+          sendGifts: { wishlistId, buyerId: user?.id },
+          buyerSig: quote.buyerSig,
+        },
+        onSuccess: async (response: any) => {
+          try {
+            const { data: fresh } = await supabase.auth.getSession();
+            const verify = await fetch("/api/verify-send-gifts", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${fresh.session?.access_token || token}` },
+              body: JSON.stringify({ reference: response.reference }),
+            });
+            const result = await verify.json().catch(() => null);
+            if (verify.ok && result?.verified) {
+              setSendDone("Done! Your gifts will go out together in one delivery.");
+              setReloadKey((k) => k + 1);
+            } else {
+              setSendError(result?.error || "We received your payment but couldn't update your gifts yet. Please contact KAT support.");
+            }
+          } catch {
+            setSendError(`We received your payment but couldn't update your gifts yet. Please contact KAT support and quote: ${response.reference}`);
+          } finally {
+            setSendingFor(null);
+          }
+        },
+        onCancel: () => {
+          setSendError("Payment cancelled. Your gifts are still waiting at KAT.");
+          setSendingFor(null);
+        },
+      });
+    } catch (e: any) {
+      setSendError(e?.message || "Something went wrong. Please try again.");
+      setSendingFor(null);
+    }
+  };
 
   if (!authLoading && !user) {
     return (
@@ -66,6 +136,14 @@ export default function MyGifts() {
   }
 
   const waiting = gifts.filter((g) => g.state === "waiting");
+  const waitingLists = Array.from(
+    waiting.reduce((map, g) => {
+      const entry = map.get(g.wishlistId) || { id: g.wishlistId, name: g.wishlistName, emoji: g.wishlistEmoji, count: 0 };
+      entry.count += 1;
+      map.set(g.wishlistId, entry);
+      return map;
+    }, new Map<string, { id: string; name: string; emoji: string; count: number }>()).values(),
+  );
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -93,11 +171,29 @@ export default function MyGifts() {
           </div>
         )}
 
-        {!loading && !error && waiting.length > 0 && (
-          <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-xs font-semibold text-amber-800">
-            {waiting.length} {waiting.length === 1 ? "gift is" : "gifts are"} waiting at KAT. They go out together in one delivery.
-          </div>
+        {sendDone && (
+          <div className="rounded-2xl bg-green-50 border border-green-200 p-3 text-xs font-semibold text-green-800">{sendDone}</div>
         )}
+        {sendError && (
+          <div className="rounded-2xl bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-700">{sendError}</div>
+        )}
+
+        {!loading && !error && waitingLists.map((l) => (
+          <div key={l.id} className="rounded-2xl bg-amber-50 border border-amber-200 p-3 space-y-2">
+            <p className="text-xs font-semibold text-amber-800">
+              {l.count} {l.count === 1 ? "gift is" : "gifts are"} waiting at KAT from {l.emoji} {l.name}. They go out together in one delivery.
+            </p>
+            <Button
+              size="sm"
+              className="rounded-full text-xs"
+              disabled={sendingFor !== null}
+              onClick={() => sendMyGifts(l.id)}
+            >
+              {sendingFor === l.id ? "Opening payment…" : "Send my gifts"}
+            </Button>
+            <p className="text-[11px] text-amber-700">You only pay delivery. Your gifts are already paid for.</p>
+          </div>
+        ))}
 
         {!loading && !error && gifts.map((g) => (
           <div key={g.id} className="flex gap-3 rounded-2xl border border-border p-3">
@@ -133,4 +229,4 @@ export default function MyGifts() {
       </div>
     </div>
   );
-}
+    }
