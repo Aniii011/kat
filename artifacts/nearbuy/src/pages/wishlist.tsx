@@ -131,6 +131,11 @@ export default function WishlistPage() {
             </button>
           </Link>
           <h1 className="text-base font-black flex-1">My Wishlists</h1>
+          <Link href="/my-gifts">
+            <Button size="sm" variant="outline" className="rounded-full gap-1 text-xs">
+              <Gift className="w-3.5 h-3.5" /> My gifts
+            </Button>
+          </Link>
           <Button size="sm" className="rounded-full gap-1 text-xs" onClick={() => setShowCreate(true)}>
             <Plus className="w-3.5 h-3.5" /> New List
           </Button>
@@ -334,4 +339,4 @@ export default function WishlistPage() {
       </div>
     </div>
   );
-                               }
+}
