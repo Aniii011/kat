@@ -512,6 +512,8 @@ export default function Checkout() {
         // because the client never made it back to finish the job.
         metadata: {
           orderIntent: makeOrderIntent(),
+          // Server-issued proof of which signed-in buyer this payment belongs to.
+          buyerSig: quote.buyerSig,
         },
         onSuccess: (response: any) => {
           handleSuccessfulPayment(response);
