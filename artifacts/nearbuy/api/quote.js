@@ -3,6 +3,7 @@ import { supabaseAdmin } from "./_lib/supabase-admin.js";
 import { getAuthedUser } from "./_lib/auth.js";
 import { priceOrder } from "./_lib/pricing.js";
 import { loadGiftContext, resolveGift } from "./_lib/gift.js";
+import { signBuyer } from "./_lib/buyer-sig.js";
 
 // Called by checkout just BEFORE the Paystack popup opens. It returns the
 // authoritative total (worked out from database prices) and an unguessable
@@ -36,9 +37,13 @@ export default async function handler(req, res) {
     const giftCheck = await resolveGift(supabaseAdmin, orderIntent, priced.lines, { requirePhone: !preview });
     if (!giftCheck.ok) return res.status(400).json({ ok: false, error: giftCheck.error });
 
+    const reference = `KAT-${crypto.randomUUID()}`;
+
     return res.status(200).json({
       ok: true,
-      reference: `KAT-${crypto.randomUUID()}`,
+      reference,
+      // Proves this reference was issued to this signed-in buyer (checked by the webhook).
+      buyerSig: signBuyer(reference, user.id),
       subtotal: priced.subtotal,
       delivery: priced.delivery,
       // Gifts only: what delivery costs, and whether an earlier gift already covered it.
@@ -58,4 +63,4 @@ export default async function handler(req, res) {
     console.error("quote error", error?.message);
     return res.status(500).json({ ok: false, error: "Could not confirm your order total. Please try again." });
   }
-}
+      }
