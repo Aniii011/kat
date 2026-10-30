@@ -26,6 +26,9 @@ export default function WishlistView() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [giftDialogOpen, setGiftDialogOpen] = useState(false);
   const [gifterName, setGifterName] = useState("");
+  // True when the signed-in person owns this list. They buy from it for themselves,
+  // so there is no "who is it from" name to ask for.
+  const [isOwner, setIsOwner] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
 
@@ -33,6 +36,21 @@ export default function WishlistView() {
     if (!wishlistId) return;
     fetchWishlist();
   }, [wishlistId]);
+
+  useEffect(() => {
+    if (!wishlistId || !user?.id) { setIsOwner(false); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("wishlists")
+        .select("id")
+        .eq("id", wishlistId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!cancelled) setIsOwner(!!data);
+    })();
+    return () => { cancelled = true; };
+  }, [wishlistId, user?.id]);
 
   const fetchWishlist = async () => {
     setLoading(true);
@@ -69,6 +87,10 @@ export default function WishlistView() {
   const isAvailable = (item: any) => item.available !== false; // sold out / switched off => false
   const recipientHasValidPhone: boolean = wishlist?.has_valid_delivery_phone ?? looksLikePhone(wishlist?.delivery_phone);
 
+  // Who the gift is from: the owner's own first name when they buy for themselves.
+  const ownerFirstName = String(user?.name || "").trim().split(" ")[0] || "Me";
+  const giftFromName: string = isOwner ? ownerFirstName : gifterName.trim();
+
   const selectedItems = items.filter((i) => selectedIds.includes(i.id) && !i.is_purchased && isAvailable(i));
   const selectedTotal = selectedItems.reduce((s, i) => s + Number(i.price || 0), 0);
 
@@ -78,7 +100,7 @@ export default function WishlistView() {
   // Start a gift checkout for every selected item. Nothing is marked "purchased" here: that
   // happens on the server only after the payment is confirmed (see api/_lib/fulfill.js).
   const handleGiftSelected = () => {
-    const name = gifterName.trim();
+    const name = giftFromName;
     const chosen = items.filter((i) => selectedIds.includes(i.id) && !i.is_purchased && isAvailable(i));
     if (!name || !canGift || chosen.length === 0) return;
 
@@ -160,7 +182,7 @@ export default function WishlistView() {
         {giftDialogOpen && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center px-4 pb-4 sm:pb-0">
             <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-card border border-card-border rounded-3xl p-6 max-w-sm w-full shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
-              <h3 className="font-black text-base flex items-center gap-2"><Gift className="w-4 h-4 text-primary" /> Buy as a Gift</h3>
+              <h3 className="font-black text-base flex items-center gap-2"><Gift className="w-4 h-4 text-primary" /> {isOwner ? "Buy for yourself" : "Buy as a Gift"}</h3>
               <div className="space-y-2">
                 {selectedItems.map((item) => (
                   <div key={item.id} className="flex gap-3 items-center bg-muted rounded-xl p-3">
@@ -173,18 +195,24 @@ export default function WishlistView() {
                 ))}
                 <p className="text-sm font-bold flex justify-between px-1"><span>Items</span><span>{formatNaira(selectedTotal)}</span></p>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Your name (so they know who gifted it)</p>
-                <Input placeholder="Your name" value={gifterName} onChange={(e) => setGifterName(e.target.value)} className="rounded-xl h-11" autoFocus />
-              </div>
+              {!isOwner && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Your name (so they know who gifted it)</p>
+                  <Input placeholder="Your name" value={gifterName} onChange={(e) => setGifterName(e.target.value)} className="rounded-xl h-11" autoFocus />
+                </div>
+              )}
               {canGift ? (
                 <div className="bg-primary/5 border border-primary/20 rounded-xl p-3">
-                  <p className="text-xs font-semibold text-primary flex items-center gap-1"><Package className="w-3.5 h-3.5" /> Delivered to {recipientFirstName || "them"}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Their address stays private, only our delivery team sees it.</p>
+                  <p className="text-xs font-semibold text-primary flex items-center gap-1"><Package className="w-3.5 h-3.5" /> {isOwner ? "Delivered to your saved address" : `Delivered to ${recipientFirstName || "them"}`}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{isOwner ? "It will be marked as bought on your list, so friends can't buy it again." : "Their address stays private, only our delivery team sees it."}</p>
                   <p className="text-[11px] text-muted-foreground mt-1.5">
                     {deliveryCovered
-                      ? "Delivery for this list is already covered by an earlier gift, so you won't pay for it."
-                      : "At checkout you can choose to pay delivery so the gifts can be sent. It's optional."}
+                      ? (isOwner
+                        ? "Delivery for your list is already covered, so you won't pay for it."
+                        : "Delivery for this list is already covered by an earlier gift, so you won't pay for it.")
+                      : (isOwner
+                        ? "At checkout you can pay delivery now, or leave it waiting at KAT and tap Send my gifts later on My gifts."
+                        : "At checkout you can choose to pay delivery so the gifts can be sent. It's optional.")}
                   </p>
                 </div>
               ) : (
@@ -195,7 +223,7 @@ export default function WishlistView() {
               {!user && canGift && (
                 <p className="text-[11px] text-muted-foreground text-center">You'll be asked to sign in before you pay.</p>
               )}
-              <Button className="w-full rounded-full font-bold h-12 gap-2" onClick={handleGiftSelected} disabled={!gifterName.trim() || !canGift || purchasing || selectedItems.length === 0}>
+              <Button className="w-full rounded-full font-bold h-12 gap-2" onClick={handleGiftSelected} disabled={!giftFromName || !canGift || purchasing || selectedItems.length === 0}>
                 {purchasing ? "Processing..." : <><ShoppingBag className="w-4 h-4" /> Continue to pay — {formatNaira(selectedTotal)}</>}
               </Button>
               <Button variant="ghost" size="sm" className="w-full rounded-full" onClick={() => setGiftDialogOpen(false)}>Cancel</Button>
@@ -303,4 +331,4 @@ export default function WishlistView() {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
-              }
+                  }
