@@ -28,6 +28,7 @@ import Orders from "@/pages/orders";
 import WishlistPage from "@/pages/wishlist";
 import WishlistAdd from "@/pages/wishlist-add";
 import WishlistView from "@/pages/wishlist-view";
+import MyGifts from "@/pages/my-gifts";
 import ShopByStore from "@/pages/shop-by-store";
 import Inbox from "@/pages/inbox";
 import Reviews from "@/pages/reviews";
@@ -59,6 +60,7 @@ function Router() {
       <Route path="/wishlists" component={WishlistPage} />
       <Route path="/wishlists/:id/add" component={WishlistAdd} />
       <Route path="/wishlist/:id" component={WishlistView} />
+      <Route path="/my-gifts" component={MyGifts} />
       <Route path="/inbox" component={Inbox} />
       <Route path="/reviews" component={Reviews} />
       <Route path="/following" component={Following} />
