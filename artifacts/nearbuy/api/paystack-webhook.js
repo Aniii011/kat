@@ -3,6 +3,7 @@ import { supabaseAdmin } from "./_lib/supabase-admin.js";
 import { priceOrder } from "./_lib/pricing.js";
 import { fulfillOrder } from "./_lib/fulfill.js";
 import { loadGiftContext, resolveGift } from "./_lib/gift.js";
+import { buyerSigMatches } from "./_lib/buyer-sig.js";
 
 // Paystack signs the EXACT bytes it sends, so we need the raw body to check the
 // signature. Re-serialising parsed JSON can produce different bytes and fail.
@@ -58,6 +59,12 @@ export default async function handler(req, res) {
   if (typeof reference !== "string" || !intent || typeof intent.buyerId !== "string") {
     console.error("PAYSTACK WEBHOOK: charge.success without usable order details", { reference });
     return res.status(200).json({ received: true, note: "Cannot reconcile." });
+  }
+
+  // The buyer in the metadata came from the browser, so only trust it if the server signed it.
+  if (!buyerSigMatches(reference, intent.buyerId, metadata?.buyerSig)) {
+    console.error("PAYSTACK WEBHOOK: buyer signature missing or invalid. Needs manual review.", { reference });
+    return res.status(200).json({ received: true, note: "Needs manual review." });
   }
 
   try {
