@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
 import { SUPPORT_EMAIL } from "@/lib/support";
+import { ANALYTICS_ENABLED, openCookieSettings } from "@/lib/analytics";
 
 export { SUPPORT_EMAIL };
 
@@ -73,6 +74,11 @@ export default function LegalPage({ title, updated, intro, sections }: LegalPage
           <Link href="/contact" className="hover:text-foreground underline underline-offset-2">Contact</Link>
           <Link href="/privacy" className="hover:text-foreground underline underline-offset-2">Privacy Policy</Link>
           <Link href="/terms" className="hover:text-foreground underline underline-offset-2">Terms of Service</Link>
+          {ANALYTICS_ENABLED && (
+            <button type="button" onClick={openCookieSettings} className="hover:text-foreground underline underline-offset-2">
+              Cookie settings
+            </button>
+          )}
           <a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-foreground underline underline-offset-2">
             {SUPPORT_EMAIL}
           </a>
@@ -80,4 +86,4 @@ export default function LegalPage({ title, updated, intro, sections }: LegalPage
       </article>
     </div>
   );
-    }
+}
