@@ -5,6 +5,7 @@ import { CheckCircle2, ShoppingBag, MapPin, Home, Mail, Copy, Check, AlertCircle
 import { Button } from "@/components/ui/button";
 import { supportMailto } from "@/lib/support";
 import { STATUS_SEQUENCE, STATUS_META } from "@/lib/order-status";
+import { trackEvent } from "@/lib/analytics";
 
 function formatNaira(n: number) { return "₦" + n.toLocaleString("en-NG"); }
 
@@ -17,7 +18,20 @@ export default function OrderConfirmation() {
   useEffect(() => {
     const stored = sessionStorage.getItem("kat_order_confirmed");
     if (stored) {
-      try { setOrder(JSON.parse(stored)); }
+      try {
+        const parsed = JSON.parse(stored);
+        setOrder(parsed);
+        // GA purchase event, once per order (not again on refresh)
+        const key = `kat_ga_purchase_${parsed.paymentRef}`;
+        if (parsed.paymentRef && !sessionStorage.getItem(key)) {
+          sessionStorage.setItem(key, "1");
+          trackEvent("purchase", {
+            transaction_id: parsed.paymentRef,
+            value: parsed.total,
+            currency: "NGN",
+          });
+        }
+      }
       catch { setNotFound(true); }
     } else {
       setNotFound(true);
