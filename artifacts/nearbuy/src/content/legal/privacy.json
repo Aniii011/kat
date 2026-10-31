@@ -1,6 +1,6 @@
 {
   "title": "Privacy Policy",
-  "updated": "October 30, 2026",
+  "updated": "October 31, 2026",
   "intro": "Your privacy matters to us. This policy is written in plain language so you can see exactly what happens to your information when you use KAT.",
   "sections": [
     {
@@ -23,7 +23,7 @@
         "Content you create: reviews, saved items, wishlists and boards, and the stores you follow.",
         "Photos you upload for image search: when you search with a picture, the image is processed so we can find similar products.",
         "Basic device data: KAT stores your sign-in session and your theme choice in your browser's local storage so you stay signed in and your settings are remembered.",
-        "Usage data: we use Google Analytics to see which pages are visited and how people move through KAT. It uses cookies and collects things like pages viewed, device and browser type, and approximate location. It is used in aggregate to improve KAT.",
+        "Usage data: we use Google Analytics to see which pages are visited and how people move through KAT. It uses cookies and collects things like pages viewed, device and browser type, and approximate location. It is used in aggregate to improve KAT. We only turn it on if you click Accept in the cookie banner, and you can change your choice at any time with the Cookie settings link at the bottom of this page.",
         "Security checks: when you sign in, sign up or reset a password, Cloudflare Turnstile checks that you are a real person and not a bot. It may read basic browser signals to do this."
       ]
     },
