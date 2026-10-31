@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Eye, EyeOff, Loader2, Sparkles, CheckCircle2, XCircle, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
+import Turnstile, { TURNSTILE_SITE_KEY, type TurnstileHandle } from "@/components/turnstile";
 
 interface AuthModalProps {
   open: boolean;
@@ -61,6 +62,10 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
   const [error, setError] = useState<string | null>(null);
   const [forgotSent, setForgotSent] = useState(false);
   const [signupSuccess, setSignupSuccess] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<TurnstileHandle>(null);
+  // When a site key is configured, the form can't be submitted until the captcha passes.
+  const captchaBlocked = Boolean(TURNSTILE_SITE_KEY) && !captchaToken;
 
   const strength = getPasswordStrength(password);
   const isPasswordValid = strength.score === 4;
@@ -86,6 +91,7 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
     setForgotSent(false);
     setSignupSuccess(false);
     setGoogleLoading(false);
+    setCaptchaToken(null);
   };
 
   const switchMode = (m: "login" | "signup" | "forgot") => {
@@ -104,6 +110,10 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
     e.preventDefault();
     if (loading) return;
     setError(null);
+    if (captchaBlocked) {
+      setError("Please complete the captcha check first.");
+      return;
+    }
     if (mode === "signup" && !name.trim()) {
       setError("Please enter your name.");
       return;
@@ -115,11 +125,12 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
     setLoading(true);
     try {
       const result = mode === "login"
-        ? await signIn(email, password)
-        : await signUp(email, password, name);
+        ? await signIn(email, password, captchaToken)
+        : await signUp(email, password, name, captchaToken);
       if (result.error) {
         setError(result.error);
         setLoading(false);
+        captchaRef.current?.reset();
         return;
       }
       setLoading(false);
@@ -129,6 +140,7 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
     } catch {
       setError("Something went wrong. Please try again.");
       setLoading(false);
+      captchaRef.current?.reset();
     }
   };
 
@@ -138,21 +150,28 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
       setError("Please enter your email address.");
       return;
     }
+    if (captchaBlocked) {
+      setError("Please complete the captcha check first.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
+        ...(captchaToken ? { captchaToken } : {}),
       });
       setLoading(false);
       if (error) {
         setError(error.message);
+        captchaRef.current?.reset();
       } else {
         setForgotSent(true);
       }
     } catch {
       setError("Something went wrong. Please try again.");
       setLoading(false);
+      captchaRef.current?.reset();
     }
   };
 
@@ -197,6 +216,7 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
         autoComplete="email"
         required
       />
+      <Turnstile ref={captchaRef} onToken={setCaptchaToken} />
       {error && (
         <p className="text-xs text-destructive bg-destructive/10 rounded-xl px-3 py-2">
           {error}
@@ -205,7 +225,7 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
       <Button
         type="submit"
         className="w-full rounded-full h-11 font-bold"
-        disabled={loading}
+        disabled={loading || captchaBlocked}
       >
         {loading
           ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -335,6 +355,7 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
           <PasswordRequirements password={password} />
         </motion.div>
       )}
+      <Turnstile ref={captchaRef} onToken={setCaptchaToken} />
       {error && (
         <motion.p
           initial={{ opacity: 0, y: -4 }}
@@ -347,7 +368,7 @@ export default function AuthModal({ open, onClose, defaultMode = "login" }: Auth
       <Button
         type="submit"
         className="w-full rounded-full h-11 font-bold text-sm"
-        disabled={loading || (mode === "signup" && password.length > 0 && !isPasswordValid)}
+        disabled={loading || captchaBlocked || (mode === "signup" && password.length > 0 && !isPasswordValid)}
       >
         {loading
           ? <Loader2 className="w-4 h-4 animate-spin" />
