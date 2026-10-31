@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -37,6 +38,7 @@ import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
 import About from "@/pages/about";
 import Contact from "@/pages/contact";
+import { initAnalytics, trackPageView } from "@/lib/analytics";
 
 const queryClient = new QueryClient();
 
@@ -83,12 +85,23 @@ function Router() {
 // buyer-facing bottom nav — it's confusing clutter on dashboard-style pages.
 const HIDE_BOTTOM_NAV_PREFIXES = ["/seller", "/admin", "/checkout"];
 
+// Reports a GA page view on every client-side route change.
+function AnalyticsTracker() {
+  const [location] = useLocation();
+  useEffect(() => {
+    initAnalytics();
+    trackPageView(location);
+  }, [location]);
+  return null;
+}
+
 function AppShell() {
   const [location] = useLocation();
   const hideBottomNav = HIDE_BOTTOM_NAV_PREFIXES.some((prefix) => location.startsWith(prefix));
 
   return (
     <>
+      <AnalyticsTracker />
       {!hideBottomNav && <BottomNav />}
       <main className="min-h-screen">
         <Router />
