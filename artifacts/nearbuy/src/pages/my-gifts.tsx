@@ -45,7 +45,7 @@ export default function MyGifts() {
         const { data: sessionData } = await supabase.auth.getSession();
         const token = sessionData.session?.access_token;
         if (!token) throw new Error("no session");
-        const res = await fetch("/api/my-gifts", { headers: { Authorization: `Bearer ${token}` } });
+        const res = await fetch("/api/gifts?action=list", { headers: { Authorization: `Bearer ${token}` } });
         const json = await res.json().catch(() => null);
         if (!res.ok || !json?.ok) throw new Error(json?.error || "failed");
         if (!cancelled) setGifts(json.gifts || []);
@@ -71,7 +71,7 @@ export default function MyGifts() {
       const token = sessionData.session?.access_token;
       if (!token) throw new Error("Please sign in again.");
 
-      const quoteRes = await fetch("/api/send-gifts", {
+      const quoteRes = await fetch("/api/gifts?action=send", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ wishlistId }),
@@ -95,7 +95,7 @@ export default function MyGifts() {
         onSuccess: async (response: any) => {
           try {
             const { data: fresh } = await supabase.auth.getSession();
-            const verify = await fetch("/api/verify-send-gifts", {
+            const verify = await fetch("/api/gifts?action=verify", {
               method: "POST",
               headers: { "Content-Type": "application/json", Authorization: `Bearer ${fresh.session?.access_token || token}` },
               body: JSON.stringify({ reference: response.reference }),
@@ -229,4 +229,4 @@ export default function MyGifts() {
       </div>
     </div>
   );
-    }
+        }
