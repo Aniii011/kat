@@ -19,11 +19,16 @@ interface KatUser {
 interface AuthContextType {
   user: KatUser | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signIn: (
+    email: string,
+    password: string,
+    captchaToken?: string | null
+  ) => Promise<{ error: string | null }>;
   signUp: (
     email: string,
     password: string,
-    name: string
+    name: string,
+    captchaToken?: string | null
   ) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -117,11 +122,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (
+    email: string,
+    password: string,
+    captchaToken?: string | null
+  ) => {
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
+        options: captchaToken ? { captchaToken } : undefined,
       });
 
       if (error) return { error: error.message };
@@ -134,7 +144,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (
     email: string,
     password: string,
-    name: string
+    name: string,
+    captchaToken?: string | null
   ) => {
     try {
       const { error } = await supabase.auth.signUp({
@@ -142,6 +153,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         password,
         options: {
           data: { name, full_name: name },
+          ...(captchaToken ? { captchaToken } : {}),
         },
       });
 
