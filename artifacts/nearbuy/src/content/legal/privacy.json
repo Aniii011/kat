@@ -1,6 +1,6 @@
 {
   "title": "Privacy Policy",
-  "updated": "October 8, 2026",
+  "updated": "October 30, 2026",
   "intro": "Your privacy matters to us. This policy is written in plain language so you can see exactly what happens to your information when you use KAT.",
   "sections": [
     {
@@ -22,7 +22,9 @@
         "Seller details: if you apply to sell, your store name, store description and category, and the product listings and photos you upload.",
         "Content you create: reviews, saved items, wishlists and boards, and the stores you follow.",
         "Photos you upload for image search: when you search with a picture, the image is processed so we can find similar products.",
-        "Basic device data: KAT stores your sign-in session and your theme choice in your browser's local storage so you stay signed in and your settings are remembered."
+        "Basic device data: KAT stores your sign-in session and your theme choice in your browser's local storage so you stay signed in and your settings are remembered.",
+        "Usage data: we use Google Analytics to see which pages are visited and how people move through KAT. It uses cookies and collects things like pages viewed, device and browser type, and approximate location. It is used in aggregate to improve KAT.",
+        "Security checks: when you sign in, sign up or reset a password, Cloudflare Turnstile checks that you are a real person and not a bot. It may read basic browser signals to do this."
       ]
     },
     {
@@ -52,6 +54,8 @@
         "Paystack: processes your payment.",
         "Supabase: provides our database, sign-in and file storage, where your account, order and listing data is held.",
         "Vercel: hosts the KAT website and our server functions.",
+        "Google Analytics: provides website usage statistics (see Usage data above).",
+        "Cloudflare: provides the Turnstile bot check on sign-in and sign-up forms.",
         "Google (Gemini) and Jina AI: when you use image search, the image you upload is sent to these services to generate descriptive tags and to match similar products. When a seller uses the listing helper, the product details they type are sent to generate a description.",
         "Delivery partners: where needed, the people who deliver your order receive your name, phone number and address.",
         "Authorities and advisers: where the law requires it, or to protect the rights, safety and property of KAT, our users or others."
