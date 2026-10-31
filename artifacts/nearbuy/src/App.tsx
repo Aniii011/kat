@@ -20,6 +20,7 @@ import AdminOrderDetail from "@/pages/admin-order-detail";
 import ResetPassword from "@/pages/reset-password";
 import BottomNav from "@/components/bottom-nav";
 import AiAssistant from "@/components/ai-assistant";
+import CookieBanner from "@/components/cookie-banner";
 import AuthCallback from "@/pages/AuthCallback";
 import SellerOrders from "@/pages/seller-orders";
 import Store from "@/pages/store";
@@ -107,6 +108,7 @@ function AppShell() {
         <Router />
       </main>
       <AiAssistant />
+      <CookieBanner />
       <Toaster />
     </>
   );
