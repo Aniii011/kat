@@ -1,3 +1,4 @@
+import { parseDbDate } from "@/lib/dates";
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -121,7 +122,7 @@ export default function SellerOrders() {
           groupKey,
           productId: o.product_id,
           title: product?.title || o.product_title || "Product",
-          imageUrl: product?.image_url || o.product_image || null,
+          imageUrl: o.product_image || product?.image_url || null,
           variantLabel: variantLabel ? `Variant: ${variantLabel}` : null,
           totalQty: o.quantity || 1,
           orders: [{ id: o.id, buyer_name: o.buyer_name, quantity: o.quantity || 1, created_at: o.created_at }],
@@ -287,8 +288,8 @@ export default function SellerOrders() {
                     className="bg-card border border-card-border rounded-2xl p-4 space-y-3"
                   >
                     <div className="flex items-center gap-3">
-                      {product?.image_url ? (
-                        <img src={product.image_url} alt={product.title} className="w-14 h-14 rounded-xl object-cover shrink-0" />
+                      {(order.product_image || product?.image_url) ? (
+                        <img src={order.product_image || product?.image_url} alt={product?.title || order.product_title || ""} className="w-14 h-14 rounded-xl object-cover shrink-0" />
                       ) : (
                         <div className="w-14 h-14 rounded-xl bg-muted flex items-center justify-center shrink-0">
                           <Package className="w-5 h-5 text-muted-foreground" />
@@ -340,7 +341,7 @@ export default function SellerOrders() {
                     </div>
 
                     <p className="text-[10px] text-muted-foreground">
-                      Order placed {new Date(order.created_at).toLocaleDateString()}
+                      Order placed {parseDbDate(order.created_at).toLocaleDateString()}
                     </p>
                   </motion.div>
                 );
@@ -351,4 +352,4 @@ export default function SellerOrders() {
       </main>
     </div>
   );
-}
+          }
