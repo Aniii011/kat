@@ -1,3 +1,4 @@
+import { parseDbDate } from "@/lib/dates";
 import { normalizeStatus, isTerminal, type OrderStatus } from "./order-status";
 
 // Checkout inserts one `orders` row per line item, all sharing one
@@ -52,7 +53,9 @@ export function resolveProduct(
 ): ResolvedProduct {
   const live = line.product_id ? productsById[line.product_id] : undefined;
   if (live) {
-    return { title: live.title, imageUrl: live.image_url || null, sellerName: live.sellerName || null };
+    // The photo saved with the order is the colour that was actually bought. The product's
+    // main photo is only a fallback (older orders that have no saved photo).
+    return { title: live.title, imageUrl: line.product_image || live.image_url || null, sellerName: live.sellerName || null };
   }
   if (line.product_title || line.product_image || line.product_seller_name) {
     return {
@@ -147,7 +150,7 @@ export function groupOrdersByPurchase(lines: OrderLine[]): PurchaseGroup[] {
     const cancelledAt = cancelledLines.length
       ? cancelledLines.reduce((latest, l) => {
           const t = l.updated_at || null;
-          return t && (!latest || new Date(t) > new Date(latest)) ? t : latest;
+          return t && (!latest || parseDbDate(t) > parseDbDate(latest)) ? t : latest;
         }, null as string | null)
       : null;
     const cancelReason = cancelledLines.find((l) => l.admin_note)?.admin_note || null;
@@ -170,7 +173,7 @@ export function groupOrdersByPurchase(lines: OrderLine[]): PurchaseGroup[] {
     });
   }
 
-  return groups.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return groups.sort((a, b) => parseDbDate(b.createdAt).getTime() - parseDbDate(a.createdAt).getTime());
 }
 
 export function isGroupActive(group: PurchaseGroup) {
