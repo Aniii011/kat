@@ -36,10 +36,31 @@ export async function fulfillOrder(sb, { reference, intent, priced, buyerId, eve
     return { state: "processing" };
   }
 
+  // The photo of the COLOUR that was bought (products.color_images), so a grey top is never
+  // shown to the seller or admin with a purple photo. Best effort: if it can't be read, the
+  // order simply falls back to the product's main photo exactly as before.
+  const colorPhotos = new Map();
+  try {
+    const ids = [...new Set(priced.lines.map((l) => l.item.listingId))];
+    const { data: photoRows } = await sb.from("products").select("id, color_images").in("id", ids);
+    for (const p of photoRows || []) colorPhotos.set(String(p.id), p.color_images);
+  } catch {
+    /* ignore: fall back to the main photo */
+  }
+  const boughtColorPhoto = (item) => {
+    const wanted = String(item.selectedColor || "").trim().toLowerCase();
+    const map = colorPhotos.get(String(item.listingId));
+    if (!wanted || !map || typeof map !== "object") return null;
+    const key = Object.keys(map).find((k) => k.trim().toLowerCase() === wanted);
+    const val = key ? map[key] : null;
+    const first = Array.isArray(val) ? val[0] : val;
+    return typeof first === "string" && first ? first : null;
+  };
+
   const rows = priced.lines.map(({ item, product, unitPrice, quantity }) => ({
     product_id: item.listingId,
     product_title: product.title || item.title || "Product",
-    product_image: product.image_url || item.imageUrl || null,
+    product_image: boughtColorPhoto(item) || product.image_url || item.imageUrl || null,
     product_seller_name: product.seller_name || item.sellerName || null,
 
     buyer_id: buyerId,
@@ -175,4 +196,4 @@ export async function fulfillOrder(sb, { reference, intent, priced, buyerId, eve
   }
 
   return { state: "created", orderIds: created.map((o) => o.id) };
-}
+    }
