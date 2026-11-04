@@ -1,3 +1,4 @@
+import { parseDbDate } from "@/lib/dates";
 import React, { useEffect, useMemo, useState } from "react";
 import SellerCategoryIcon from "@/components/seller/category-icons";
 import { Link } from "wouter";
@@ -65,7 +66,7 @@ function friendlyError(error: any, fallback = "Something went wrong. Please try 
 
 // ── Order aging / date helpers (pure functions over existing order_events / created_at — no new backend) ──
 function ageLabel(dateStr: string): string {
-  const ms = Date.now() - new Date(dateStr).getTime();
+  const ms = Date.now() - parseDbDate(dateStr).getTime();
   const hrs = ms / (1000 * 60 * 60);
   if (hrs < 1) return "just now";
   if (hrs < 24) return `${Math.floor(hrs)}h`;
@@ -74,7 +75,7 @@ function ageLabel(dateStr: string): string {
 
 function isSameDayOrAfter(dateStr: string, daysAgo: number): boolean {
   const cutoff = Date.now() - daysAgo * 24 * 60 * 60 * 1000;
-  return new Date(dateStr).getTime() >= cutoff;
+  return parseDbDate(dateStr).getTime() >= cutoff;
 }
 
 type SellerSection = "home" | "products" | "orders" | "analytics" | "promotions" | "earnings" | "store";
@@ -136,8 +137,22 @@ export default function Seller() {
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [showAddStore, setShowAddStore] = useState(false);
   const [newStoreName, setNewStoreName] = useState("");
-  const [storePendingCounts, setStorePendingCounts] = useState<Record<string, number>>({});
+  // Orders that are new to a store (not started yet), and which of them this seller has already
+  // looked at. "Unread" = new and not yet seen. Seen ids are remembered on this device.
+  const [newOrderRows, setNewOrderRows] = useState<{ id: string; store_id: string | null }[]>([]);
+  const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
   const [addStoreError, setAddStoreError] = useState<string | null>(null);
+
+  const unreadRows = useMemo(() => newOrderRows.filter((r) => !seenIds.has(r.id)), [newOrderRows, seenIds]);
+  const storeUnreadCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    unreadRows.forEach((r) => { if (r.store_id) counts[r.store_id] = (counts[r.store_id] || 0) + 1; });
+    return counts;
+  }, [unreadRows]);
+  // Unread in the store being managed, and unread in the OTHER stores (so you can tell from
+  // inside one store that a different store has an order waiting).
+  const unreadActiveCount = isMultiStore ? (selectedStoreId ? storeUnreadCounts[selectedStoreId] || 0 : 0) : unreadRows.length;
+  const unreadOtherStores = isMultiStore && selectedStoreId ? unreadRows.filter((r) => r.store_id !== selectedStoreId).length : 0;
 
   const [profileSellerCategory, setProfileSellerCategory] = useState<SellerCategoryId | null | undefined>(undefined);
   const [savingSellerCategory, setSavingSellerCategory] = useState(false);
@@ -203,6 +218,21 @@ export default function Seller() {
   // shapes, same state machine. Only the presentational sections after the
   // "MAIN DASHBOARD" comment are new.
 
+  // Every order of this seller that is new (not started yet), across ALL their stores.
+  const refreshNewOrders = async () => {
+    if (!user?.id) return;
+    const { data, error } = await supabase
+      .from("orders")
+      .select("id, store_id")
+      .eq("seller_id", user.id)
+      .in("admin_status", ["pending", "accepted"]);
+    if (error) {
+      console.error("NEW ORDER COUNT FAILED:", error.message);
+      return;
+    }
+    setNewOrderRows((data || []) as { id: string; store_id: string | null }[]);
+  };
+
   const fetchAll = async () => {
     if (!user) return;
     setLoading(true);
@@ -232,14 +262,6 @@ export default function Seller() {
           }
         }
 
-        const { data: pendingOrdersData, error: pendingErr } = await supabase
-          .from("orders").select("store_id").eq("seller_id", user.id).eq("admin_status", "pending");
-        if (pendingErr) throw new Error("pending orders: " + pendingErr.message);
-        const counts: Record<string, number> = {};
-        (pendingOrdersData || []).forEach((o: any) => {
-          if (o.store_id) counts[o.store_id] = (counts[o.store_id] || 0) + 1;
-        });
-        setStorePendingCounts(counts);
       } else {
         // Single-store sellers still have a row in `stores` — fetch it so new
         // products can be tagged with a real store_id instead of null.
@@ -248,6 +270,8 @@ export default function Seller() {
         if (myStoreErr) throw new Error("store: " + myStoreErr.message);
         setMyStoreId(myStoreData?.id ?? null);
       }
+
+      await refreshNewOrders();
 
       const activeStoreId = multiStore ? selectedStoreId : null;
       if (multiStore && !activeStoreId) {
@@ -282,14 +306,26 @@ export default function Seller() {
 
     const channel = supabase.channel("seller-orders-rt")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders", filter: `seller_id=eq.${user?.id}` }, (payload) => {
+        const created = payload.new as any;
+        if (["pending", "accepted"].includes(created.admin_status || "pending")) {
+          setNewOrderRows((prev) => (prev.some((r) => r.id === created.id) ? prev : [...prev, { id: created.id, store_id: created.store_id ?? null }]));
+        }
         setOrders((prev) => [payload.new as any, ...prev]);
         setNewOrderAlert(true);
         setTimeout(() => setNewOrderAlert(false), 5000);
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders", filter: `seller_id=eq.${user?.id}` }, (payload) => {
+        const changed = payload.new as any;
+        // Once an order is started (or cancelled) it is no longer "new" for the badge.
+        if (!["pending", "accepted"].includes(changed.admin_status || "pending")) {
+          setNewOrderRows((prev) => prev.filter((r) => r.id !== changed.id));
+        }
         setOrders((prev) => prev.map((o) => o.id === (payload.new as any).id ? payload.new as any : o));
       })
       .subscribe();
+
+    // Safety net: re-check every minute in case a live update was missed.
+    const poll = setInterval(() => { refreshNewOrders(); }, 60000);
 
     const urlParams = new URLSearchParams(window.location.search);
     const forcedStoreId = urlParams.get("store");
@@ -298,8 +334,38 @@ export default function Seller() {
       setSelectedStoreId(forcedStoreId);
     }
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { supabase.removeChannel(channel); clearInterval(poll); };
   }, [user]);
+
+  // Remember which orders this seller has already looked at (on this device).
+  useEffect(() => {
+    if (!user?.id) return;
+    try {
+      const raw = localStorage.getItem(`kat_seen_orders_${user.id}`);
+      setSeenIds(new Set(raw ? (JSON.parse(raw) as string[]) : []));
+    } catch {
+      setSeenIds(new Set());
+    }
+  }, [user?.id]);
+
+  // Opening the Orders section counts as reading the new orders that are showing there.
+  useEffect(() => {
+    if (section !== "orders" || !user?.id || orders.length === 0) return;
+    const toMark = orders
+      .filter((o) => ["pending", "accepted"].includes(o.admin_status || "pending") && !seenIds.has(o.id))
+      .map((o) => o.id);
+    if (toMark.length === 0) return;
+    setSeenIds((prev) => {
+      const next = new Set(prev);
+      toMark.forEach((id) => next.add(id));
+      try {
+        localStorage.setItem(`kat_seen_orders_${user.id}`, JSON.stringify([...next].slice(-500)));
+      } catch {
+        /* private mode: badge just comes back next visit */
+      }
+      return next;
+    });
+  }, [section, orders, user?.id]);
 
   useEffect(() => {
     if (isMultiStore && selectedStoreId) fetchAll();
@@ -365,7 +431,7 @@ export default function Seller() {
         </div>
         <div className="max-w-sm w-full space-y-3">
           {stores.map((s) => {
-            const pendingCount = storePendingCounts[s.id] || 0;
+            const pendingCount = storeUnreadCounts[s.id] || 0;
             return (
               <button
                 key={s.id}
@@ -373,7 +439,7 @@ export default function Seller() {
                 className="relative w-full flex items-center gap-3 p-4 rounded-2xl border-2 border-border bg-card hover:border-primary transition-all text-left"
               >
                 {pendingCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-foreground text-background text-[10px] font-bold flex items-center justify-center shadow">
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow">
                     {pendingCount > 99 ? "99+" : pendingCount}
                   </span>
                 )}
@@ -462,7 +528,7 @@ export default function Seller() {
     if (!salesByProduct[key]) salesByProduct[key] = { title: p.title, unitsSold: 0, revenue: 0, lastSoldAt: o.created_at };
     salesByProduct[key].unitsSold += o.quantity || 1;
     salesByProduct[key].revenue += o.total || o.amount || 0;
-    if (new Date(o.created_at) > new Date(salesByProduct[key].lastSoldAt)) salesByProduct[key].lastSoldAt = o.created_at;
+    if (parseDbDate(o.created_at) > parseDbDate(salesByProduct[key].lastSoldAt)) salesByProduct[key].lastSoldAt = o.created_at;
   });
   const bestSellers = Object.values(salesByProduct).sort((a, b) => b.unitsSold - a.unitsSold).slice(0, 3);
   const dormantProducts = products.filter((p) => {
@@ -1077,7 +1143,12 @@ export default function Seller() {
                 <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Managing</p>
                 <p className="text-xs font-bold truncate">{stores.find((s) => s.id === selectedStoreId)?.name || "Store"}</p>
               </div>
-              <span className="text-[10px] font-semibold text-primary shrink-0 ml-2">Switch</span>
+              <span className="text-[10px] font-semibold text-primary shrink-0 ml-2 flex items-center gap-1.5">
+                {unreadOtherStores > 0 && (
+                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">{unreadOtherStores > 99 ? "99+" : unreadOtherStores}</span>
+                )}
+                Switch
+              </span>
             </button>
           </div>
         )}
@@ -1087,8 +1158,8 @@ export default function Seller() {
             <button key={item.key} onClick={() => setSection(item.key)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${section === item.key ? "bg-muted text-foreground font-bold" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
               {item.icon} {item.label}
-              {item.key === "orders" && pendingOrders.length > 0 && (
-                <span className="ml-auto bg-foreground text-background text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{pendingOrders.length}</span>
+              {item.key === "orders" && unreadActiveCount > 0 && (
+                <span className="ml-auto min-w-[20px] h-5 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{unreadActiveCount > 99 ? "99+" : unreadActiveCount}</span>
               )}
             </button>
           ))}
@@ -1116,8 +1187,11 @@ export default function Seller() {
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b border-border">
         <div className="flex items-center justify-between px-4 h-14">
           <div className="flex items-center gap-2">
-            <button onClick={() => setMobileMenuOpen(true)} className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
+            <button onClick={() => setMobileMenuOpen(true)} className="relative w-9 h-9 rounded-full bg-muted flex items-center justify-center">
               <Menu className="w-4 h-4" />
+              {unreadRows.length > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">{unreadRows.length > 99 ? "99+" : unreadRows.length}</span>
+              )}
             </button>
             <span className="text-lg font-black text-primary">KAT</span>
           </div>
@@ -1174,7 +1248,12 @@ export default function Seller() {
                     <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Managing</p>
                     <p className="text-xs font-bold truncate">{stores.find((s) => s.id === selectedStoreId)?.name || "Store"}</p>
                   </div>
-                  <span className="text-[10px] font-semibold text-primary shrink-0 ml-2">Switch</span>
+                  <span className="text-[10px] font-semibold text-primary shrink-0 ml-2 flex items-center gap-1.5">
+                {unreadOtherStores > 0 && (
+                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">{unreadOtherStores > 99 ? "99+" : unreadOtherStores}</span>
+                )}
+                Switch
+              </span>
                 </button>
               </div>
             )}
@@ -1187,8 +1266,8 @@ export default function Seller() {
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${section === item.key ? "bg-muted text-foreground font-bold" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
                 >
                   {item.icon} {item.label}
-                  {item.key === "orders" && pendingOrders.length > 0 && (
-                    <span className="ml-auto bg-foreground text-background text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{pendingOrders.length}</span>
+                  {item.key === "orders" && unreadActiveCount > 0 && (
+                    <span className="ml-auto min-w-[20px] h-5 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{unreadActiveCount > 99 ? "99+" : unreadActiveCount}</span>
                   )}
                 </button>
               ))}
@@ -1722,7 +1801,7 @@ function SellerOrdersSection({ orders, products, cancellationRate, onUpdateStatu
           groupKey,
           productId: o.product_id,
           title: product?.title || o.product_title || "Product",
-          imageUrl: product?.image_url || o.product_image || null,
+          imageUrl: o.product_image || product?.image_url || null,
           variantLabel: variantLabel ? `Variant: ${variantLabel}` : null,
           totalQty: o.quantity || 1,
           orders: [{ id: o.id, buyer_name: o.buyer_name, quantity: o.quantity || 1, created_at: o.created_at }],
@@ -1853,7 +1932,7 @@ function SellerAnalyticsSection({ orders, products, salesByProduct, cancellation
   const unitsSold = inRange.reduce((s: number, o: any) => s + (o.quantity || 1), 0);
   const aov = inRange.length > 0 ? revenueInRange / inRange.length : 0;
 
-  const hasEnoughData = orders.length > 0 && (Date.now() - new Date(orders[orders.length - 1]?.created_at || Date.now()).getTime()) > 6 * 24 * 60 * 60 * 1000;
+  const hasEnoughData = orders.length > 0 && (Date.now() - parseDbDate(orders[orders.length - 1]?.created_at || Date.now()).getTime()) > 6 * 24 * 60 * 60 * 1000;
 
   const salesByCategory: Record<string, number> = {};
   inRange.forEach((o: any) => {
@@ -1987,7 +2066,7 @@ function RevenueTrendChart({ orders, rangeDays }: { orders: any[]; rangeDays: nu
     const end = start + bucketMs;
     const total = orders
       .filter((o: any) => {
-        const t = new Date(o.created_at).getTime();
+        const t = parseDbDate(o.created_at).getTime();
         return t >= start && t < end;
       })
       .reduce((s: number, o: any) => s + (o.total || o.amount || 0), 0);
@@ -2086,7 +2165,7 @@ function SellerEarningsSection({ orders }: any) {
               const cancelled = o.admin_status === "cancelled";
               return (
                 <div key={o.id} className="flex items-center justify-between py-2 text-sm">
-                  <span>#{o.id.slice(0, 8)} · {new Date(o.created_at).toLocaleDateString()}</span>
+                  <span>#{o.id.slice(0, 8)} · {parseDbDate(o.created_at).toLocaleDateString()}</span>
                   <span className={cancelled ? "text-xs text-muted-foreground" : "font-medium"}>{cancelled ? "cancelled" : `${formatNaira(net)} net`}</span>
                 </div>
               );
@@ -2255,4 +2334,4 @@ function EmptyState({ icon, title, action }: any) {
       {action}
     </div>
   );
-}
+    }
