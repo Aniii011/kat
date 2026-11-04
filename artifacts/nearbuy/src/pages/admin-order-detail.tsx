@@ -1,3 +1,4 @@
+import { parseDbDate } from "@/lib/dates";
 import { useEffect, useState } from "react";
 import { Link, useRoute, useLocation } from "wouter";
 import { ArrowLeft, Package, Printer, Copy, Check, X, Gift, Lock, Mail, AlertTriangle, Clock } from "lucide-react";
@@ -382,7 +383,7 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
             const prod = productsById[l.product_id];
             const sel = sellersById[l.seller_id];
             const title = prod?.title || l.product_title || "Product unavailable";
-            const img = prod?.image_url || l.product_image;
+            const img = l.product_image || prod?.image_url;
             const sellerName = sel?.store_name || sel?.full_name || l.product_seller_name;
             const c = l.variant?.color;
             const sz = l.variant?.size;
@@ -632,7 +633,7 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
                     <span className="font-semibold">{({ placed: "Order confirmed", out_for_delivery: "On its way", delivered: "Delivered", cancelled: "Cancelled" } as Record<string, string>)[e.kind] || e.kind}</span>
                     <span className="text-muted-foreground">
                       {" · "}{e.status === "sent" ? "sent" : e.status === "failed" ? "failed" : "sending"}
-                      {(e.sent_at || e.created_at) ? ` · ${new Date(e.sent_at || e.created_at).toLocaleString("en-NG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}` : ""}
+                      {(e.sent_at || e.created_at) ? ` · ${parseDbDate(e.sent_at || e.created_at).toLocaleString("en-NG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}` : ""}
                     </span>
                   </span>
                   {e.status === "failed" && (
@@ -653,7 +654,7 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
                 <li key={i} className="text-xs rounded-xl bg-muted px-3 py-2">
                   <span className="font-semibold">{ALL_STATUSES.find((s) => s.key === e.status)?.label || e.status}</span>
                   <span className="text-muted-foreground">
-                    {" · "}{new Date(e.created_at).toLocaleString("en-NG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+                    {" · "}{parseDbDate(e.created_at).toLocaleString("en-NG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
                     {" · "}{e.actor_id ? (actorNames[e.actor_id] || "Team member") : "System"}
                   </span>
                   {e.note && <p className={`mt-0.5 ${String(e.note).startsWith("CORRECTION") ? "text-amber-700 dark:text-amber-400 font-medium" : "text-muted-foreground"}`}>{e.note}</p>}
@@ -693,7 +694,7 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
               </div>
               <div style={{ textAlign: "right" }}>
                 <p style={{ fontSize: "9px", color: "#666", margin: 0, textTransform: "uppercase", letterSpacing: "1px" }}>Packing Slip</p>
-                <p style={{ fontSize: "10px", color: "#666", margin: "2px 0 0" }}>{new Date(order.created_at).toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                <p style={{ fontSize: "10px", color: "#666", margin: "2px 0 0" }}>{parseDbDate(order.created_at).toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" })}</p>
               </div>
             </div>
 
@@ -724,7 +725,7 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
             {(lines.length ? lines : [order]).map((l) => {
               const prod = productsById[l.product_id];
               const sel = sellersById[l.seller_id];
-              const img = prod?.image_url || l.product_image;
+              const img = l.product_image || prod?.image_url;
               const c = l.variant?.color;
               const sz = l.variant?.size;
               return (
@@ -780,4 +781,4 @@ export default function AdminOrderDetail({ embeddedId, onClose, onChanged }: Adm
       </main>
     </div>
   );
-    }
+}
