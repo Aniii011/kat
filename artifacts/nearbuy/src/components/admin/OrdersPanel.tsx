@@ -1,3 +1,4 @@
+import { parseDbDate } from "@/lib/dates";
 import { useMemo, useState } from "react";
 import { AlertTriangle, Clock, Download, Gift, Package, RefreshCw, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -16,7 +17,7 @@ function formatNaira(n: number) {
 }
 
 function ageLabel(dateStr: string): string {
-  const hrs = (Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60);
+  const hrs = (Date.now() - parseDbDate(dateStr).getTime()) / (1000 * 60 * 60);
   if (hrs < 1) return "just now";
   if (hrs < 24) return `${Math.floor(hrs)}h ago`;
   return `${Math.floor(hrs / 24)}d ago`;
@@ -145,7 +146,7 @@ export default function OrdersPanel({
     const cutoff = range ? Date.now() - range * 24 * 60 * 60 * 1000 : 0;
     let list = allGroups.filter((g) => {
       if (!matchesFilter(g.headlineStatus, statusFilter, g)) return false;
-      if (range && new Date(g.createdAt).getTime() < cutoff) return false;
+      if (range && parseDbDate(g.createdAt).getTime() < cutoff) return false;
       if (!q) return true;
       return g.lines.some((o: any) => {
         const p = productsById[o.product_id];
@@ -156,7 +157,7 @@ export default function OrdersPanel({
     });
     list = [...list].sort((a, b) => {
       if (sort === "highest") return b.total - a.total;
-      const d = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      const d = parseDbDate(a.createdAt).getTime() - parseDbDate(b.createdAt).getTime();
       return sort === "oldest" ? d : -d;
     });
     return list;
@@ -185,7 +186,7 @@ export default function OrdersPanel({
       const f: any = g.lines[0];
       const cs = customerStats[f.buyer_id];
       const items = g.lines.map((l: any) => `${l.product_title || productsById[l.product_id]?.title || "Item"} x${l.quantity}`).join("; ");
-      return [g.paymentRef || f.id, new Date(g.createdAt).toISOString(), STATUS_LABEL[g.headlineStatus] || g.headlineStatus,
+      return [g.paymentRef || f.id, parseDbDate(g.createdAt).toISOString(), STATUS_LABEL[g.headlineStatus] || g.headlineStatus,
         f.buyer_name, f.buyer_phone, f.buyer_address, f.delivery_area, f.delivery_state, items, g.sellerCount,
         g.subtotal, g.deliveryFee, g.discount, g.total, cs?.orders ?? "", cs ? cs.first.slice(0, 10) : ""].map(csvCell).join(",");
     });
@@ -201,7 +202,7 @@ export default function OrdersPanel({
   const Thumbs = ({ g, size = "w-9 h-9" }: { g: PurchaseGroup; size?: string }) => (
     <div className="flex -space-x-3 shrink-0">
       {g.lines.slice(0, 3).map((l: any) => {
-        const src = productsById[l.product_id]?.image_url || l.product_image;
+        const src = l.product_image || productsById[l.product_id]?.image_url;
         return src ? (
           <img key={l.id} src={src} alt="" className={`${size} rounded-lg object-cover border-2 border-card`} />
         ) : (
@@ -221,7 +222,7 @@ export default function OrdersPanel({
 
   const isGift = (g: PurchaseGroup) => g.lines.some((l: any) => !!l.variant?.gift);
   const isAging = (g: PurchaseGroup) =>
-    ["pending", "accepted", "preparing"].includes(g.headlineStatus) && Date.now() - new Date(g.createdAt).getTime() > 2 * 24 * 60 * 60 * 1000;
+    ["pending", "accepted", "preparing"].includes(g.headlineStatus) && Date.now() - parseDbDate(g.createdAt).getTime() > 2 * 24 * 60 * 60 * 1000;
   const customerLabel = (g: PurchaseGroup) => {
     const cs = customerStats[(g.lines[0] as any).buyer_id];
     return cs && cs.orders > 1 ? `${cs.orders} orders` : "First order";
@@ -451,4 +452,4 @@ export default function OrdersPanel({
       )}
     </div>
   );
-                   }
+                }
