@@ -1,3 +1,4 @@
+import { parseDbDate } from "@/lib/dates";
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
@@ -32,7 +33,7 @@ function formatNaira(n: number) { return "₦" + Number(n || 0).toLocaleString("
 // buyerAmount / 1.095 and KAT keeps the rest. (It is NOT 9.5% of the buyer amount.)
 
 function ageLabel(dateStr: string): string {
-  const ms = Date.now() - new Date(dateStr).getTime();
+  const ms = Date.now() - parseDbDate(dateStr).getTime();
   const hrs = ms / (1000 * 60 * 60);
   if (hrs < 1) return "just now";
   if (hrs < 24) return `${Math.floor(hrs)}h`;
@@ -41,7 +42,7 @@ function ageLabel(dateStr: string): string {
 
 function isSameDayOrAfter(dateStr: string, daysAgo: number): boolean {
   const cutoff = Date.now() - daysAgo * 24 * 60 * 60 * 1000;
-  return new Date(dateStr).getTime() >= cutoff;
+  return parseDbDate(dateStr).getTime() >= cutoff;
 }
 
 type AdminSection = "home" | "sellers" | "products" | "orders" | "finance" | "analytics" | "logistics" | "coupons" | "users" | "moderation" | "settings";
@@ -177,10 +178,10 @@ export default function Admin() {
   // ── UNCHANGED base derivations ──
   const totalRevenue = orders.reduce((s, o) => s + (o.total || o.amount || 0), 0);
   const today = new Date().toDateString();
-  const ordersToday = orders.filter((o) => new Date(o.created_at).toDateString() === today);
+  const ordersToday = orders.filter((o) => parseDbDate(o.created_at).toDateString() === today);
   const revenueToday = ordersToday.reduce((sum, o) => sum + (o.total || o.amount || 0), 0);
-  const usersToday = users.filter((u) => new Date(u.created_at).toDateString() === today);
-  const sellersToday = sellers.filter((s) => new Date(s.created_at).toDateString() === today);
+  const usersToday = users.filter((u) => parseDbDate(u.created_at).toDateString() === today);
+  const sellersToday = sellers.filter((s) => parseDbDate(s.created_at).toDateString() === today);
   const pendingOrders = orders.filter((o) => (o.admin_status || "pending") === "pending").length;
   const pendingSellers = sellers.filter((s) => s.is_seller && !s.seller_verified).length;
   const totalBuyers = users.filter((u) => !u.is_seller && !u.is_admin).length;
@@ -197,7 +198,7 @@ export default function Admin() {
     const placed = evts.find((e) => e.status === "pending");
     const delivered = evts.find((e) => e.status === "delivered");
     if (placed && delivered) {
-      const diff = new Date(delivered.created_at).getTime() - new Date(placed.created_at).getTime();
+      const diff = parseDbDate(delivered.created_at).getTime() - parseDbDate(placed.created_at).getTime();
       if (diff > 0) deliveryDurationsMs.push(diff);
     }
   });
@@ -462,7 +463,7 @@ export default function Admin() {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
     const label = d.toLocaleDateString("en-NG", { weekday: "short" });
-    const dayOrders = orders.filter((o) => new Date(o.created_at).toDateString() === d.toDateString());
+    const dayOrders = orders.filter((o) => parseDbDate(o.created_at).toDateString() === d.toDateString());
     return { name: label, revenue: dayOrders.reduce((s, o) => s + (o.total || 0), 0), orders: dayOrders.length };
   });
 
@@ -1025,7 +1026,7 @@ export default function Admin() {
                 <div className="divide-y divide-border border-t border-b border-border">
                   {orders.filter((o) => o.admin_status !== "cancelled").slice(0, 10).map((o) => (
                     <div key={o.id} className="flex items-center justify-between py-2 text-sm">
-                      <span>#{o.id.slice(0, 8)} · {new Date(o.created_at).toLocaleDateString()}</span>
+                      <span>#{o.id.slice(0, 8)} · {parseDbDate(o.created_at).toLocaleDateString()}</span>
                       <span className="text-xs text-muted-foreground">{formatNaira(o.total || o.amount)} gross · {formatNaira(platformFee(o.total || o.amount || 0))} commission</span>
                     </div>
                   ))}
@@ -1270,7 +1271,7 @@ function TrendChart({ orders, rangeDays, metric }: { orders: any[]; rangeDays: n
     const start = now - (bucketCount - i) * bucketMs;
     const end = start + bucketMs;
     const total = orders
-      .filter((o: any) => { const t = new Date(o.created_at).getTime(); return t >= start && t < end && o.admin_status !== "cancelled"; })
+      .filter((o: any) => { const t = parseDbDate(o.created_at).getTime(); return t >= start && t < end && o.admin_status !== "cancelled"; })
       .reduce((s: number, o: any) => s + (o.total || o.amount || 0), 0);
     return metric === "commission" ? platformFee(total) : total;
   });
@@ -1291,4 +1292,4 @@ function TrendChart({ orders, rangeDays, metric }: { orders: any[]; rangeDays: n
       </div>
     </div>
   );
-  }
+    }
