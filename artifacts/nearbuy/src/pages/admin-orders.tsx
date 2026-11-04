@@ -1,3 +1,4 @@
+import { parseDbDate } from "@/lib/dates";
 import React, { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -230,8 +231,8 @@ export default function AdminOrders() {
                     className="p-4 flex items-start gap-3 cursor-pointer hover:bg-muted/30 transition-colors"
                     onClick={() => setExpanded(isExpanded ? null : order.id)}
                   >
-                    {product?.image_url ? (
-                      <img src={product.image_url} alt={product.title} className="w-12 h-12 rounded-xl object-cover shrink-0" />
+                    {(order.product_image || product?.image_url) ? (
+                      <img src={order.product_image || product?.image_url} alt={product?.title || order.product_title || ""} className="w-12 h-12 rounded-xl object-cover shrink-0" />
                     ) : (
                       <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center shrink-0">
                         <Package className="w-5 h-5 text-muted-foreground" />
@@ -246,7 +247,7 @@ export default function AdminOrders() {
                       </div>
                       <p className="font-bold text-sm truncate">{product?.title || "Product"}</p>
                       <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                        {buyer?.full_name || buyer?.email || "Unknown buyer"} · {new Date(order.created_at).toLocaleDateString()}
+                        {buyer?.full_name || buyer?.email || "Unknown buyer"} · {parseDbDate(order.created_at).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -392,4 +393,4 @@ export default function AdminOrders() {
       </main>
     </div>
   );
-                                    }
+                }
