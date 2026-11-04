@@ -1,3 +1,4 @@
+import { parseDbDate } from "@/lib/dates";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Package, Mail, Copy, Check, RotateCcw, Pencil } from "lucide-react";
@@ -159,7 +160,7 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
           </h1>
           {isCancelled && group.cancelledAt && (
             <p className="text-xs text-muted-foreground mt-1">
-              Cancelled {new Date(group.cancelledAt).toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" })}
+              Cancelled {parseDbDate(group.cancelledAt).toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" })}
             </p>
           )}
           <p className="text-sm text-muted-foreground mt-1.5">
@@ -269,8 +270,8 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
                   const product = resolveProduct(line, productsById);
                   const color = line.variant?.color;
                   const size = line.variant?.size;
-                  return (
-                    <div key={line.id} className="flex gap-3">
+                  const row = (
+                    <>
                       <div className="w-20 h-20 rounded-lg overflow-hidden bg-muted shrink-0">
                         {product.imageUrl ? (
                           <img src={product.imageUrl} alt={product.title} className="w-full h-full object-cover" />
@@ -287,8 +288,19 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
                           {(color || size) ? " · " : ""}Qty {line.quantity ?? 1}
                         </p>
                         <p className="text-sm font-bold mt-1">{formatNaira(line.total ?? line.amount ?? 0)}</p>
+                        {line.product_id && productsById[line.product_id] && (
+                          <p className="text-[11px] font-semibold text-primary mt-1">View product / buy again →</p>
+                        )}
                       </div>
-                    </div>
+                    </>
+                  );
+                  // Tap a product to open its page (only if it still exists), like Temu / Shein
+                  return line.product_id && productsById[line.product_id] ? (
+                    <Link key={line.id} href={`/listing/${line.product_id}`} className="flex gap-3 rounded-lg hover:bg-muted/40 transition-colors">
+                      {row}
+                    </Link>
+                  ) : (
+                    <div key={line.id} className="flex gap-3">{row}</div>
                   );
                 })}
               </div>
@@ -344,4 +356,4 @@ export default function PurchaseDetail({ group, productsById, onClose }: Purchas
       </main>
     </motion.div>
   );
-                }
+        }
