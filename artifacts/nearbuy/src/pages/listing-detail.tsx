@@ -594,28 +594,65 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
               <p className="text-sm font-bold mb-2">
                 Colour{selectedColor && <span className="text-muted-foreground font-normal"> — {selectedColor}</span>}
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2.5">
                 {listing.colors.map((c) => {
                   const soldOut = isColorSoldOut(c);
+                  const colorPhoto = listing.colorImages?.[c]?.[0];
+                  const picked = selectedColor === c;
+                  const pick = () => { setSelectedColor(picked ? null : c); setVariantError(null); };
+
+                  // Colours with a photo get a large thumbnail (like Temu/Shein) so the choice is
+                  // visible right where you tap, without scrolling up to the main photo.
+                  if (colorPhoto) {
+                    return (
+                      <button
+                        key={c}
+                        disabled={soldOut}
+                        onClick={pick}
+                        aria-pressed={picked}
+                        aria-label={soldOut ? `${c} (sold out)` : c}
+                        className="flex flex-col items-center gap-1 w-16 disabled:cursor-not-allowed"
+                      >
+                        <span
+                          className={`relative block w-14 h-14 rounded-xl overflow-hidden border-2 transition-all ${
+                            soldOut
+                              ? "border-border opacity-50"
+                              : picked
+                              ? "border-primary ring-2 ring-primary ring-offset-1"
+                              : "border-border hover:border-primary/50"
+                          }`}
+                        >
+                          <img src={colorPhoto} alt={c} className={`w-full h-full object-cover ${soldOut ? "grayscale" : ""}`} />
+                          {!soldOut && picked && (
+                            <span className="absolute bottom-0 right-0 bg-primary text-primary-foreground rounded-tl-md p-0.5">
+                              <Check className="w-3 h-3" />
+                            </span>
+                          )}
+                        </span>
+                        <span className={`text-[11px] leading-tight text-center w-full truncate ${picked ? "font-bold text-primary" : "text-muted-foreground"}`}>
+                          {c}
+                        </span>
+                        {soldOut && <span className="text-[10px] leading-none text-muted-foreground/70">Sold out</span>}
+                      </button>
+                    );
+                  }
+
                   return (
                     <button
                       key={c}
                       disabled={soldOut}
-                      onClick={() => { setSelectedColor(selectedColor === c ? null : c); setVariantError(null); }}
+                      onClick={pick}
                       className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border-2 font-medium transition-all ${
                         soldOut
                           ? "border-border text-muted-foreground/50 opacity-50 cursor-not-allowed"
-                          : selectedColor === c
+                          : picked
                           ? "border-primary text-primary bg-primary/10 ring-2 ring-primary ring-offset-1"
                           : "border-border text-muted-foreground hover:border-primary/50"
                       }`}
                     >
-                      {listing.colorImages?.[c]?.[0] && (
-                        <img src={listing.colorImages[c][0]} alt={c} className={`w-5 h-5 rounded-full object-cover shrink-0 border border-background ${soldOut ? "grayscale" : ""}`} />
-                      )}
                       {c}
                       {soldOut && <span className="text-[10px]">(Sold out)</span>}
-                      {!soldOut && selectedColor === c && <Check className="w-3 h-3" />}
+                      {!soldOut && picked && <Check className="w-3 h-3" />}
                     </button>
                   );
                 })}
@@ -1204,4 +1241,4 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
-    }
+        }
