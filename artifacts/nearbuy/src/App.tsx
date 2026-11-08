@@ -86,6 +86,17 @@ function Router() {
 // buyer-facing bottom nav — it's confusing clutter on dashboard-style pages.
 const HIDE_BOTTOM_NAV_PREFIXES = ["/seller", "/admin", "/checkout"];
 
+// Starts every new page at the top, so a listing never opens scrolled down because the
+// previous page was. The home page is left alone: it restores its own scroll position.
+function ScrollToTop() {
+  const [location] = useLocation();
+  useEffect(() => {
+    if (location === "/") return;
+    window.scrollTo(0, 0);
+  }, [location]);
+  return null;
+}
+
 // Reports a GA page view on every client-side route change.
 function AnalyticsTracker() {
   const [location] = useLocation();
@@ -103,6 +114,7 @@ function AppShell() {
   return (
     <>
       <AnalyticsTracker />
+      <ScrollToTop />
       {!hideBottomNav && <BottomNav />}
       <main className="min-h-screen">
         <Router />
