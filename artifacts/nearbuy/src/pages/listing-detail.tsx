@@ -22,6 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import AuthModal from "@/components/auth-modal";
 import { useAuth } from "@/context/auth-context";
 
@@ -110,6 +111,7 @@ export default function ListingDetail() {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedShoeSize, setSelectedShoeSize] = useState<string | null>(null);
   const [variantError, setVariantError] = useState<string | null>(null);
+  const [showVariantSheet, setShowVariantSheet] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [wishlisted, setWishlisted] = useState(false);
   const [showDeposit, setShowDeposit] = useState(false);
@@ -275,20 +277,11 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
     setShowAuth(true);
     return;
   }
-  if (hasColors && !selectedColor) {
-    setVariantError("Please select a colour");
-    return;
-  }
-  if (selectedComboOutOfStock) {
-    setVariantError("This combination is out of stock");
-    return;
-  }
-  if (allClothingSizes.length > 0 && !selectedSize) {
-    setVariantError("Please select a size");
-    return;
-  }
-  if (allShoeSizes.length > 0 && !selectedShoeSize) {
-    setVariantError("Please select a shoe size");
+  if (needsSelection) {
+    // Temu-style: instead of an error, open the option sheet so the buyer can finish
+    // choosing right here without scrolling.
+    setVariantError(null);
+    setShowVariantSheet(true);
     return;
   }
   setVariantError(null);
@@ -304,6 +297,7 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
     variantImage: selectedVariantImage,
   });
   flyToCart(document.querySelector("[data-product-image]") ?? e?.currentTarget ?? null, selectedVariantImage || listing.imageUrl);
+  setShowVariantSheet(false);
   setShowAddedToCart(true);
   if (cartToastRef.current) clearTimeout(cartToastRef.current);
   cartToastRef.current = setTimeout(() => setShowAddedToCart(false), 2500);
@@ -349,245 +343,8 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
     { q: "Is this item returnable?", a: listing.isThrift ? "Thrift items are non-refundable once payment is complete." : "Yes, within 14 days of delivery in original condition." },
   ];
 
-  return (
-    <div className="min-h-screen bg-background pb-32">
-
-      {/* Added to cart toast */}
-      <AnimatePresence>
-        {showAddedToCart && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-primary text-primary-foreground text-xs font-bold px-4 py-2 rounded-full shadow-lg flex items-center gap-2"
-          >
-            <CheckCircle2 className="w-3.5 h-3.5" /> Added to cart!
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Share toast */}
-      <AnimatePresence>
-        {showShareSheet && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-foreground text-background text-xs font-bold px-4 py-2 rounded-full shadow-lg"
-          >
-            Link copied!
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-2">
-          <button
-            onClick={() => {
-              // Go back to wherever the buyer came from (Home with their
-              // category/scroll intact, Search results, a store, etc.).
-              // Only fall back to Home when there is no history to go back to.
-              if (window.history.length > 1) window.history.back();
-              else navigate("/");
-            }}
-            className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold truncate">{listing.title}</p>
-          </div>
-          <ThemeSwitcher />
-          <button
-            onClick={() => setShowWishlistSheet(true)}
-            aria-label="Add to wishlist"
-            className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0"
-          >
-            <GiftIcon className="w-4 h-4" />
-          </button>
-          <button
-            onClick={handleSaveForLater}
-            className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0"
-          >
-            <Heart className={`w-4 h-4 ${wishlisted || isSaved(listing.id) ? "fill-primary text-primary" : ""}`} />
-          </button>
-          <button
-            onClick={handleShare}
-            className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0"
-          >
-            <Share2 className="w-4 h-4" />
-          </button>
-          <HeaderCartButton />
-        </div>
-      </header>
-
-      <div className="max-w-5xl mx-auto">
-
-        {/* Two-column on tablet/desktop (md+): gallery left, buy box right.
-            Below md (phones) the grid is a no-op and everything stacks as before. */}
-        <div className="md:grid md:grid-cols-2 md:gap-8 lg:gap-12 md:px-4 md:pt-6 md:items-start">
-
-        {/* Image Gallery (sticks while the buy box scrolls on desktop) */}
-        <div className="md:sticky md:top-20">
-        <div className="relative bg-muted md:rounded-3xl md:overflow-hidden">
-          <div className="aspect-square overflow-hidden relative bg-muted">
-  <AnimatePresence mode="wait">
-    {media[selectedImage]?.type === "video" ? (
-      <motion.video
-        key={selectedImage}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.15 }}
-        src={media[selectedImage].url}
-        controls
-        playsInline
-        className="w-full h-full object-contain bg-black"
-      />
-    ) : (
-      <motion.img
-        key={selectedImage}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.15 }}
-        src={media[selectedImage]?.url ?? listing.imageUrl}
-        alt={listing.title}
-        data-product-image=""
-        className="w-full h-full object-contain"
-      />
-    )}
-  </AnimatePresence>
-
-            {/* Media counter */}
-            <div className="absolute bottom-3 right-3 bg-black/60 text-white text-[10px] font-bold px-2 py-1 rounded-full">
-              {selectedImage + 1}/{media.length}
-            </div>
-
-            {/* Badge */}
-            {listing.badge && (
-              <div className="absolute top-3 left-3 text-xs px-3 py-1 rounded-full font-bold bg-primary text-primary-foreground">
-                {listing.badge}
-              </div>
-            )}
-            {listing.isThrift && (
-              <div className="absolute top-3 left-3 text-xs px-3 py-1 rounded-full font-bold bg-purple-500 text-white">
-                Thrift Drop
-              </div>
-            )}
-
-            {/* Nav arrows */}
-            {media.length > 1 && (
-              <>
-                <button
-                  onClick={() => setSelectedImage((p) => (p - 1 + media.length) % media.length)}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-background/80 flex items-center justify-center shadow-md"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setSelectedImage((p) => (p + 1) % media.length)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-background/80 flex items-center justify-center shadow-md"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </>
-            )}
-          </div>
-
-          {/* Thumbnail strip */}
-          {media.length > 1 && (
-            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide px-3 py-2">
-              {media.map((item, i) => (
-                <button
-  key={i}
-  onClick={() => setSelectedImage(i)}
-  className={`relative shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 bg-muted transition-all ${
-    selectedImage === i ? "border-primary" : "border-transparent opacity-50 hover:opacity-80"
-  }`}
->
-  {item.type === "video" ? (
+  const variantSelectors = (
     <>
-      <video src={item.url} className="w-full h-full object-cover" muted playsInline />
-      <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-        <Play className="w-5 h-5 text-white fill-white" />
-      </span>
-    </>
-  ) : (
-    <img src={item.url} alt="" className="w-full h-full object-contain" />
-  )}
-</button>
-              ))}
-            </div>
-          )}
-        </div>
-        </div>
-
-        {/* Product Info — right column on md+ */}
-        <div className="px-4 py-4 space-y-4 md:px-0 md:pt-0">
-
-          {/* Title + sold count */}
-          <div>
-            <h1 className="text-lg font-black leading-tight">{listing.title}</h1>
-            {listing.brand && <p className="text-xs text-muted-foreground mt-0.5">{listing.brand}</p>}
-            <div className="flex items-center gap-3 mt-2 flex-wrap">
-              <StarRow rating={listing.rating || 0} count={listing.reviewCount || 0} />
-              {listing.sold > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  {listing.sold.toLocaleString()} sold
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Price */}
-          <div className="flex items-baseline gap-3 bg-primary/5 rounded-2xl px-4 py-3">
-            <span className="text-2xl font-black text-primary">{formatNaira(listing.price)}</span>
-            {listing.originalPrice && (
-              <span className="text-sm text-muted-foreground line-through">{formatNaira(listing.originalPrice)}</span>
-            )}
-            {listing.discount && (
-              <span className="text-xs font-bold bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
-                -{listing.discount}% OFF
-              </span>
-            )}
-          </div>
-
-          {/* Add to wishlist (a gift list friends can buy from), different from the heart which saves for later */}
-          <button
-            onClick={() => setShowWishlistSheet(true)}
-            className="w-full flex items-center justify-center gap-2 rounded-2xl border border-primary/40 text-primary font-semibold text-sm py-2.5 hover:bg-primary/5 transition-colors"
-          >
-            <GiftIcon className="w-4 h-4" /> Add to wishlist
-          </button>
-
-          {/* Thrift deposit */}
-          {listing.isThrift && listing.depositAmount && (
-            <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-2xl p-3">
-              <div className="flex items-center gap-2 mb-1">
-                <Clock className="w-4 h-4 text-purple-500" />
-                <span className="text-sm font-bold text-purple-600 dark:text-purple-400">One-of-one — deposit to hold</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Pay {formatNaira(listing.depositAmount)} deposit to secure for 24 hours.
-              </p>
-            </div>
-          )}
-
-          {/* Aesthetics tags */}
-          {listing.aesthetics && listing.aesthetics.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {listing.aesthetics.map((a) => (
-                <span key={a} className="text-xs bg-accent text-accent-foreground px-2.5 py-1 rounded-full font-semibold">
-                  {a}
-                </span>
-              ))}
-            </div>
-          )}
-
-          <Separator />
-
           {/* Color selector */}
           {listing.colors && listing.colors.length > 0 && (
             <div>
@@ -739,6 +496,250 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
                   );
                 })}
               </div>
+            </div>
+          )}
+
+    </>
+  );
+
+  return (
+    <div className="min-h-screen bg-background pb-32">
+
+      {/* Added to cart toast */}
+      <AnimatePresence>
+        {showAddedToCart && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-primary text-primary-foreground text-xs font-bold px-4 py-2 rounded-full shadow-lg flex items-center gap-2"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" /> Added to cart!
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Share toast */}
+      <AnimatePresence>
+        {showShareSheet && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-foreground text-background text-xs font-bold px-4 py-2 rounded-full shadow-lg"
+          >
+            Link copied!
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-2">
+          <button
+            onClick={() => {
+              // Go back to wherever the buyer came from (Home with their
+              // category/scroll intact, Search results, a store, etc.).
+              // Only fall back to Home when there is no history to go back to.
+              if (window.history.length > 1) window.history.back();
+              else navigate("/");
+            }}
+            className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold truncate">{listing.title}</p>
+          </div>
+          <ThemeSwitcher />
+          <button
+            onClick={() => setShowWishlistSheet(true)}
+            aria-label="Add to wishlist"
+            className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0"
+          >
+            <GiftIcon className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleSaveForLater}
+            className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0"
+          >
+            <Heart className={`w-4 h-4 ${wishlisted || isSaved(listing.id) ? "fill-primary text-primary" : ""}`} />
+          </button>
+          <button
+            onClick={handleShare}
+            className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors shrink-0"
+          >
+            <Share2 className="w-4 h-4" />
+          </button>
+          <HeaderCartButton />
+        </div>
+      </header>
+
+      <div className="max-w-5xl mx-auto">
+
+        {/* Two-column on tablet/desktop (md+): gallery left, buy box right.
+            Below md (phones) the grid is a no-op and everything stacks as before. */}
+        <div className="md:grid md:grid-cols-2 md:gap-8 lg:gap-12 md:px-4 md:pt-6 md:items-start">
+
+        {/* Image Gallery (sticks while the buy box scrolls on desktop) */}
+        <div className="md:sticky md:top-20">
+        <div className="relative bg-muted md:rounded-3xl md:overflow-hidden">
+          <div className="aspect-square max-h-[46vh] md:max-h-none w-full overflow-hidden relative bg-muted">
+  <AnimatePresence mode="wait">
+    {media[selectedImage]?.type === "video" ? (
+      <motion.video
+        key={selectedImage}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        src={media[selectedImage].url}
+        controls
+        playsInline
+        className="w-full h-full object-contain bg-black"
+      />
+    ) : (
+      <motion.img
+        key={selectedImage}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        src={media[selectedImage]?.url ?? listing.imageUrl}
+        alt={listing.title}
+        data-product-image=""
+        className="w-full h-full object-contain"
+      />
+    )}
+  </AnimatePresence>
+
+            {/* Media counter */}
+            <div className="absolute bottom-3 right-3 bg-black/60 text-white text-[10px] font-bold px-2 py-1 rounded-full">
+              {selectedImage + 1}/{media.length}
+            </div>
+
+            {/* Badge */}
+            {listing.badge && (
+              <div className="absolute top-3 left-3 text-xs px-3 py-1 rounded-full font-bold bg-primary text-primary-foreground">
+                {listing.badge}
+              </div>
+            )}
+            {listing.isThrift && (
+              <div className="absolute top-3 left-3 text-xs px-3 py-1 rounded-full font-bold bg-purple-500 text-white">
+                Thrift Drop
+              </div>
+            )}
+
+            {/* Nav arrows */}
+            {media.length > 1 && (
+              <>
+                <button
+                  onClick={() => setSelectedImage((p) => (p - 1 + media.length) % media.length)}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-background/80 flex items-center justify-center shadow-md"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setSelectedImage((p) => (p + 1) % media.length)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-background/80 flex items-center justify-center shadow-md"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Thumbnail strip */}
+          {media.length > 1 && (
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide px-3 py-2">
+              {media.map((item, i) => (
+                <button
+  key={i}
+  onClick={() => setSelectedImage(i)}
+  className={`relative shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 bg-muted transition-all ${
+    selectedImage === i ? "border-primary" : "border-transparent opacity-50 hover:opacity-80"
+  }`}
+>
+  {item.type === "video" ? (
+    <>
+      <video src={item.url} className="w-full h-full object-cover" muted playsInline />
+      <span className="absolute inset-0 flex items-center justify-center bg-black/30">
+        <Play className="w-5 h-5 text-white fill-white" />
+      </span>
+    </>
+  ) : (
+    <img src={item.url} alt="" className="w-full h-full object-contain" />
+  )}
+</button>
+              ))}
+            </div>
+          )}
+        </div>
+        </div>
+
+        {/* Product Info — right column on md+ */}
+        <div className="px-4 py-4 space-y-4 md:px-0 md:pt-0">
+
+          {/* Title + sold count */}
+          <div>
+            <h1 className="text-lg font-black leading-tight">{listing.title}</h1>
+            {listing.brand && <p className="text-xs text-muted-foreground mt-0.5">{listing.brand}</p>}
+            <div className="flex items-center gap-3 mt-2 flex-wrap">
+              <StarRow rating={listing.rating || 0} count={listing.reviewCount || 0} />
+              {listing.sold > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {listing.sold.toLocaleString()} sold
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Price */}
+          <div className="flex items-baseline gap-3 bg-primary/5 rounded-2xl px-4 py-3">
+            <span className="text-2xl font-black text-primary">{formatNaira(listing.price)}</span>
+            {listing.originalPrice && (
+              <span className="text-sm text-muted-foreground line-through">{formatNaira(listing.originalPrice)}</span>
+            )}
+            {listing.discount && (
+              <span className="text-xs font-bold bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
+                -{listing.discount}% OFF
+              </span>
+            )}
+          </div>
+
+          <Separator />
+
+          {variantSelectors}
+
+          {/* Add to wishlist (a gift list friends can buy from), different from the heart which saves for later */}
+          <button
+            onClick={() => setShowWishlistSheet(true)}
+            className="w-full flex items-center justify-center gap-2 rounded-2xl border border-primary/40 text-primary font-semibold text-sm py-2.5 hover:bg-primary/5 transition-colors"
+          >
+            <GiftIcon className="w-4 h-4" /> Add to wishlist
+          </button>
+
+          {/* Thrift deposit */}
+          {listing.isThrift && listing.depositAmount && (
+            <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-2xl p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <Clock className="w-4 h-4 text-purple-500" />
+                <span className="text-sm font-bold text-purple-600 dark:text-purple-400">One-of-one — deposit to hold</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Pay {formatNaira(listing.depositAmount)} deposit to secure for 24 hours.
+              </p>
+            </div>
+          )}
+
+          {/* Aesthetics tags */}
+          {listing.aesthetics && listing.aesthetics.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {listing.aesthetics.map((a) => (
+                <span key={a} className="text-xs bg-accent text-accent-foreground px-2.5 py-1 rounded-full font-semibold">
+                  {a}
+                </span>
+              ))}
             </div>
           )}
 
@@ -1122,6 +1123,69 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
         </div>
       </div>
 
+      {/* Option sheet (Temu-style): opens when "Add to Cart" is tapped before every option is chosen */}
+      <Sheet open={showVariantSheet} onOpenChange={setShowVariantSheet}>
+        <SheetContent side="bottom" className="rounded-t-3xl max-h-[85vh] overflow-y-auto pb-6">
+          <SheetHeader className="text-left">
+            <div className="flex items-center gap-3 pr-6">
+              <img
+                src={selectedVariantImage || listing.imageUrl}
+                alt={listing.title}
+                className="w-20 h-20 rounded-xl object-cover bg-muted shrink-0"
+              />
+              <div className="min-w-0">
+                <SheetTitle className="text-xl font-black text-primary">{formatNaira(listing.price)}</SheetTitle>
+                <SheetDescription className="text-xs line-clamp-2">
+                  {[selectedColor, selectedSize, selectedShoeSize ? `EU ${selectedShoeSize}` : null].filter(Boolean).join(" · ") || "Choose your options"}
+                </SheetDescription>
+              </div>
+            </div>
+          </SheetHeader>
+
+          <div className="space-y-4 mt-4">
+            {variantSelectors}
+
+            <div>
+              <p className="text-sm font-bold mb-2">Quantity</p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  className="w-9 h-9 rounded-full border border-border flex items-center justify-center hover:bg-muted transition-colors"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <span className="w-8 text-center font-black text-base">{quantity}</span>
+                <button
+                  onClick={() => setQuantity(Math.min(listing.stockCount || 99, quantity + 1))}
+                  className="w-9 h-9 rounded-full border border-border flex items-center justify-center hover:bg-muted transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {selectedComboOutOfStock && (
+              <p className="text-xs text-destructive font-semibold">This combination is out of stock. Please pick another.</p>
+            )}
+
+            <Button
+              className="w-full rounded-full font-bold h-12 gap-2"
+              disabled={needsSelection}
+              onClick={handleAddToCart}
+            >
+              {needsSelection ? (
+                hasColors && !selectedColor ? "Select a colour"
+                : allClothingSizes.length > 0 && !selectedSize ? "Select a size"
+                : allShoeSizes.length > 0 && !selectedShoeSize ? "Select a shoe size"
+                : "Out of stock"
+              ) : (
+                <><ShoppingBag className="w-4 h-4" /> Add to Cart — {formatNaira(listing.price * quantity)}</>
+              )}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
       {/* Deposit dialog */}
       <Dialog open={showDeposit} onOpenChange={setShowDeposit}>
         <DialogContent className="rounded-3xl max-w-sm mx-auto">
@@ -1241,4 +1305,4 @@ const handleAddToCart = (e?: React.MouseEvent<HTMLElement>) => {
       <AuthModal open={showAuth} onClose={() => setShowAuth(false)} defaultMode="login" />
     </div>
   );
-        }
+                            }
