@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowLeft, Gift, Clock, Truck, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
+import { SUPPORT_EMAIL } from "@/lib/support";
 import { Button } from "@/components/ui/button";
 
 type GiftState = "waiting" | "on_the_way" | "delivered" | "cancelled";
@@ -67,6 +68,10 @@ export default function MyGifts() {
       const PaystackPop = (window as any).PaystackPop;
       if (!PaystackPop) throw new Error("Payment couldn't load. Please refresh the page and try again.");
 
+      // No fallback key on purpose: a missing key must fail loudly, never run in test mode.
+      const paystackKey = (import.meta as any).env?.VITE_PAYSTACK_PUBLIC_KEY as string | undefined;
+      if (!paystackKey) throw new Error("Payments are temporarily unavailable. Please try again shortly.");
+
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
       if (!token) throw new Error("Please sign in again.");
@@ -81,10 +86,8 @@ export default function MyGifts() {
 
       const popup = new PaystackPop();
       popup.newTransaction({
-        key:
-          (import.meta as any).env?.VITE_PAYSTACK_PUBLIC_KEY ||
-          "pk_test_f4a152b1348a3c6f5c4b415f3341691ea02b2e2c",
-        email: user?.email || "support@kat.ng",
+        key: paystackKey,
+        email: user?.email || SUPPORT_EMAIL,
         amount: quote.amountKobo,
         currency: "NGN",
         reference: quote.reference,
@@ -229,4 +232,4 @@ export default function MyGifts() {
       </div>
     </div>
   );
-        }
+          }
