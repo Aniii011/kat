@@ -438,6 +438,16 @@ export default function Checkout() {
       return;
     }
 
+    // No fallback key on purpose: if the key is missing we stop here instead of
+    // silently running in test mode.
+    const paystackKey = (import.meta as any).env?.VITE_PAYSTACK_PUBLIC_KEY as string | undefined;
+    if (!paystackKey) {
+      console.error("VITE_PAYSTACK_PUBLIC_KEY is not set");
+      setError("Payments are temporarily unavailable. Please try again shortly.");
+      setPlacing(false);
+      return;
+    }
+
     try {
       // Ask the server what this order really costs BEFORE opening the payment
       // popup. We charge exactly the server's amount, with an unguessable reference.
@@ -494,10 +504,8 @@ export default function Checkout() {
       // https://js.paystack.co/v2/inline.js for this to work.
       const popup = new PaystackPop();
       popup.newTransaction({
-        // Set VITE_PAYSTACK_PUBLIC_KEY in Vercel (use your pk_live_ key at launch).
-        key:
-          (import.meta as any).env?.VITE_PAYSTACK_PUBLIC_KEY ||
-          "pk_test_f4a152b1348a3c6f5c4b415f3341691ea02b2e2c",
+        // VITE_PAYSTACK_PUBLIC_KEY is set in Vercel (pk_live_ in production).
+        key: paystackKey,
         email: user?.email || SUPPORT_EMAIL,
         amount: quote.amountKobo,
         currency: "NGN",
